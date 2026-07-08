@@ -1,0 +1,639 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+<title>AlgoEval · 算法效果验证平台 Demo</title>
+<style>
+:root{
+  --surface-1:#fcfcfb; --page:#f9f9f7;
+  --ink-1:#0b0b0b; --ink-2:#52514e; --ink-3:#898781;
+  --grid:#e1e0d9; --axis:#c3c2b7; --border:rgba(11,11,11,.10);
+  --s1:#2a78d6; --s2:#1baf7a; --s3:#eda100; --s5:#4a3aa7; --s6:#e34948;
+  --good:#0ca30c; --warn:#fab219; --serious:#ec835a; --critical:#d03b3b;
+  --good-text:#006300;
+  --seq-250:#86b6ef; --seq-400:#3987e5; --seq-550:#1c5cab;
+  --side-bg:#141a24; --side-ink:#aeb6c2; --side-active:#ffffff;
+}
+@media (prefers-color-scheme: dark){
+  :root{
+    --surface-1:#1a1a19; --page:#0d0d0d;
+    --ink-1:#ffffff; --ink-2:#c3c2b7; --ink-3:#898781;
+    --grid:#2c2c2a; --axis:#383835; --border:rgba(255,255,255,.10);
+    --s1:#3987e5; --s2:#199e70; --s3:#c98500; --s5:#9085e9; --s6:#e66767;
+    --good-text:#0ca30c;
+    --side-bg:#10151d;
+  }
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:system-ui,-apple-system,"Segoe UI","PingFang SC","Microsoft YaHei",sans-serif;background:var(--page);color:var(--ink-1);font-size:14px;line-height:1.6}
+a{color:var(--s1);text-decoration:none}
+/* ---------- 布局 ---------- */
+.app{display:flex;min-height:100vh}
+.sidebar{width:216px;background:var(--side-bg);color:var(--side-ink);flex-shrink:0;padding:20px 0;position:sticky;top:0;height:100vh;overflow-y:auto}
+.logo{padding:0 20px 18px;font-size:17px;font-weight:700;color:#fff;letter-spacing:.5px}
+.logo small{display:block;font-weight:400;font-size:11px;color:var(--side-ink);margin-top:2px}
+.nav-group{font-size:11px;color:#6b7482;padding:14px 20px 6px;text-transform:uppercase;letter-spacing:1px}
+.nav-item{display:flex;align-items:center;gap:9px;padding:9px 20px;cursor:pointer;font-size:13.5px;border-left:3px solid transparent}
+.nav-item:hover{background:rgba(255,255,255,.06);color:#fff}
+.nav-item.active{background:rgba(57,135,229,.16);color:var(--side-active);border-left-color:#3987e5;font-weight:600}
+.nav-item .ico{width:18px;text-align:center}
+.main{flex:1;min-width:0;padding:24px 28px 60px}
+.page{display:none}
+.page.active{display:block;animation:fade .18s ease}
+@keyframes fade{from{opacity:0;transform:translateY(4px)}to{opacity:1;transform:none}}
+.page-head{margin-bottom:18px}
+.page-head h1{font-size:20px;font-weight:700}
+.page-head p{color:var(--ink-2);font-size:13px;margin-top:3px}
+/* ---------- 通用组件 ---------- */
+.card{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:18px;margin-bottom:16px}
+.card h3{font-size:14.5px;font-weight:700;margin-bottom:12px}
+.card h3 small{font-weight:400;color:var(--ink-3);font-size:12px;margin-left:8px}
+.grid{display:grid;gap:14px}
+.g4{grid-template-columns:repeat(4,1fr)} .g3{grid-template-columns:repeat(3,1fr)} .g2{grid-template-columns:repeat(2,1fr)}
+@media(max-width:1100px){.g4{grid-template-columns:repeat(2,1fr)}.g3{grid-template-columns:1fr}.g2{grid-template-columns:1fr}}
+.tile{background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:16px 18px}
+.tile .lb{font-size:12.5px;color:var(--ink-2)}
+.tile .v{font-size:26px;font-weight:700;margin-top:4px}
+.tile .d{font-size:12px;margin-top:2px;color:var(--ink-3)}
+.tile .d.up{color:var(--good-text)} .tile .d.down{color:var(--critical)}
+table{width:100%;border-collapse:collapse;font-size:13px}
+th{text-align:left;color:var(--ink-3);font-weight:600;font-size:12px;padding:8px 10px;border-bottom:1px solid var(--grid)}
+td{padding:9px 10px;border-bottom:1px solid var(--grid);color:var(--ink-1);vertical-align:middle}
+tr:last-child td{border-bottom:none}
+td.num,th.num{text-align:right;font-variant-numeric:tabular-nums}
+.tag{display:inline-block;padding:1px 9px;border-radius:20px;font-size:11.5px;border:1px solid var(--border);color:var(--ink-2);background:transparent;white-space:nowrap}
+.tag.blue{color:var(--s1);border-color:var(--s1)}
+.tag.green{color:var(--good-text);border-color:var(--good)}
+.tag.yellow{color:#8a6100;border-color:var(--s3)}
+.tag.red{color:var(--critical);border-color:var(--critical)}
+.tag.violet{color:var(--s5);border-color:var(--s5)}
+.btn{display:inline-flex;align-items:center;gap:6px;padding:7px 16px;border-radius:8px;border:1px solid var(--border);background:var(--surface-1);color:var(--ink-1);font-size:13px;cursor:pointer;font-family:inherit}
+.btn:hover{border-color:var(--s1);color:var(--s1)}
+.btn.primary{background:var(--s1);border-color:var(--s1);color:#fff}
+.btn.primary:hover{opacity:.9;color:#fff}
+.btn.sm{padding:3px 10px;font-size:12px;border-radius:6px}
+.btn:disabled{opacity:.5;cursor:not-allowed}
+.form-row{display:grid;grid-template-columns:repeat(auto-fit,minmax(210px,1fr));gap:14px;margin-bottom:14px}
+label.fl{display:block;font-size:12.5px;color:var(--ink-2);margin-bottom:5px;font-weight:600}
+select,input[type=text],input[type=number],textarea{width:100%;padding:8px 10px;border:1px solid var(--grid);border-radius:8px;background:var(--surface-1);color:var(--ink-1);font-size:13px;font-family:inherit}
+select:focus,input:focus,textarea:focus{outline:none;border-color:var(--s1)}
+.steps{display:flex;gap:0;margin-bottom:18px;flex-wrap:wrap}
+.step{flex:1;min-width:150px;padding:12px 14px;border:1px solid var(--border);background:var(--surface-1);position:relative;font-size:12.5px}
+.step:first-child{border-radius:10px 0 0 10px} .step:last-child{border-radius:0 10px 10px 0}
+.step .n{display:inline-flex;width:20px;height:20px;border-radius:50%;background:var(--grid);color:var(--ink-2);align-items:center;justify-content:center;font-size:11px;font-weight:700;margin-right:6px}
+.step.done .n{background:var(--good);color:#fff}
+.step.doing .n{background:var(--s1);color:#fff}
+.step.doing{border-color:var(--s1)}
+.step .t{font-weight:700} .step .sub{color:var(--ink-3);font-size:11.5px;margin-top:3px}
+.bar-row{display:flex;align-items:center;gap:10px;margin:7px 0}
+.bar-row .bl{width:130px;font-size:12.5px;color:var(--ink-2);text-align:right;flex-shrink:0}
+.bar-track{flex:1;height:16px;position:relative}
+.bar-fill{height:16px;border-radius:0 4px 4px 0;min-width:2px;position:relative;cursor:default}
+.bar-row .bv{width:56px;font-size:12px;color:var(--ink-2);font-variant-numeric:tabular-nums}
+.progress{height:8px;background:var(--grid);border-radius:4px;overflow:hidden}
+.progress>div{height:100%;background:var(--s1);border-radius:4px;width:0;transition:width .3s}
+.pill-link{background:var(--page);border:1px dashed var(--axis);border-radius:8px;padding:8px 12px;font-family:ui-monospace,monospace;font-size:12px;color:var(--ink-2);display:flex;justify-content:space-between;align-items:center;gap:10px}
+.dropzone{border:2px dashed var(--axis);border-radius:10px;padding:34px;text-align:center;color:var(--ink-3);cursor:pointer;background:var(--surface-1)}
+.dropzone:hover{border-color:var(--s1);color:var(--s1)}
+.muted{color:var(--ink-3);font-size:12px}
+.legend{display:flex;gap:16px;font-size:12px;color:var(--ink-2);margin-bottom:8px;flex-wrap:wrap}
+.legend .sw{display:inline-block;width:10px;height:10px;border-radius:2px;margin-right:5px;vertical-align:-1px}
+.toast{position:fixed;bottom:26px;left:50%;transform:translateX(-50%);background:var(--ink-1);color:var(--page);padding:10px 22px;border-radius:8px;font-size:13px;opacity:0;pointer-events:none;transition:opacity .25s;z-index:99}
+.toast.show{opacity:1}
+#tooltip{position:fixed;background:var(--ink-1);color:var(--page);padding:6px 10px;border-radius:6px;font-size:12px;pointer-events:none;opacity:0;transition:opacity .12s;z-index:98;white-space:nowrap}
+.report-doc{max-width:860px;background:var(--surface-1);border:1px solid var(--border);border-radius:10px;padding:34px 40px}
+.report-doc h2{font-size:18px;margin-bottom:4px}
+.report-doc h4{font-size:14px;margin:20px 0 8px;border-left:3px solid var(--s1);padding-left:8px}
+.report-doc .meta{color:var(--ink-3);font-size:12px;margin-bottom:14px}
+.conclusion{border:1px solid var(--s1);background:rgba(42,120,214,.06);border-radius:8px;padding:12px 16px;font-size:13px}
+.dim-row{display:flex;align-items:center;gap:10px;padding:8px 0;border-bottom:1px solid var(--grid)}
+.dim-row:last-child{border-bottom:none}
+.dim-row .dn{width:150px;font-size:13px;flex-shrink:0}
+.dim-row .dn small{color:var(--ink-3);display:block;font-size:11px}
+.dim-row select{flex:1}
+.dim-row .dw{width:52px;text-align:right;font-size:12px;color:var(--ink-3);font-variant-numeric:tabular-nums;flex-shrink:0}
+.sample-img{background:linear-gradient(135deg,#dce8f7,#c6dcf3);border-radius:10px;height:250px;display:flex;align-items:center;justify-content:center;font-size:56px;border:1px solid var(--border)}
+@media (prefers-color-scheme: dark){.sample-img{background:linear-gradient(135deg,#1d2a3c,#16202e)}}
+.review-actions{display:flex;gap:6px}
+.stars{color:var(--s3);letter-spacing:2px;font-size:15px}
+.kv{display:flex;justify-content:space-between;padding:6px 0;border-bottom:1px solid var(--grid);font-size:13px}
+.kv:last-child{border-bottom:none}
+.kv b{font-variant-numeric:tabular-nums}
+</style>
+</head>
+<body>
+<div class="app">
+  <!-- ============ 侧边导航 ============ -->
+  <nav class="sidebar">
+    <div class="logo">AlgoEval<small>算法效果验证平台 · Demo</small></div>
+    <div class="nav-group">总览</div>
+    <div class="nav-item active" data-page="dashboard"><span class="ico">▦</span>工作台</div>
+    <div class="nav-group">评估准备</div>
+    <div class="nav-item" data-page="requirements"><span class="ico">▤</span>需求管理</div>
+    <div class="nav-item" data-page="datasets"><span class="ico">⛁</span>数据集管理</div>
+    <div class="nav-group">效果验证</div>
+    <div class="nav-item" data-page="preeval"><span class="ico">◎</span>初期效果验证</div>
+    <div class="nav-item" data-page="modeltest"><span class="ico">⚙</span>模型测试与验收</div>
+    <div class="nav-item" data-page="satisfaction"><span class="ico">☺</span>用户满意度评测</div>
+    <div class="nav-group">人工与产出</div>
+    <div class="nav-item" data-page="annotation"><span class="ico">✎</span>标注平台</div>
+    <div class="nav-item" data-page="reports"><span class="ico">▣</span>报告中心</div>
+  </nav>
+
+  <main class="main">
+  <!-- ============ 工作台 ============ -->
+  <section class="page active" id="page-dashboard">
+    <div class="page-head"><h1>工作台</h1><p>需求期预验证 → 模型自动化验收 → 用户满意度评测，全流程一站式</p></div>
+    <div class="grid g4">
+      <div class="tile"><div class="lb">进行中评估任务</div><div class="v">12</div><div class="d up">↑ 3 较上周</div></div>
+      <div class="tile"><div class="lb">累计评估样本</div><div class="v">86,420</div><div class="d up">↑ 12,300 本月新增</div></div>
+      <div class="tile"><div class="lb">AI-人工打分一致率</div><div class="v">91.4%</div><div class="d">Cohen's Kappa 0.78</div></div>
+      <div class="tile"><div class="lb">待人工校验样本</div><div class="v">347</div><div class="d down">需 2 名标注员 · 约 1.5 天</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <h3>评估任务趋势<small>近 8 周 · 每周完成任务数</small></h3>
+        <svg id="trendChart" viewBox="0 0 520 200" width="100%" style="overflow:visible"></svg>
+      </div>
+      <div class="card">
+        <h3>最近报告</h3>
+        <table>
+          <thead><tr><th>报告</th><th>类型</th><th>结论</th><th>日期</th></tr></thead>
+          <tbody>
+            <tr><td><a href="#" onclick="go('reports');return false">图片描述 V2 模型验收报告</a></td><td><span class="tag violet">测试验收</span></td><td><span class="tag green">通过</span></td><td class="muted">07-06</td></tr>
+            <tr><td><a href="#" onclick="go('reports');return false">商品标题生成 初期评估报告</a></td><td><span class="tag blue">初期评估</span></td><td><span class="tag yellow">有风险</span></td><td class="muted">07-04</td></tr>
+            <tr><td><a href="#" onclick="go('reports');return false">图片描述 海外用户满意度报告</a></td><td><span class="tag green">满意度</span></td><td><span class="tag green">CSAT 4.2</span></td><td class="muted">07-01</td></tr>
+            <tr><td><a href="#" onclick="go('reports');return false">OCR 票据识别 初期评估报告</a></td><td><span class="tag blue">初期评估</span></td><td><span class="tag red">不达标</span></td><td class="muted">06-28</td></tr>
+          </tbody>
+        </table>
+      </div>
+    </div>
+    <div class="card">
+      <h3>三条主链路</h3>
+      <div class="steps">
+        <div class="step done"><span class="n">A</span><span class="t">需求期预验证</span><div class="sub">规则/文档/SDK/demo + 上传数据 + 大模型评估 → 评估报告</div></div>
+        <div class="step doing"><span class="n">B</span><span class="t">模型测试与验收</span><div class="sub">被测模型输出 → 评估小模型打分 → 人工校验 → 测试报告</div></div>
+        <div class="step"><span class="n">C</span><span class="t">用户满意度评测</span><div class="sub">邀请外部/海外用户打分 → 满意度报告</div></div>
+      </div>
+      <p class="muted">人工环节统一由「标注平台」承载：抽检复核、验收校验、质检仲裁、一致性统计。</p>
+    </div>
+  </section>
+
+  <!-- ============ 需求管理 ============ -->
+  <section class="page" id="page-requirements">
+    <div class="page-head"><h1>需求管理</h1><p>录入产品规则 / 需求文档 / 算法 SDK / 网页 demo，配置评估标准与验收目标</p></div>
+    <div class="card">
+      <h3>新建需求</h3>
+      <div class="form-row">
+        <div><label class="fl">需求名称</label><input type="text" id="reqName" placeholder="如：图片描述生成 V3"></div>
+        <div><label class="fl">被测对象接入方式</label>
+          <select id="reqType"><option>产品规则（结构化条目）</option><option>需求文档（附件）</option><option>算法 SDK（沙箱调用）</option><option>网页 Demo（浏览器自动化驱动）</option></select></div>
+        <div><label class="fl">评估标准模板</label>
+          <select><option>图片描述质量度量（10 维 · 100 分制）</option><option>分类任务准召模板</option><option>生成任务通用模板</option><option>自定义…</option></select></div>
+        <div><label class="fl">验收目标</label><input type="text" value="主观均分 ≥ 85 且 精确率 ≥ 90%"></div>
+      </div>
+      <button class="btn primary" onclick="addRequirement()">＋ 创建需求</button>
+    </div>
+    <div class="card">
+      <h3>需求列表</h3>
+      <table>
+        <thead><tr><th>需求</th><th>接入方式</th><th>评估标准</th><th>验收目标</th><th>阶段</th><th>操作</th></tr></thead>
+        <tbody id="reqTable">
+          <tr><td>图片描述生成 V2</td><td><span class="tag blue">算法 SDK</span></td><td>图片描述质量 10 维</td><td class="muted">均分≥85 · P≥90%</td><td><span class="tag violet">验收中</span></td><td><a href="#" onclick="go('modeltest');return false">进入验收</a></td></tr>
+          <tr><td>商品标题生成</td><td><span class="tag yellow">网页 Demo</span></td><td>生成任务通用模板</td><td class="muted">均分≥80</td><td><span class="tag blue">初期验证</span></td><td><a href="#" onclick="go('preeval');return false">去评估</a></td></tr>
+          <tr><td>OCR 票据识别</td><td><span class="tag green">产品规则</span></td><td>字段级准召</td><td class="muted">F1≥0.92</td><td><span class="tag red">不达标</span></td><td><a href="#" onclick="go('reports');return false">看报告</a></td></tr>
+          <tr><td>视频高光剪辑</td><td><span class="tag violet">需求文档</span></td><td>主观 5 档打分</td><td class="muted">CSAT≥4.0</td><td><span class="tag green">满意度评测</span></td><td><a href="#" onclick="go('satisfaction');return false">看回收</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 数据集管理 ============ -->
+  <section class="page" id="page-datasets">
+    <div class="page-head"><h1>数据集管理</h1><p>上传评估数据，支持无标注集 / 有标注集（ground truth）/ 结果集</p></div>
+    <div class="card">
+      <div class="dropzone" onclick="toast('Demo：已模拟上传 eval_images_0708.zip（500 张）')">⬆<br>拖拽文件到此处，或点击上传<br><span class="muted">支持 CSV / JSONL / Excel / 图片压缩包 / 音视频 · 上传后进入字段映射向导</span></div>
+    </div>
+    <div class="card">
+      <h3>数据集列表</h3>
+      <table>
+        <thead><tr><th>数据集</th><th>类型</th><th class="num">样本数</th><th>用途</th><th>安全级别</th><th>更新</th></tr></thead>
+        <tbody>
+          <tr><td>图片描述验收集 v3</td><td><span class="tag green">有标注集</span></td><td class="num">2,000</td><td>模型验收 / 回归</td><td><span class="tag">内部</span></td><td class="muted">07-05</td></tr>
+          <tr><td>电商图片盲测集</td><td><span class="tag blue">无标注集</span></td><td class="num">500</td><td>初期主观评估</td><td><span class="tag">内部</span></td><td class="muted">07-03</td></tr>
+          <tr><td>图片描述 V2 输出结果</td><td><span class="tag violet">结果集</span></td><td class="num">300</td><td>用户满意度评测</td><td><span class="tag yellow">外发审批中</span></td><td class="muted">07-02</td></tr>
+          <tr><td>OCR 票据金标集</td><td><span class="tag green">有标注集</span></td><td class="num">1,200</td><td>准召计算</td><td><span class="tag">内部</span></td><td class="muted">06-25</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </section>
+
+  <!-- ============ 初期效果验证 ============ -->
+  <section class="page" id="page-preeval">
+    <div class="page-head"><h1>初期效果验证</h1><p>链路 A：需求/规则/SDK/demo + 上传数据 + 大模型评估 → 主观打分与准召指标 → 评估报告</p></div>
+    <div class="card">
+      <h3>评估任务配置</h3>
+      <div class="form-row">
+        <div><label class="fl">需求</label><select><option>商品标题生成（网页 Demo）</option><option>图片描述生成 V2</option></select></div>
+        <div><label class="fl">数据集</label><select><option>电商图片盲测集（500 · 无标注）</option><option>图片描述验收集 v3（2,000 · 有标注）</option></select></div>
+        <div><label class="fl">评估大模型</label><select><option>claude-fable-5（云端 API）</option><option>claude-opus-4-8</option><option>qwen-max</option></select></div>
+        <div><label class="fl">抽样规模</label><select><option>200 条（快速）</option><option>500 条（全量）</option></select></div>
+      </div>
+      <button class="btn primary" id="runEvalBtn" onclick="runPreEval()">▶ 运行评估</button>
+      <span class="muted" id="evalStatus" style="margin-left:12px"></span>
+      <div class="progress" id="evalProg" style="margin-top:12px;display:none"><div></div></div>
+    </div>
+    <div id="preevalResult" style="display:none">
+      <div class="grid g4">
+        <div class="tile"><div class="lb">主观均分（LLM）</div><div class="v">82.6</div><div class="d down">目标 ≥ 85 · 未达标</div></div>
+        <div class="tile"><div class="lb">精确率 Precision</div><div class="v">88.3%</div><div class="d down">目标 ≥ 90%</div></div>
+        <div class="tile"><div class="lb">召回率 Recall</div><div class="v">91.7%</div><div class="d up">达标</div></div>
+        <div class="tile"><div class="lb">F1</div><div class="v">0.899</div><div class="d">低置信样本 23 条 → 已推送人工复核</div></div>
+      </div>
+      <div class="grid g2" style="margin-top:16px">
+        <div class="card">
+          <h3>主观分分布<small>LLM 逐条打分 · n=200</small></h3>
+          <div id="scoreDist"></div>
+        </div>
+        <div class="card">
+          <h3>分维度得分率<small>得分 / 满分</small></h3>
+          <div id="dimBars"></div>
+        </div>
+      </div>
+      <div class="card">
+        <h3>Top Badcase<small>按扣分排序</small></h3>
+        <table>
+          <thead><tr><th>#</th><th>样本</th><th>问题维度</th><th>LLM 打分理由（摘要）</th><th class="num">得分</th></tr></thead>
+          <tbody>
+            <tr><td>1</td><td>img_0347</td><td><span class="tag red">幻觉控制</span></td><td>描述称"桌上有一杯咖啡"，图中并无咖啡杯</td><td class="num">41</td></tr>
+            <tr><td>2</td><td>img_0102</td><td><span class="tag red">数量准确性</span></td><td>图中 5 人被描述为"三个人"</td><td class="num">55</td></tr>
+            <tr><td>3</td><td>img_0219</td><td><span class="tag yellow">图中文字识别</span></td><td>招牌"兰州拉面"转述为"兰州牛肉面"</td><td class="num">63</td></tr>
+          </tbody>
+        </table>
+      </div>
+      <div class="card">
+        <h3>评估结论（AI 生成 · 需人工确认）</h3>
+        <div class="conclusion">主观均分 82.6 未达目标（85），主要失分集中在<b>幻觉控制</b>与<b>数量准确性</b>两个维度；客观指标中精确率 88.3% 略低于目标。建议：① 对幻觉类 badcase 做 prompt 约束或后处理校验；② 数量类问题建议补充计数专项数据；③ 达标风险中等，具备继续投入价值。</div>
+        <div style="margin-top:12px"><button class="btn primary" onclick="go('reports');toast('已生成《商品标题生成 初期评估报告》')">⇩ 生成评估报告</button>
+        <button class="btn" onclick="go('annotation')">→ 低置信样本人工复核（23）</button></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 模型测试与验收 ============ -->
+  <section class="page" id="page-modeltest">
+    <div class="page-head"><h1>模型测试与验收</h1><p>链路 B：被测模型输出 → 云端评估小模型打分 → 人工校验 → 自动生成测试报告</p></div>
+    <div class="steps">
+      <div class="step done"><span class="n">1</span><span class="t">批量推理</span><div class="sub">图片描述 V2 · 2,000 条已产出 · 失败率 0.3%</div></div>
+      <div class="step done"><span class="n">2</span><span class="t">AI 自动打分</span><div class="sub">judge: eval-scorer-mini（云端 API）· 双打分交叉</div></div>
+      <div class="step doing"><span class="n">3</span><span class="t">人工校验</span><div class="sub">分层抽检 15% + 全量低分 · 247/300 已完成</div></div>
+      <div class="step"><span class="n">4</span><span class="t">测试报告</span><div class="sub">一致率达标后自动生成并给出验收结论</div></div>
+    </div>
+    <div class="grid g4">
+      <div class="tile"><div class="lb">AI 打分均分</div><div class="v">87.9</div><div class="d up">目标 ≥ 85</div></div>
+      <div class="tile"><div class="lb">AI-人工一致率</div><div class="v" id="agreeRate">92.3%</div><div class="d">阈值 ≥ 90% · <span id="agreeCnt">228/247</span></div></div>
+      <div class="tile"><div class="lb">Cohen's Kappa</div><div class="v" id="kappaV">0.79</div><div class="d up">≥ 0.75 视为可靠</div></div>
+      <div class="tile"><div class="lb">平均分差 |AI−人工|</div><div class="v">3.2 分</div><div class="d">分歧样本强制仲裁</div></div>
+    </div>
+    <div class="card" style="margin-top:16px">
+      <h3>人工校验工作台<small>看到「样本 + 模型输出 + AI 打分及理由」，操作：认可 / 修改 / 争议</small></h3>
+      <table id="reviewTable">
+        <thead><tr><th>样本</th><th>模型输出（摘要）</th><th class="num">AI 打分</th><th>AI 理由</th><th class="num">人工分</th><th>状态</th><th>操作</th></tr></thead>
+        <tbody></tbody>
+      </table>
+    </div>
+    <div class="card">
+      <h3>验收判定</h3>
+      <div class="kv"><span>主观均分 ≥ 85（人工校验后最终分 87.4）</span><b style="color:var(--good-text)">✔ 达标</b></div>
+      <div class="kv"><span>精确率 ≥ 90%（实际 91.2%）</span><b style="color:var(--good-text)">✔ 达标</b></div>
+      <div class="kv"><span>AI-人工一致率 ≥ 90%（实际 <span id="agreeRate2">92.3%</span>）</span><b style="color:var(--good-text)">✔ 达标</b></div>
+      <div class="kv"><span>工程指标：P99 延迟 1.8s / 失败率 0.3%</span><b style="color:var(--good-text)">✔ 达标</b></div>
+      <div style="margin-top:12px"><button class="btn primary" onclick="go('reports');toast('已生成《图片描述 V2 模型验收报告》· 结论：通过')">⇩ 生成测试报告（结论：通过）</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 用户满意度评测 ============ -->
+  <section class="page" id="page-satisfaction">
+    <div class="page-head"><h1>用户满意度评测</h1><p>链路 C：将需求生成的结果邀请外部 / 海外用户打分，输出满意度报告</p></div>
+    <div class="card">
+      <h3>评测活动：图片描述 V2 · 海外用户盲测</h3>
+      <div class="form-row">
+        <div><label class="fl">结果集</label><select><option>图片描述 V2 输出结果（300 条）</option></select></div>
+        <div><label class="fl">问卷语言</label><select><option>中文 + English</option><option>English only</option></select></div>
+        <div><label class="fl">每人评估样本数</label><input type="number" value="10"></div>
+        <div><label class="fl">参与方式</label><select><option>匿名链接（免登录 · 防刷频控）</option><option>受邀名单制</option></select></div>
+      </div>
+      <label class="fl">邀请链接（海外 CDN 加速 · 移动端自适应）</label>
+      <div class="pill-link"><span>https://eval.example.com/s/imgcap-v2-oversea?lang=en</span><button class="btn sm" onclick="toast('链接已复制')">复制</button></div>
+    </div>
+    <div class="grid g4">
+      <div class="tile"><div class="lb">回收有效问卷</div><div class="v">186</div><div class="d up">完成率 78% · 目标 100 份已达成</div></div>
+      <div class="tile"><div class="lb">CSAT 总体满意度</div><div class="v">4.2 <span style="font-size:14px;color:var(--ink-3)">/ 5</span></div><div class="d up">目标 ≥ 4.0</div></div>
+      <div class="tile"><div class="lb">NPS</div><div class="v">+34</div><div class="d">推荐者 52% − 贬损者 18%</div></div>
+      <div class="tile"><div class="lb">海外用户占比</div><div class="v">63%</div><div class="d">EN 117 · ZH 69</div></div>
+    </div>
+    <div class="grid g2" style="margin-top:16px">
+      <div class="card">
+        <h3>满意度评分分布<small>1–5 星 · n=186</small></h3>
+        <div id="csatBars"></div>
+      </div>
+      <div class="card">
+        <h3>维度得分<small>用户按维度 1–5 打分的均值</small></h3>
+        <div id="satDims"></div>
+      </div>
+    </div>
+    <div class="card">
+      <h3>开放反馈聚类摘要（LLM 生成）</h3>
+      <table>
+        <thead><tr><th>主题</th><th class="num">提及</th><th>代表反馈</th></tr></thead>
+        <tbody>
+          <tr><td><span class="tag green">描述细致</span></td><td class="num">64</td><td>"Descriptions capture small details I didn't notice."</td></tr>
+          <tr><td><span class="tag yellow">偶有冗长</span></td><td class="num">31</td><td>"结尾总有一句'画面温馨和谐'，有点套话。"</td></tr>
+          <tr><td><span class="tag red">个别事实错误</span></td><td class="num">12</td><td>"It said 3 people but there were 5."</td></tr>
+        </tbody>
+      </table>
+      <div style="margin-top:12px"><button class="btn primary" onclick="go('reports');toast('已生成《图片描述 海外用户满意度报告》')">⇩ 生成满意度报告</button></div>
+    </div>
+  </section>
+
+  <!-- ============ 标注平台 ============ -->
+  <section class="page" id="page-annotation">
+    <div class="page-head"><h1>自动化测试标注平台</h1><p>承载所有人工环节：抽检复核、验收校验、质检仲裁 · 支持 AI 预标注与一致性统计</p></div>
+    <div class="card">
+      <h3>标注任务</h3>
+      <table>
+        <thead><tr><th>任务</th><th>来源</th><th>模板</th><th>进度</th><th>质检</th><th>一致性 α</th></tr></thead>
+        <tbody>
+          <tr><td>图片描述 V2 验收校验</td><td><span class="tag violet">模型验收</span></td><td>10 维 · AI 预标注</td><td class="num">247 / 300</td><td><span class="tag green">抽检 98%</span></td><td class="num">0.81</td></tr>
+          <tr><td>商品标题低置信复核</td><td><span class="tag blue">初期评估</span></td><td>生成任务通用</td><td class="num">9 / 23</td><td><span class="tag">待质检</span></td><td class="num">—</td></tr>
+          <tr><td>满意度开放题整理</td><td><span class="tag green">满意度</span></td><td>主题归类</td><td class="num">107 / 107</td><td><span class="tag green">已完成</span></td><td class="num">0.86</td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="grid g2">
+      <div class="card">
+        <h3>标注工作台 · 样本 <span id="annoIdx">1</span>/3<small>模板：图片描述质量度量（10 维 · 100 分制 · 五步法）</small></h3>
+        <div class="sample-img" id="annoImg">🖼️</div>
+        <p style="margin-top:10px;font-size:13px"><b>模型描述：</b><span id="annoDesc"></span></p>
+        <p class="muted" style="margin-top:6px">AI 预打分：<b id="annoAI"></b> 分 · 理由：<span id="annoAIReason"></span></p>
+      </div>
+      <div class="card">
+        <h3>评分表单<small>各维度独立打分 · 说错重于没说</small></h3>
+        <div id="dimForm"></div>
+        <div style="display:flex;align-items:center;justify-content:space-between;margin-top:14px">
+          <div>总分：<b id="annoTotal" style="font-size:22px">—</b> <span class="muted">/ 100</span></div>
+          <div>
+            <button class="btn" onclick="prefillAI()">采纳 AI 预标注</button>
+            <button class="btn primary" onclick="submitAnno()">提交并下一条</button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 报告中心 ============ -->
+  <section class="page" id="page-reports">
+    <div class="page-head"><h1>报告中心</h1><p>三类报告自动生成：初期评估报告 / 模型测试验收报告 / 用户满意度报告 · 支持导出与分享</p></div>
+    <div class="card">
+      <table>
+        <thead><tr><th>报告</th><th>类型</th><th>结论</th><th>日期</th><th>操作</th></tr></thead>
+        <tbody>
+          <tr><td>图片描述 V2 模型验收报告</td><td><span class="tag violet">测试验收</span></td><td><span class="tag green">通过</span></td><td class="muted">07-06</td><td><a href="#" onclick="return false">预览中 ↓</a> · <a href="#" onclick="toast('Demo：已导出 PDF');return false">导出 PDF</a> · <a href="#" onclick="toast('分享链接已复制（7 天有效 · 带水印）');return false">分享</a></td></tr>
+          <tr><td>商品标题生成 初期评估报告</td><td><span class="tag blue">初期评估</span></td><td><span class="tag yellow">有风险</span></td><td class="muted">07-04</td><td><a href="#" onclick="toast('Demo：切换预览');return false">预览</a> · <a href="#" onclick="toast('Demo：已导出 PDF');return false">导出 PDF</a></td></tr>
+          <tr><td>图片描述 海外用户满意度报告</td><td><span class="tag green">满意度</span></td><td><span class="tag green">CSAT 4.2</span></td><td class="muted">07-01</td><td><a href="#" onclick="toast('Demo：切换预览');return false">预览</a> · <a href="#" onclick="toast('Demo：已导出 PDF');return false">导出 PDF</a></td></tr>
+        </tbody>
+      </table>
+    </div>
+    <div class="report-doc">
+      <h2>图片描述 V2 · 模型测试验收报告</h2>
+      <div class="meta">报告编号 RPT-20260706-014 ｜ 生成时间 2026-07-06 18:42 ｜ 数据集：图片描述验收集 v3（2,000）｜ judge：eval-scorer-mini</div>
+      <h4>1. 一页纸结论</h4>
+      <div class="conclusion"><b>验收结论：通过。</b>人工校验后最终主观均分 87.4（目标 ≥85），精确率 91.2%（目标 ≥90%），AI-人工打分一致率 92.3%（Kappa 0.79，judge 可靠）。主要残余风险为「图中文字识别」维度得分率 78%，建议下版本专项优化并纳入回归集监控。</div>
+      <h4>2. 指标总览</h4>
+      <table>
+        <thead><tr><th>指标</th><th class="num">实际</th><th class="num">目标</th><th>判定</th></tr></thead>
+        <tbody>
+          <tr><td>主观均分（人工校验后）</td><td class="num">87.4</td><td class="num">≥ 85</td><td style="color:var(--good-text)">✔ 达标</td></tr>
+          <tr><td>精确率 Precision</td><td class="num">91.2%</td><td class="num">≥ 90%</td><td style="color:var(--good-text)">✔ 达标</td></tr>
+          <tr><td>召回率 Recall</td><td class="num">93.5%</td><td class="num">—</td><td class="muted">参考</td></tr>
+          <tr><td>F1</td><td class="num">0.923</td><td class="num">—</td><td class="muted">参考</td></tr>
+        </tbody>
+      </table>
+      <h4>3. AI 打分与人工校验一致性</h4>
+      <p style="font-size:13px">抽检 300 条（分层 15% + 全量低分），人工认可 228 条、修改 19 条；一致率 92.3%，Cohen's Kappa 0.79，平均绝对分差 3.2。judge 打分可作为主要评估手段，人工抽检比例可维持 15%。</p>
+      <h4>4. 分维度分析（节选）</h4>
+      <p style="font-size:13px">幻觉控制得分率 94%（较 V1 +9pt）；图中文字识别 78% 为最薄弱维度，badcase 集中于手写体与低分辨率招牌。Top20 badcase 已回流至标注平台形成专项集。</p>
+      <h4>5. 签署</h4>
+      <p class="muted">算法负责人 ______ ｜ 测试负责人 ______ ｜ 产品负责人 ______</p>
+    </div>
+  </section>
+  </main>
+</div>
+
+<div class="toast" id="toast"></div>
+<div id="tooltip"></div>
+
+<script>
+/* ---------- 导航 ---------- */
+function go(p){
+  document.querySelectorAll('.nav-item').forEach(n=>n.classList.toggle('active',n.dataset.page===p));
+  document.querySelectorAll('.page').forEach(pg=>pg.classList.toggle('active',pg.id==='page-'+p));
+  window.scrollTo(0,0);
+}
+document.querySelectorAll('.nav-item').forEach(n=>n.onclick=()=>go(n.dataset.page));
+
+function toast(msg){
+  const t=document.getElementById('toast');t.textContent=msg;t.classList.add('show');
+  clearTimeout(t._h);t._h=setTimeout(()=>t.classList.remove('show'),2200);
+}
+/* ---------- 悬浮提示 ---------- */
+const tip=document.getElementById('tooltip');
+function showTip(e,txt){tip.textContent=txt;tip.style.opacity=1;moveTip(e);}
+function moveTip(e){tip.style.left=(e.clientX+12)+'px';tip.style.top=(e.clientY-30)+'px';}
+function hideTip(){tip.style.opacity=0;}
+function bindTip(el,txt){el.addEventListener('mouseenter',e=>showTip(e,txt));el.addEventListener('mousemove',moveTip);el.addEventListener('mouseleave',hideTip);}
+
+/* ---------- 工作台：趋势折线图（单系列，无图例，直接由标题命名） ---------- */
+(function(){
+  const data=[{w:'W1',v:6},{w:'W2',v:8},{w:'W3',v:7},{w:'W4',v:11},{w:'W5',v:10},{w:'W6',v:14},{w:'W7',v:13},{w:'W8',v:16}];
+  const svg=document.getElementById('trendChart');
+  const W=520,H=200,pl=34,pr=14,pt=14,pb=26,max=20;
+  const x=i=>pl+i*(W-pl-pr)/(data.length-1), y=v=>pt+(1-v/max)*(H-pt-pb);
+  let g='';
+  [0,5,10,15,20].forEach(v=>{
+    g+=`<line x1="${pl}" y1="${y(v)}" x2="${W-pr}" y2="${y(v)}" stroke="var(--grid)" stroke-width="1"/>`;
+    g+=`<text x="${pl-8}" y="${y(v)+4}" text-anchor="end" font-size="10" fill="var(--ink-3)">${v}</text>`;
+  });
+  data.forEach((d,i)=>g+=`<text x="${x(i)}" y="${H-8}" text-anchor="middle" font-size="10" fill="var(--ink-3)">${d.w}</text>`);
+  const pts=data.map((d,i)=>`${x(i)},${y(d.v)}`).join(' ');
+  g+=`<polyline points="${pts}" fill="none" stroke="var(--s1)" stroke-width="2" stroke-linejoin="round"/>`;
+  data.forEach((d,i)=>{
+    g+=`<circle class="pt" data-i="${i}" cx="${x(i)}" cy="${y(d.v)}" r="4" fill="var(--s1)" stroke="var(--surface-1)" stroke-width="2"/>`;
+    g+=`<circle class="hit" data-i="${i}" cx="${x(i)}" cy="${y(d.v)}" r="14" fill="transparent"/>`;
+  });
+  const last=data[data.length-1];
+  g+=`<text x="${x(data.length-1)}" y="${y(last.v)-10}" text-anchor="middle" font-size="11" font-weight="700" fill="var(--ink-1)">${last.v}</text>`;
+  svg.innerHTML=g;
+  svg.querySelectorAll('.hit').forEach(c=>bindTip(c,''));
+  svg.querySelectorAll('.hit').forEach(c=>{
+    c.addEventListener('mouseenter',e=>showTip(e,`${data[c.dataset.i].w} · 完成 ${data[c.dataset.i].v} 个任务`));
+  });
+})();
+
+/* ---------- 通用横向条形渲染（4px 圆角数据端 · 2px 表面间隔由行距保证） ---------- */
+function renderBars(elId,rows,color,fmt,maxV){
+  const el=document.getElementById(elId);if(!el)return;
+  const m=maxV||Math.max(...rows.map(r=>r.v));
+  el.innerHTML=rows.map(r=>`
+    <div class="bar-row">
+      <div class="bl">${r.l}</div>
+      <div class="bar-track"><div class="bar-fill" data-tip="${r.l}：${fmt(r.v)}" style="width:${Math.max(2,r.v/m*100)}%;background:${r.c||color}"></div></div>
+      <div class="bv">${fmt(r.v)}</div>
+    </div>`).join('');
+  el.querySelectorAll('.bar-fill').forEach(b=>bindTip(b,b.dataset.tip));
+}
+
+/* ---------- 初期效果验证 ---------- */
+function runPreEval(){
+  const btn=document.getElementById('runEvalBtn'),st=document.getElementById('evalStatus'),
+        prog=document.getElementById('evalProg'),bar=prog.firstElementChild;
+  btn.disabled=true;prog.style.display='block';
+  const stages=['拉取数据集 200 条…','调用被测网页 Demo 批量产出结果…','评估大模型逐条打分（维度分+理由+置信度）…','计算准召指标与混淆矩阵…','汇总结论…'];
+  let i=0;
+  const t=setInterval(()=>{
+    i++;bar.style.width=(i/stages.length*100)+'%';st.textContent=stages[Math.min(i-1,stages.length-1)];
+    if(i>=stages.length){clearInterval(t);st.textContent='评估完成 ✔（用时 4 分 12 秒 · 模拟）';btn.disabled=false;
+      document.getElementById('preevalResult').style.display='block';
+      renderBars('scoreDist',[
+        {l:'90–100 分',v:38},{l:'80–89 分',v:74},{l:'70–79 分',v:52},{l:'60–69 分',v:21},{l:'< 60 分',v:15,c:'var(--critical)'}
+      ],'var(--seq-400)',v=>v+' 条');
+      renderBars('dimBars',[
+        {l:'主体对象识别',v:93},{l:'幻觉控制',v:76,c:'var(--critical)'},{l:'属性描述准确性',v:88},{l:'数量准确性',v:71,c:'var(--critical)'},
+        {l:'空间位置与布局',v:85},{l:'图中文字识别',v:80},{l:'内容覆盖度',v:87},{l:'语言流畅性',v:95}
+      ],'var(--s1)',v=>v+'%',100);
+      document.getElementById('preevalResult').scrollIntoView({behavior:'smooth'});
+    }
+  },550);
+}
+
+/* ---------- 需求管理 ---------- */
+function addRequirement(){
+  const name=document.getElementById('reqName').value.trim();
+  if(!name){toast('请填写需求名称');return;}
+  const type=document.getElementById('reqType').value.split('（')[0];
+  const tr=document.createElement('tr');
+  tr.innerHTML=`<td>${name}</td><td><span class="tag blue">${type}</span></td><td>图片描述质量 10 维</td><td class="muted">均分≥85</td><td><span class="tag blue">初期验证</span></td><td><a href="#" onclick="go('preeval');return false">去评估</a></td>`;
+  document.getElementById('reqTable').prepend(tr);
+  document.getElementById('reqName').value='';
+  toast('需求已创建，可到「初期效果验证」发起评估');
+}
+
+/* ---------- 模型测试与验收：人工校验 ---------- */
+const reviewData=[
+  {id:'img_1088',out:'一名穿红色外套的女子在雪地里牵着两只哈士奇…',ai:92,why:'主体/数量/属性均正确，覆盖完整',hs:null,st:'待校验'},
+  {id:'img_0234',out:'桌面上摆放着笔记本电脑和三杯咖啡…',ai:85,why:'主体正确；"三杯咖啡"待核（图中疑为两杯）',hs:null,st:'待校验'},
+  {id:'img_0521',out:'黄昏的海滩上一对情侣相拥，远处有帆船…',ai:74,why:'"帆船"疑似幻觉（低置信 0.58），强制人工',hs:null,st:'待校验'},
+];
+function renderReview(){
+  const tb=document.querySelector('#reviewTable tbody');
+  tb.innerHTML=reviewData.map((r,i)=>{
+    const stTag=r.st==='待校验'?'<span class="tag yellow">待校验</span>':r.st==='已认可'?'<span class="tag green">已认可</span>':r.st==='已修改'?'<span class="tag blue">已修改</span>':'<span class="tag red">争议仲裁</span>';
+    return `<tr><td>${r.id}</td><td class="muted" style="max-width:230px">${r.out}</td><td class="num"><b>${r.ai}</b></td><td class="muted" style="max-width:220px">${r.why}</td><td class="num">${r.hs==null?'—':'<b>'+r.hs+'</b>'}</td><td>${stTag}</td>
+    <td><div class="review-actions">
+      <button class="btn sm" onclick="reviewAct(${i},'ok')">认可</button>
+      <button class="btn sm" onclick="reviewAct(${i},'edit')">修改</button>
+      <button class="btn sm" onclick="reviewAct(${i},'dispute')">争议</button>
+    </div></td></tr>`;
+  }).join('');
+}
+let agree=228,total=247;
+function reviewAct(i,act){
+  const r=reviewData[i];
+  if(act==='ok'){r.hs=r.ai;r.st='已认可';agree++;total++;toast('已认可 AI 打分 '+r.ai+' 分');}
+  else if(act==='edit'){
+    const v=prompt('请输入人工修正分（0–100）：',r.ai-8);
+    if(v===null)return;
+    r.hs=Math.max(0,Math.min(100,parseInt(v)||0));r.st='已修改';total++;
+    if(Math.abs(r.hs-r.ai)<=5){agree++;}
+    toast('已记录人工分 '+r.hs+' 分（与 AI 分差 '+Math.abs(r.hs-r.ai)+'）');
+  }else{r.st='争议仲裁';toast('已提交仲裁：将由质检员双人背靠背复核');}
+  const rate=(agree/total*100).toFixed(1);
+  document.getElementById('agreeRate').textContent=rate+'%';
+  document.getElementById('agreeRate2').textContent=rate+'%';
+  document.getElementById('agreeCnt').textContent=agree+'/'+total;
+  document.getElementById('kappaV').textContent=(0.79+(rate-92.3)*0.01).toFixed(2);
+  renderReview();
+}
+renderReview();
+
+/* ---------- 满意度图表 ---------- */
+renderBars('csatBars',[
+  {l:'★★★★★',v:71},{l:'★★★★',v:62},{l:'★★★',v:33},{l:'★★',v:13,c:'var(--serious)'},{l:'★',v:7,c:'var(--critical)'}
+],'var(--seq-400)',v=>v+' 人');
+renderBars('satDims',[
+  {l:'准确性',v:4.1},{l:'细节丰富度',v:4.4},{l:'语言自然度',v:4.3},{l:'有用性',v:4.0},{l:'简洁不啰嗦',v:3.6,c:'var(--s3)'}
+],'var(--s2)',v=>v.toFixed(1),5);
+
+/* ---------- 标注工作台 ---------- */
+const DIMS=[
+  {n:'主体对象识别',w:15},{n:'幻觉控制',w:15},{n:'属性描述准确性',w:8},{n:'数量准确性',w:6},
+  {n:'空间位置与布局',w:6},{n:'图中文字识别',w:5},{n:'内容覆盖度',w:12},{n:'动作与事件描述',w:8},
+  {n:'推断合理性',w:7},{n:'信息密度与重点',w:8},{n:'语言流畅性',w:10}
+];
+const LEVELS=[{t:'完全正确',r:1},{t:'轻微问题',r:.75},{t:'明显问题',r:.4},{t:'严重错误',r:0}];
+const annoSamples=[
+  {img:'🏖️',desc:'一片阳光明媚的海滩，两名儿童在沙滩上堆沙堡，远处海面上有一艘白色帆船。整个画面温馨和谐，充满生活气息。',ai:81,why:'主体与动作正确；结尾套话扣信息密度分；"帆船"需核实'},
+  {img:'🍜',desc:'一碗热气腾腾的牛肉面放在木桌上，旁边招牌写着"兰州牛肉面"，店内有三位顾客用餐。',ai:73,why:'招牌文字疑为"兰州拉面"（OCR 低置信）；顾客数量待核'},
+  {img:'🚴',desc:'一名骑行者沿着山路向上骑行，身穿蓝色骑行服，道路右侧是悬崖。',ai:90,why:'主体/属性/空间关系均正确，覆盖完整'}
+];
+let annoI=0;
+function renderAnno(){
+  const s=annoSamples[annoI];
+  document.getElementById('annoIdx').textContent=annoI+1;
+  document.getElementById('annoImg').textContent=s.img;
+  document.getElementById('annoDesc').textContent=s.desc;
+  document.getElementById('annoAI').textContent=s.ai;
+  document.getElementById('annoAIReason').textContent=s.why;
+  document.getElementById('dimForm').innerHTML=DIMS.map((d,i)=>`
+    <div class="dim-row">
+      <div class="dn">${d.n}<small>权重 ${d.w} 分</small></div>
+      <select data-w="${d.w}" onchange="calcTotal()">
+        <option value="">未评</option>
+        ${LEVELS.map(l=>`<option value="${l.r}">${l.t}（${Math.round(d.w*l.r)} 分）</option>`).join('')}
+      </select>
+      <div class="dw" id="dimv-${i}">—</div>
+    </div>`).join('');
+  document.getElementById('annoTotal').textContent='—';
+}
+function calcTotal(){
+  let sum=0,all=true;
+  document.querySelectorAll('#dimForm select').forEach((s,i)=>{
+    const w=+s.dataset.w;
+    if(s.value===''){all=false;document.getElementById('dimv-'+i).textContent='—';}
+    else{const v=Math.round(w*+s.value);sum+=v;document.getElementById('dimv-'+i).textContent=v;}
+  });
+  document.getElementById('annoTotal').textContent=all?sum:sum+'*';
+  return {sum,all};
+}
+function prefillAI(){
+  const sels=document.querySelectorAll('#dimForm select');
+  const target=annoSamples[annoI].ai/100;
+  sels.forEach(s=>{
+    let best=LEVELS[0].r,bd=1;
+    LEVELS.forEach(l=>{const d=Math.abs(l.r-target);if(d<bd){bd=d;best=l.r;}});
+    s.value=best;
+  });
+  calcTotal();toast('已按 AI 预标注填充，请人工核对后提交');
+}
+function submitAnno(){
+  const {all,sum}=calcTotal();
+  if(!all){toast('还有维度未评分');return;}
+  toast(`样本 ${annoI+1} 已提交：人工 ${sum} 分（AI ${annoSamples[annoI].ai} 分）`);
+  annoI=(annoI+1)%annoSamples.length;
+  renderAnno();
+}
+renderAnno();
+</script>
+</body>
+</html>
