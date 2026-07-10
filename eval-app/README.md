@@ -13,12 +13,12 @@
 
 `dist/` 目录（或 GitHub 分支页面下载）：
 
-- `度量台-windows.exe` — Windows 10/11
-- `度量台-macos-apple芯片` — macOS (M 系列)
-- `度量台-macos-intel` — macOS (Intel)
-- `度量台-linux` — Linux / NAS (x86_64)
+- `度量台-Windows.zip` — Windows 10/11（exe 已内嵌应用图标、产品版本信息与清单）
+- `度量台-macOS-Apple芯片.zip` — macOS M1/M2/M3/M4（标准 .app 包，含图标；附「首次打开前双击我-移除隔离.command」一键信任脚本）
 
-双击运行 → 浏览器自动打开 `http://127.0.0.1:8471/`。首次运行的系统安全提示处理方式见 `dist/使用说明.txt`。
+双击运行 → 自动启动本机服务并打开浏览器。系统安全提示的处理见压缩包内 `使用说明.txt`。
+
+**关于信任**：未购买商业代码签名证书（Apple Developer ID / Windows Authenticode）时，系统首次打开会有一次性提示，属正常现象。已做的无证书信任措施：macOS 侧 Go 工具链自动附加临时（ad-hoc）签名 + 标准 .app 包 + 一键移除隔离脚本；Windows 侧注入产品名/版本/公司元数据与应用清单。要彻底消除提示需企业采购证书后签名/公证（一次性工作）。
 
 ## 从源码构建
 

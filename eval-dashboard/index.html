@@ -3,16 +3,19 @@
 <head>
 <meta charset="UTF-8">
 <meta name="viewport" content="width=device-width, initial-scale=1.0">
-<title>搜索与文案生成效果度量台 · AI NAS</title>
+<title>搜索与文案生成效果度量台</title>
+<link rel="icon" type="image/png" href="favicon.png">
+<link rel="apple-touch-icon" href="logo.png">
 <link rel="stylesheet" href="styles.css">
 </head>
 <body>
 <div id="app" v-cloak>
 
   <div class="top">
-    <div>
+    <img class="logo" src="logo.png" alt="度量台">
+    <div class="titles">
       <h1>搜索与文案生成效果度量台</h1>
-      <div class="sub">面向 AI NAS 影视/音乐搜索与文案生成场景的离线评估工具：上传标注集与系统输出，在浏览器本地完成指标计算与可视化（数据不出本机）。</div>
+      <div class="sub">上传标注集与系统输出，在本机完成指标计算与可视化 · 数据不出本机</div>
     </div>
     <button class="theme-btn" @click="toggleTheme">{{ theme === 'dark' ? '☀️ 浅色' : '🌙 深色' }}</button>
   </div>
@@ -25,34 +28,39 @@
   <div v-show="tab === 'guide'">
     <div class="card">
       <h2>这套度量在测什么</h2>
-      <p class="desc">两类任务，两套指标。<b>搜索效果</b>回答"用户输入查询后，正确的结果有没有排在前面"；<b>文案生成效果</b>回答"模型生成的文字是否相关、通顺、准确、有吸引力"。两者都需要一份<b>人工标注的黄金数据</b>作为对照基准——没有标注就没有度量。</p>
+      <p class="desc"><b>搜索效果</b>回答"用户输入查询后，正确的结果有没有排在前面"；<b>文案生成效果</b>回答"模型生成的文字是否相关、通顺、准确、有吸引力"。两者都需要一份<b>人工标注的黄金数据</b>作为对照基准。所有指标的计算口径与主流开源评估框架对齐，每个指标都标注了出处，便于与命令行工具交叉验证。</p>
     </div>
     <div class="card">
-      <h2>搜索效果指标（本页自动计算）</h2>
+      <h2>搜索效果指标 <span class="src">口径：ranx / trec_eval</span></h2>
+      <p class="desc">与 ranx（github.com/AmenRa/ranx）、trec_eval（pytrec_eval）的同名指标口径一致，可用 <span class="formula">ranx.evaluate(qrels, run, ["hit_rate@5","mrr@5","map@5","ndcg@5"])</span> 交叉验证。</p>
       <div class="tbl-wrap"><table class="tbl">
-        <tr><th>指标</th><th>回答的问题</th><th>计算方式</th><th>适用场景</th></tr>
-        <tr><td><b>Hit@K（Top-K 命中率）</b></td><td>前 K 条结果里至少有 1 条相关结果的查询占比</td><td class="formula">命中查询数 / 总查询数</td><td>语义类查询的验收主指标（如"剧情搜索 Top5 命中率 ≥ 80%"）</td></tr>
-        <tr><td><b>MRR@K（平均倒数排名）</b></td><td>第一条相关结果平均排在第几位</td><td class="formula">mean(1 / 首个相关结果的排名)</td><td>衡量"正确答案是否够靠前"，适合片名/演员等精确检索</td></tr>
-        <tr><td><b>Recall@K（召回率）</b></td><td>标注的相关结果中有多少被找回来了</td><td class="formula">前K中相关结果数 / 标注相关结果总数</td><td>衡量漏召回，适合"把某系列都找出来"类查询</td></tr>
-        <tr><td><b>Precision@K（精确率）</b></td><td>前 K 条结果里有多少是相关的</td><td class="formula">前K中相关结果数 / K</td><td>衡量误召回（结构化硬条件场景应接近 1）</td></tr>
-        <tr><td><b>NDCG@K（归一化折损累计增益）</b></td><td>综合考虑相关程度分级与排序位置的总分</td><td class="formula">DCG@K / 理想DCG@K，增益取标注等级(0–3)</td><td>有分级标注（非常相关/相关/部分相关）时最全面的排序质量指标</td></tr>
+        <tr><th>指标</th><th>来源框架</th><th>回答的问题</th><th>计算方式</th><th>适用场景</th></tr>
+        <tr><td><b>Hit@K（命中率）</b></td><td><span class="src">ranx: hit_rate</span></td><td>前 K 条里至少有 1 条相关结果的查询占比</td><td class="formula">命中查询数 / 总查询数</td><td>语义类查询验收主指标（如"剧情搜索 Hit@5 ≥ 80%"）</td></tr>
+        <tr><td><b>MRR@K（平均倒数排名）</b></td><td><span class="src">ranx / trec_eval: recip_rank</span></td><td>第一条相关结果平均排第几</td><td class="formula">mean(1 / 首个相关结果排名)</td><td>片名/演员等精确检索"是否够靠前"</td></tr>
+        <tr><td><b>MAP@K（平均精确率均值）</b></td><td><span class="src">ranx / trec_eval: map</span></td><td>综合考虑所有相关结果的位置</td><td class="formula">mean(每命中一条相关结果时的 Precision 的平均)</td><td>多相关结果查询的综合排序质量</td></tr>
+        <tr><td><b>Recall@K（召回率）</b></td><td><span class="src">ranx: recall</span></td><td>标注的相关结果被找回多少</td><td class="formula">前K中相关数 / 标注相关总数</td><td>"把某系列都找出来"类查询的漏召回</td></tr>
+        <tr><td><b>Precision@K（精确率）</b></td><td><span class="src">ranx / trec_eval: P</span></td><td>前 K 条里有多少是相关的</td><td class="formula">前K中相关数 / K</td><td>误召回（结构化硬条件场景应接近 1）</td></tr>
+        <tr><td><b>F1@K</b></td><td><span class="src">ranx: f1</span></td><td>精确与召回的调和平均</td><td class="formula">2PR / (P + R)</td><td>需要单一数字平衡查准/查全时</td></tr>
+        <tr><td><b>NDCG@K</b></td><td><span class="src">ranx / trec_eval: ndcg</span></td><td>考虑相关程度分级与位置的总分</td><td class="formula">DCG@K / 理想DCG@K，增益取标注等级(0–3)</td><td>有分级标注时最全面的排序质量指标</td></tr>
+        <tr><td><b>R-Precision</b></td><td><span class="src">ranx / trec_eval: r_prec</span></td><td>前 R 条（R=该查询相关总数）里的精确率</td><td class="formula">前R中相关数 / R</td><td>不受 K 选取影响的平衡指标</td></tr>
       </table></div>
-      <h3>验收口径建议（对应需求评估文档）</h3>
-      <p class="desc">结构化查询（年份/评分/演员/国家）看 <b>Top1 准确率与硬条件满足率</b>；剧情/情绪等语义查询看 <b>Hit@5</b>；组合查询看 <b>NDCG@5</b>。不要用"能检索出合适结果"这类不可测的表述。</p>
+      <h3>验收口径建议</h3>
+      <p class="desc">结构化查询（年份/评分/演员/国家）看 <b>Top1 命中（K=1 的 Hit）与 Precision</b>；剧情/情绪等语义查询看 <b>Hit@5</b>；组合查询看 <b>NDCG@5</b>。避免"能检索出合适结果"这类不可测表述。</p>
     </div>
     <div class="card">
-      <h2>文案生成效果指标（本页自动计算）</h2>
+      <h2>文案生成效果指标</h2>
       <div class="tbl-wrap"><table class="tbl">
-        <tr><th>指标</th><th>回答的问题</th><th>计算方式</th><th>说明</th></tr>
-        <tr><td><b>维度均分</b></td><td>相关性/流畅性/准确性/吸引力各多少分</td><td class="formula">各维度 1–5 分打分的平均值</td><td>打分来自人工标注或 LLM 评审（LLM-as-a-Judge），评分标准见"操作步骤"页的评审提示词模板</td></tr>
-        <tr><td><b>通过率</b></td><td>多少比例的样本达到发布标准</td><td class="formula">所有维度 ≥ 阈值(默认4分) 的样本占比</td><td>作为上线验收的硬指标，阈值可在页面调整</td></tr>
-        <tr><td><b>ROUGE-L（字符级）</b></td><td>生成文案与参考文案的最长公共子序列重合度</td><td class="formula">F1 = 2PR/(P+R)，基于字符 LCS</td><td>仅当提供参考文案（reference 列）时计算；适合摘要类任务，推荐语类文案以主观维度为准</td></tr>
-        <tr><td><b>低分样本（badcase）</b></td><td>哪些样本拖了后腿</td><td class="formula">按总分升序列出</td><td>badcase 回流是迭代提示词/模型的主要输入</td></tr>
+        <tr><th>指标</th><th>来源框架</th><th>回答的问题</th><th>计算方式</th><th>说明</th></tr>
+        <tr><td><b>维度均分</b></td><td><span class="src">G-Eval · DeepEval</span></td><td>相关性/流畅性/准确性/吸引力各几分</td><td class="formula">各维度 1–5 分的平均值</td><td>打分来自人工或 LLM 评审（LLM-as-a-Judge），方法与 DeepEval 的 G-Eval 指标一致；提示词模板见"操作步骤"页</td></tr>
+        <tr><td><b>通过率</b></td><td><span class="src">DeepEval: pass rate</span></td><td>多少样本达到发布标准</td><td class="formula">所有维度 ≥ 阈值(默认4) 的样本占比</td><td>对应 DeepEval 测试用例的通过率概念，作为上线门禁</td></tr>
+        <tr><td><b>ROUGE-1 / 2 / L</b></td><td><span class="src">rouge-score（Google）</span></td><td>与参考文案的 n-gram / 最长公共子序列重合度</td><td class="formula">字符级 F1（中文按字切分）</td><td>需提供 reference 列；适合摘要类，推荐语类以主观维度为准</td></tr>
+        <tr><td><b>Distinct-1 / 2</b></td><td><span class="src">通用多样性指标（Li et al.）</span></td><td>生成文案的用词多样性</td><td class="formula">全部生成文本中不重复 n-gram 占比</td><td>过低说明模型在"套模板"，各条文案雷同</td></tr>
+        <tr><td><b>Badcase 清单</b></td><td><span class="src">通用实践</span></td><td>哪些样本拖了后腿</td><td class="formula">按总分升序列出</td><td>badcase 回流是迭代提示词/模型的主要输入</td></tr>
       </table></div>
     </div>
     <div class="card">
       <h2>结果怎么读</h2>
-      <p class="desc">① 所有指标都是 0–1（或 1–5 分），越高越好；② 单一系统的绝对分数意义有限，<b>对比才有意义</b>——对比两个版本（v1/v2）、对比不同查询类别（剧情类 vs 年份类），找出短板；③ 语义类指标是概率性的，关注<b>趋势与 badcase 收敛</b>，而不是追求 100%。</p>
+      <p class="desc">① 搜索指标为 0–1、评分维度为 1–5，越高越好；② 单一系统的绝对分数意义有限，<b>对比才有意义</b>——对比版本（v1/v2）、对比查询类别，找出短板；③ 语义类指标是概率性的，关注<b>趋势与 badcase 收敛</b>，而不是追求 100%。</p>
     </div>
   </div>
 
@@ -60,52 +68,61 @@
   <div v-show="tab === 'search'">
     <div class="card">
       <h2>① 提供数据</h2>
-      <p class="desc">需要 2 个 CSV 文件（第 3 个可选）。列名不分大小写，格式详见"操作步骤"页；也可以先点<b>加载示例数据</b>看效果。</p>
+      <p class="desc">推荐先下载 Excel 模板（含填写说明与示例），填好后整个文件拖进来即可；也支持任意列名的 Excel/CSV——系统会自动识别关键信息，缺什么会告诉你怎么补。</p>
+      <div class="uploader" style="margin:0 0 14px">
+        <a class="btn ghost" href="templates/搜索效果度量模板.xlsx" download>⬇︎ 下载 Excel 模板</a>
+        <button class="btn link" @click="loadSearchSample">用示例数据看效果</button>
+      </div>
+      <label class="dropzone" :class="{drag: dragging === 'search'}"
+             @dragover.prevent="dragging = 'search'" @dragleave="dragging = ''"
+             @drop.prevent="onDrop($event, 'search')">
+        <input type="file" multiple accept=".csv,.xlsx,.xls" @change="onPick($event, 'search')">
+        <div class="dz-title">点击选择或拖入文件（可多选）</div>
+        <div class="dz-hint">支持 .xlsx / .csv · 需要：标注集 qrels + 检索结果 run（查询清单可选）· 列名支持中文别名</div>
+      </label>
+      <div class="parts" v-if="searchIngest.touched">
+        <span class="part" :class="searchIngest.qrels ? 'ok' : 'miss'">{{ searchIngest.qrels ? '✓' : '✗' }} 标注集 qrels {{ searchIngest.qrels ? searchIngest.qrels + ' 行' : '未识别' }}</span>
+        <span class="part" :class="searchIngest.run ? 'ok' : 'miss'">{{ searchIngest.run ? '✓' : '✗' }} 检索结果 run {{ searchIngest.run ? searchIngest.run + ' 行' : '未识别' }}</span>
+        <span class="part" :class="searchIngest.queries ? 'ok' : ''">{{ searchIngest.queries ? '✓' : '○' }} 查询清单 {{ searchIngest.queries ? searchIngest.queries + ' 行' : '（可选）未提供' }}</span>
+      </div>
+      <div class="guide-box" v-if="searchGuide.length">
+        <b>还差一点，按下面提示补全后重新上传：</b>
+        <ul><li v-for="g in searchGuide" v-html="g"></li></ul>
+      </div>
       <div class="uploader">
         <div class="field">
-          <label>标注集 qrels.csv（必需）</label>
-          <input type="file" accept=".csv" @change="onFile($event, 'qrels')">
-          <span class="hint">query_id, doc_id, relevance(0–3)</span>
-          <span v-if="files.qrels" class="file-ok">✓ 已载入 {{ files.qrels }} 行</span>
-        </div>
-        <div class="field">
-          <label>检索结果 run.csv（必需）</label>
-          <input type="file" accept=".csv" @change="onFile($event, 'run')">
-          <span class="hint">system, query_id, doc_id, rank（或 score）</span>
-          <span v-if="files.run" class="file-ok">✓ 已载入 {{ files.run }} 行</span>
-        </div>
-        <div class="field">
-          <label>查询清单 queries.csv（可选）</label>
-          <input type="file" accept=".csv" @change="onFile($event, 'queries')">
-          <span class="hint">query_id, query_text, category → 启用按类别对比</span>
-          <span v-if="files.queries" class="file-ok">✓ 已载入 {{ files.queries }} 行</span>
-        </div>
-        <div class="field" style="min-width:90px">
           <label>截断位置 K</label>
           <select v-model.number="topK"><option>1</option><option>3</option><option>5</option><option>10</option></select>
         </div>
         <button class="btn" :disabled="!canRunSearch" @click="runSearchEval">② 计算指标</button>
-        <button class="btn ghost" @click="loadSearchSample">加载示例数据</button>
       </div>
       <div v-if="searchError" class="err">{{ searchError }}</div>
     </div>
 
     <div v-if="searchResult" class="card">
-      <h2>③ 度量结果 <span class="tag">K = {{ searchResult.k }}</span><span class="tag">{{ searchResult.queryCount }} 条查询</span><span class="tag" v-for="s in searchResult.systems">{{ s }}</span></h2>
+      <h2>③ 度量结果 <span class="tag">K = {{ searchResult.k }}</span><span class="tag">{{ searchResult.queryCount }} 条查询</span><span class="src">口径：ranx / trec_eval</span></h2>
       <div v-for="sys in searchResult.systems" :key="sys">
         <h3>{{ sys }}</h3>
         <div class="tiles">
-          <div class="tile"><div class="k">Hit@{{ searchResult.k }} 命中率</div><div class="v">{{ pct(searchResult.summary[sys].hit) }}</div></div>
-          <div class="tile"><div class="k">MRR@{{ searchResult.k }}</div><div class="v">{{ fix(searchResult.summary[sys].mrr) }}</div></div>
-          <div class="tile"><div class="k">Recall@{{ searchResult.k }}</div><div class="v">{{ pct(searchResult.summary[sys].recall) }}</div></div>
-          <div class="tile"><div class="k">Precision@{{ searchResult.k }}</div><div class="v">{{ pct(searchResult.summary[sys].precision) }}</div></div>
-          <div class="tile"><div class="k">NDCG@{{ searchResult.k }}</div><div class="v">{{ fix(searchResult.summary[sys].ndcg) }}</div></div>
+          <div class="tile"><div class="k">Hit@{{ searchResult.k }} 命中率</div><div class="v">{{ pct(searchResult.summary[sys].hit) }}</div><div class="s">ranx: hit_rate</div></div>
+          <div class="tile"><div class="k">MRR@{{ searchResult.k }}</div><div class="v">{{ fix(searchResult.summary[sys].mrr) }}</div><div class="s">trec_eval: recip_rank</div></div>
+          <div class="tile"><div class="k">MAP@{{ searchResult.k }}</div><div class="v">{{ fix(searchResult.summary[sys].map) }}</div><div class="s">trec_eval: map</div></div>
+          <div class="tile"><div class="k">NDCG@{{ searchResult.k }}</div><div class="v">{{ fix(searchResult.summary[sys].ndcg) }}</div><div class="s">trec_eval: ndcg</div></div>
         </div>
       </div>
-      <div class="grid-2">
+      <h3>全部指标</h3>
+      <div class="tbl-wrap"><table class="tbl">
+        <tr><th>指标</th><th>来源框架</th><th class="num" v-for="sys in searchResult.systems">{{ sys }}</th></tr>
+        <tr v-for="m in metricRows">
+          <td><b>{{ m.label(searchResult.k) }}</b></td>
+          <td><span class="src">{{ m.src }}</span></td>
+          <td class="num" v-for="sys in searchResult.systems">{{ m.pct ? pct(searchResult.summary[sys][m.key]) : fix(searchResult.summary[sys][m.key]) }}</td>
+        </tr>
+      </table></div>
+      <div class="grid-2" style="margin-top:16px">
         <div>
           <div class="chart-title">指标汇总对比</div>
-          <p class="chart-sub">五项指标均为 0–1，越高越好；多系统时并排对比</p>
+          <p class="chart-sub">各指标均为 0–1，越高越好；多系统时并排对比</p>
           <div class="chart" ref="chartSummary"></div>
         </div>
         <div>
@@ -137,36 +154,60 @@
   <div v-show="tab === 'gen'">
     <div class="card">
       <h2>① 提供数据</h2>
-      <p class="desc">需要 1 个 CSV：每行一条生成样本，包含生成文案与各维度打分（人工或 LLM 评审打出，1–5 分）。列名中的数值列会被自动识别为评分维度；提供 reference 列时自动计算字符级 ROUGE-L。</p>
+      <p class="desc">推荐先下载 Excel 模板（含填写说明与示例）；也支持任意列名的 Excel/CSV——需要生成文案列 + 各维度评分列（1–5 分），提供参考文案时自动计算 ROUGE。</p>
+      <div class="uploader" style="margin:0 0 14px">
+        <a class="btn ghost" href="templates/文案生成度量模板.xlsx" download>⬇︎ 下载 Excel 模板</a>
+        <button class="btn link" @click="loadGenSample">用示例数据看效果</button>
+      </div>
+      <label class="dropzone" :class="{drag: dragging === 'gen'}"
+             @dragover.prevent="dragging = 'gen'" @dragleave="dragging = ''"
+             @drop.prevent="onDrop($event, 'gen')">
+        <input type="file" multiple accept=".csv,.xlsx,.xls" @change="onPick($event, 'gen')">
+        <div class="dz-title">点击选择或拖入文件</div>
+        <div class="dz-hint">支持 .xlsx / .csv · 需要：生成文案列 + 评分维度列 · 列名支持中文别名（生成文案/参考文案/相关性…）</div>
+      </label>
+      <div class="parts" v-if="genIngest.touched">
+        <span class="part" :class="genIngest.rows ? 'ok' : 'miss'">{{ genIngest.rows ? '✓' : '✗' }} 评测数据 {{ genIngest.rows ? genIngest.rows + ' 行' : '未识别' }}</span>
+        <span class="part" :class="genIngest.dims ? 'ok' : 'miss'">{{ genIngest.dims ? '✓ 评分维度：' + genIngest.dims : '✗ 未识别到评分维度列' }}</span>
+        <span class="part" :class="genIngest.ref ? 'ok' : ''">{{ genIngest.ref ? '✓ 含参考文案（将计算 ROUGE）' : '○ 无参考文案（跳过 ROUGE）' }}</span>
+      </div>
+      <div class="guide-box" v-if="genGuide.length">
+        <b>还差一点，按下面提示补全后重新上传：</b>
+        <ul><li v-for="g in genGuide" v-html="g"></li></ul>
+      </div>
       <div class="uploader">
         <div class="field">
-          <label>生成结果与评分 gen_results.csv（必需）</label>
-          <input type="file" accept=".csv" @change="onFile($event, 'gen')">
-          <span class="hint">case_id, category, prompt, generated, reference, 各维度分…</span>
-          <span v-if="files.gen" class="file-ok">✓ 已载入 {{ files.gen }} 行</span>
-        </div>
-        <div class="field" style="min-width:120px">
           <label>通过阈值（每维 ≥）</label>
-          <input type="number" v-model.number="passThreshold" min="1" max="5" step="0.5">
+          <input type="number" v-model.number="passThreshold" min="1" max="5" step="0.5" style="width:70px">
         </div>
-        <button class="btn" :disabled="!files.gen" @click="runGenEval">② 计算指标</button>
-        <button class="btn ghost" @click="loadGenSample">加载示例数据</button>
+        <button class="btn" :disabled="!genIngest.rows" @click="runGenEval">② 计算指标</button>
       </div>
       <div v-if="genError" class="err">{{ genError }}</div>
     </div>
 
     <div v-if="genResult" class="card">
-      <h2>③ 度量结果 <span class="tag">{{ genResult.count }} 条样本</span><span class="tag">{{ genResult.dims.join(' / ') }}</span></h2>
+      <h2>③ 度量结果 <span class="tag">{{ genResult.count }} 条样本</span><span class="src">G-Eval · DeepEval 口径</span></h2>
       <div class="tiles">
-        <div class="tile"><div class="k">总平均分（各维平均）</div><div class="v">{{ fix(genResult.overallMean, 2) }}<span class="s"> / 5</span></div></div>
-        <div class="tile"><div class="k">通过率（每维 ≥ {{ passThreshold }} 分）</div><div class="v">{{ pct(genResult.passRate) }}</div></div>
-        <div class="tile" v-if="genResult.rougeL !== null"><div class="k">ROUGE-L F1（对照参考文案）</div><div class="v">{{ fix(genResult.rougeL) }}</div></div>
+        <div class="tile"><div class="k">总平均分（各维平均）</div><div class="v">{{ fix(genResult.overallMean, 2) }}<span class="s"> / 5</span></div><div class="s">G-Eval / DeepEval</div></div>
+        <div class="tile"><div class="k">通过率（每维 ≥ {{ passThreshold }}）</div><div class="v">{{ pct(genResult.passRate) }}</div><div class="s">DeepEval pass rate</div></div>
         <div class="tile"><div class="k">最弱维度</div><div class="v" style="font-size:18px">{{ genResult.weakestDim }}</div><div class="s">均分 {{ fix(genResult.weakestScore, 2) }}</div></div>
+        <div class="tile"><div class="k">Distinct-2 多样性</div><div class="v">{{ fix(genResult.distinct2) }}</div><div class="s">通用多样性指标</div></div>
       </div>
-      <div class="grid-2">
+      <h3>全部指标</h3>
+      <div class="tbl-wrap"><table class="tbl">
+        <tr><th>指标</th><th>来源框架</th><th class="num">数值</th><th>说明</th></tr>
+        <tr v-for="d in genResult.dims"><td><b>{{ d }} 均分</b></td><td><span class="src">G-Eval · DeepEval</span></td><td class="num">{{ fix(genResult.dimMeans[d], 2) }} / 5</td><td>{{ genResult.dimMeans[d] < passThreshold ? '低于通过线，优化重点' : '达标' }}</td></tr>
+        <tr><td><b>通过率</b></td><td><span class="src">DeepEval: pass rate</span></td><td class="num">{{ pct(genResult.passRate) }}</td><td>每个维度 ≥ {{ passThreshold }} 分的样本占比</td></tr>
+        <tr v-if="genResult.rouge1 !== null"><td><b>ROUGE-1 F1</b></td><td><span class="src">rouge-score</span></td><td class="num">{{ fix(genResult.rouge1) }}</td><td>与参考文案的单字重合度（字符级）</td></tr>
+        <tr v-if="genResult.rouge2 !== null"><td><b>ROUGE-2 F1</b></td><td><span class="src">rouge-score</span></td><td class="num">{{ fix(genResult.rouge2) }}</td><td>与参考文案的二元组重合度（字符级）</td></tr>
+        <tr v-if="genResult.rougeL !== null"><td><b>ROUGE-L F1</b></td><td><span class="src">rouge-score</span></td><td class="num">{{ fix(genResult.rougeL) }}</td><td>与参考文案的最长公共子序列重合度</td></tr>
+        <tr><td><b>Distinct-1 / Distinct-2</b></td><td><span class="src">多样性指标（Li et al.）</span></td><td class="num">{{ fix(genResult.distinct1) }} / {{ fix(genResult.distinct2) }}</td><td>全部生成文案的不重复字 / 二元组占比，过低说明文案雷同</td></tr>
+        <tr><td><b>平均长度</b></td><td><span class="src">通用统计</span></td><td class="num">{{ fix(genResult.avgLen, 1) }} 字</td><td>对照文案长度规范（如"80字以内"）</td></tr>
+      </table></div>
+      <div class="grid-2" style="margin-top:16px">
         <div>
           <div class="chart-title">各评分维度均分</div>
-          <p class="chart-sub">1–5 分制；低于 4 分的维度是优化重点</p>
+          <p class="chart-sub">1–5 分制；低于通过线的维度是优化重点</p>
           <div class="chart" ref="gchartDims"></div>
         </div>
         <div>
@@ -177,7 +218,7 @@
       </div>
       <div v-if="genResult.hasCategory">
         <div class="chart-title">按文案类别对比（各维度均分）</div>
-        <p class="chart-sub">定位哪类文案（推荐语 / 摘要 / 命中理由）需要单独优化提示词</p>
+        <p class="chart-sub">定位哪类文案需要单独优化提示词</p>
         <div class="chart" ref="gchartCat"></div>
       </div>
       <h3>Badcase 清单（总分最低的 10 条）</h3>
@@ -199,7 +240,7 @@
       <h2>你需要提供什么</h2>
       <div class="tbl-wrap"><table class="tbl">
         <tr><th>任务</th><th>必须提供</th><th>怎么来</th></tr>
-        <tr><td><b>搜索效果度量</b></td><td>① 评测查询集（30–200 条，覆盖各类别）<br>② 标注集 qrels：每条查询哪些结果是相关的、相关程度几级<br>③ 被测系统的检索结果 run：每条查询返回的 Top-N 及排序</td><td>查询集从需求文档示例 + 真实用户查询日志抽样；标注由产品/运营对照曲库/片库人工标（每条查询标 2–5 个相关项，10 分钟/条以内）；run 由研发跑一遍检索接口导出</td></tr>
+        <tr><td><b>搜索效果度量</b></td><td>① 评测查询集（30–200 条，覆盖各类别）<br>② 标注集 qrels：每条查询哪些结果相关、相关程度几级<br>③ 被测系统的检索结果 run：每条查询返回的 Top-N 及排序</td><td>查询集从需求文档示例 + 真实用户查询日志抽样；标注由产品/运营对照曲库/片库人工标（每条查询标 2–5 个相关项）；run 由研发跑一遍检索接口导出</td></tr>
         <tr><td><b>文案生成度量</b></td><td>① 评测用例集（每类文案 20+ 条 prompt）<br>② 模型生成结果<br>③ 各维度评分（人工或 LLM 评审）<br>④ 参考文案（可选，摘要类建议提供）</td><td>评分推荐用下方 LLM 评审提示词批量打分 + 人工抽检 20% 校准；参考文案可取自现有运营文案或人工撰写</td></tr>
       </table></div>
     </div>
@@ -207,22 +248,19 @@
     <div class="card">
       <h2>搜索效果度量 · 操作步骤</h2>
       <div class="steps">
-        <div class="step"><span class="no"></span><div><h4>准备标注集 qrels.csv</h4><p>三列：query_id（查询编号）、doc_id（曲目/影片在系统中的 ID）、relevance（0=不相关 1=部分相关 2=相关 3=非常相关）。没标注的 doc 默认视为不相关，不用写。</p><pre class="code">query_id,doc_id,relevance
-q01,m01a,3
-q01,m01b,2</pre></div></div>
-        <div class="step"><span class="no"></span><div><h4>导出被测系统结果 run.csv</h4><p>研发对评测查询集逐条调用检索接口，取 Top-10 写入：system（版本名，可多版本对比）、query_id、doc_id、rank（从 1 开始；也可给 score，按分数降序）。</p><pre class="code">system,query_id,doc_id,rank,score
-v2_混合检索,q01,m01a,1,0.93</pre></div></div>
-        <div class="step"><span class="no"></span><div><h4>（可选）准备 queries.csv 启用类别分析</h4><p>三列：query_id、query_text、category（剧情语义/主观偏好/组合条件/演员/年份…）。提供后可看到分类别对比图，直接定位短板。</p></div></div>
-        <div class="step"><span class="no"></span><div><h4>上传 → 选 K → 计算</h4><p>在"搜索效果度量"页上传文件，K 按验收口径选（语义类建议 5，精确类建议 1），点击计算。所有计算在浏览器本地完成。</p></div></div>
-        <div class="step"><span class="no"></span><div><h4>读结果 → 回流迭代</h4><p>先看指标汇总是否达验收线，再看类别对比找短板，最后逐条过 badcase 清单：未命中的是召回问题（查词典/索引），命中但排名靠后的是排序问题（调权重）。导出明细 CSV 附在测试报告里。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>下载并填写 Excel 模板（推荐）</h4><p>在"搜索效果度量"页下载模板，含 3 张表（qrels标注集 / run检索结果 / queries查询清单）与填写说明，示例行替换成真实数据即可。也可以上传自己现成的 Excel/CSV——列名支持中文别名（查询ID/文档ID/相关性/排名/系统…），缺关键列时页面会明确提示补什么。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>标注 qrels</h4><p>relevance 相关等级：0=不相关 1=部分相关 2=相关 3=非常相关；未标注的结果默认不相关，无需填写。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>导出被测系统结果 run</h4><p>研发对评测查询集逐条调用检索接口，取 Top-10 写入；system 列填版本名，填多个版本自动对比。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>拖入文件 → 选 K → 计算</h4><p>K 按验收口径选（语义类建议 5，精确类建议 1）。所有计算在浏览器本地完成。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>读结果 → 回流迭代</h4><p>先看指标是否达验收线，再看类别对比找短板，最后逐条过 badcase：未命中是召回问题（查词典/索引），命中但靠后是排序问题（调权重）。导出明细附进测试报告。</p></div></div>
       </div>
     </div>
 
     <div class="card">
       <h2>文案生成度量 · 操作步骤</h2>
       <div class="steps">
-        <div class="step"><span class="no"></span><div><h4>准备评测用例并跑生成</h4><p>每类文案（歌单推荐语/影片命中理由/简介摘要）准备 20+ 条 prompt，跑被测模型得到 generated 列。</p></div></div>
-        <div class="step"><span class="no"></span><div><h4>用 LLM 评审批量打分（或人工打分）</h4><p>将下方提示词与每条样本一起发给评审模型（建议用比被测模型更强的模型），得到四个维度 1–5 分。<b>务必人工抽检 20% 对齐评分标准。</b></p>
+        <div class="step"><span class="no"></span><div><h4>下载模板 / 准备评测用例并跑生成</h4><p>每类文案（歌单推荐语/影片命中理由/简介摘要）准备 20+ 条 prompt，跑被测模型得到生成文案。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>用 LLM 评审批量打分（或人工打分）</h4><p>将下方提示词与每条样本发给评审模型（建议比被测模型更强），得到四个维度 1–5 分。<b>务必人工抽检 20% 对齐评分标准。</b>此方法即 DeepEval 的 G-Eval 指标做法。</p>
         <pre class="code">你是文案质量评审。针对【任务要求】和【生成文案】，按以下四个维度独立打分（1-5 整数），只输出 JSON：
 - relevance 相关性：文案是否切合任务要求与对象（歌单/影片）本身
 - fluency 流畅性：是否通顺自然、无语病、符合中文表达习惯
@@ -232,30 +270,28 @@ v2_混合检索,q01,m01a,1,0.93</pre></div></div>
 生成文案：{generated}
 （如有参考文案可对照：{reference}）
 输出：{"relevance":?,"fluency":?,"accuracy":?,"attractiveness":?,"reason":"一句话"}</pre></div></div>
-        <div class="step"><span class="no"></span><div><h4>汇总成 gen_results.csv</h4><p>固定列：case_id、category、prompt、generated、reference（可选）；其后每个数值列都会被识别为一个评分维度（列名即维度名）。</p></div></div>
-        <div class="step"><span class="no"></span><div><h4>上传 → 设阈值 → 计算</h4><p>在"文案生成度量"页上传，通过阈值默认 4 分（每个维度都 ≥ 4 才算通过），可按发布标准调整。</p></div></div>
-        <div class="step"><span class="no"></span><div><h4>读结果 → 优化提示词/模型</h4><p>最弱维度决定优化方向：准确性低 → 给模型补充结构化元数据；吸引力低 → 在提示词中加入风格范例（few-shot）；按类别图定位哪类文案需要单独的提示词模板。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>填入模板 → 拖入上传 → 设阈值 → 计算</h4><p>通过阈值默认 4 分（每个维度都 ≥ 4 才算通过），可按发布标准调整。</p></div></div>
+        <div class="step"><span class="no"></span><div><h4>读结果 → 优化提示词/模型</h4><p>最弱维度决定优化方向：准确性低 → 给模型补充结构化元数据；吸引力低 → 提示词加风格范例（few-shot）；按类别图定位哪类文案需要单独模板。</p></div></div>
       </div>
     </div>
 
     <div class="card">
       <h2>与开源框架配合（进阶）</h2>
-      <p class="desc">样本量大或要进 CI 时，用命令行框架算分，本页做可视化与归档：</p>
-      <pre class="code"># 搜索指标（Python, ranx）：与本页算法一致，可交叉验证
+      <p class="desc">样本量大或要进 CI 时，用命令行框架算分（口径与本页一致），本页做可视化与归档：</p>
+      <pre class="code"># 搜索指标（ranx）—— 与本页同口径，可交叉验证
 pip install ranx
 python -c "
 from ranx import Qrels, Run, evaluate
-qrels = Qrels.from_file('qrels.trec')  # 或 from_df 读 CSV
+qrels = Qrels.from_file('qrels.trec')
 run   = Run.from_file('run.trec')
-print(evaluate(qrels, run, ['hit_rate@5','mrr@5','recall@5','ndcg@5']))"
+print(evaluate(qrels, run, ['hit_rate@5','mrr@5','map@5','recall@5','precision@5','f1@5','ndcg@5','r-precision']))"
 
-# 生成质量（DeepEval）：内置 G-Eval / 幻觉 / 摘要指标，评审模型可换国产或本地模型
+# 生成质量（DeepEval，G-Eval 口径）
 pip install deepeval
 deepeval test run test_copywriting.py
 
-# 提示词 A/B 回归（promptfoo）：自带 Web UI，适合提示词版本对比
+# 提示词 A/B 回归（promptfoo，自带 Web UI）
 npx promptfoo@latest eval && npx promptfoo@latest view</pre>
-      <p class="desc">框架产出的逐样本分数整理成上述 CSV 上传本页即可，形成统一的评估报告出口。</p>
     </div>
   </div>
 
@@ -283,23 +319,14 @@ npx promptfoo@latest eval && npx promptfoo@latest view</pre>
         </div>
       </div>
     </div>
-    <div class="card">
-      <h2>本度量网页的技术栈及选择理由</h2>
-      <div class="tbl-wrap"><table class="tbl">
-        <tr><th>选型</th><th>理由</th></tr>
-        <tr><td><b>Vue 3</b>（github.com/vuejs/core）</td><td>当前国内团队最主流的前端框架之一；本页用其"全局构建版"直接 &lt;script&gt; 引入，<b>零构建、零 Node 依赖</b>，克隆仓库双击 index.html 即可运行——与 NAS 团队"离线、轻部署"的约束一致。相比 React 免去 JSX 编译链，相比原生 JS 保留声明式数据绑定的可维护性。</td></tr>
-        <tr><td><b>Apache ECharts</b>（github.com/apache/echarts）</td><td>Apache 顶级项目、国内可视化事实标准，中文文档完善；柱状图/直方图/分组对比开箱即用，支持按主题重绘（本页亮/暗切换即依赖此能力）。</td></tr>
-        <tr><td><b>纯静态 + 浏览器本地计算</b></td><td>评测数据（查询日志、标注、生成文案）可能含内部信息，本页所有解析与指标计算都在浏览器内完成，<b>不发起任何网络请求</b>——与产品"数据不出域"的卖点同一原则；依赖（vue/echarts）已随仓库离线内置于 vendor/。</td></tr>
-        <tr><td><b>指标算法自实现（约 100 行）</b></td><td>Hit/MRR/Recall/Precision/NDCG 与 ROUGE-L 均为标准公式，JS 直接实现并可与 ranx 交叉验证，避免为网页引入 Python 后端。</td></tr>
-      </table></div>
-    </div>
   </div>
 
-  <footer>搜索与文案生成效果度量台 · 纯本地静态页面（无网络请求）· 指标口径与《AI NAS 影视/音乐搜索可行性评估》评审报告一致</footer>
+  <footer>搜索与文案生成效果度量台 · 纯本地计算（无网络请求）· 指标口径与 ranx / trec_eval / DeepEval / rouge-score 对齐</footer>
 </div>
 
 <script src="vendor/vue.global.prod.js"></script>
 <script src="vendor/echarts.min.js"></script>
+<script src="vendor/xlsx.full.min.js"></script>
 <script src="samples.js"></script>
 <script src="app.js"></script>
 </body>
