@@ -1,0 +1,453 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+<meta charset="UTF-8" />
+<meta name="viewport" content="width=device-width, initial-scale=1.0" />
+<title>微信视频号下载器 · 本地解密</title>
+<style>
+html,body{margin:0}
+:root {
+  --bg: #0f1115;
+  --bg-elev: #171a21;
+  --bg-elev2: #1f232c;
+  --border: #2a2f3a;
+  --text: #e6e8ec;
+  --text-dim: #9aa1ac;
+  --accent: #07c160;      /* 微信绿 */
+  --accent-dim: #06a552;
+  --danger: #ff5c5c;
+  --warn: #ffb020;
+  --radius: 12px;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.35);
+}
+:root[data-theme='light'],
+:root:not([data-theme='dark']) {
+  /* 显式选浅色，或系统偏好浅色（下方 media query）时生效；data-theme 永远优先 */
+}
+@media (prefers-color-scheme: light) {
+  :root:not([data-theme='dark']) {
+    --bg: #f4f6f9;
+    --bg-elev: #ffffff;
+    --bg-elev2: #eef1f5;
+    --border: #dde1e8;
+    --text: #1a1d23;
+    --text-dim: #66707d;
+    --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+  }
+}
+:root[data-theme='light'] {
+  --bg: #f4f6f9;
+  --bg-elev: #ffffff;
+  --bg-elev2: #eef1f5;
+  --border: #dde1e8;
+  --text: #1a1d23;
+  --text-dim: #66707d;
+  --shadow: 0 8px 30px rgba(0, 0, 0, 0.08);
+}
+
+* { box-sizing: border-box; }
+html, body { height: 100%; margin: 0; }
+body {
+  font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'PingFang SC',
+    'Microsoft YaHei', Roboto, Helvetica, Arial, sans-serif;
+  background: var(--bg);
+  color: var(--text);
+  font-size: 14px;
+  line-height: 1.55;
+  -webkit-font-smoothing: antialiased;
+}
+
+.app { display: flex; flex-direction: column; min-height: 100vh; }
+
+header.topbar {
+  display: flex; align-items: center; gap: 12px;
+  padding: 14px 20px;
+  background: var(--bg-elev);
+  border-bottom: 1px solid var(--border);
+  position: sticky; top: 0; z-index: 10;
+}
+.logo {
+  width: 30px; height: 30px; border-radius: 8px;
+  background: linear-gradient(135deg, var(--accent), #34d67f);
+  display: grid; place-items: center; color: #fff; font-weight: 700;
+}
+.title { font-weight: 650; font-size: 16px; }
+.subtitle { color: var(--text-dim); font-size: 12px; }
+.spacer { flex: 1; }
+.icon-btn {
+  background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text);
+  border-radius: 8px; padding: 7px 11px; cursor: pointer; font-size: 13px;
+}
+.icon-btn:hover { border-color: var(--accent); }
+
+nav.tabs { display: flex; gap: 4px; padding: 10px 16px 0; background: var(--bg-elev);
+  border-bottom: 1px solid var(--border); }
+nav.tabs button {
+  background: transparent; border: none; color: var(--text-dim);
+  padding: 10px 16px; cursor: pointer; font-size: 14px; border-radius: 8px 8px 0 0;
+  border-bottom: 2px solid transparent;
+}
+nav.tabs button.active { color: var(--text); border-bottom-color: var(--accent); font-weight: 600; }
+nav.tabs button:hover { color: var(--text); }
+
+main { flex: 1; padding: 22px; max-width: 900px; width: 100%; margin: 0 auto; }
+.panel { display: none; }
+.panel.active { display: block; animation: fade .18s ease; }
+@keyframes fade { from { opacity: 0; transform: translateY(4px); } to { opacity: 1; transform: none; } }
+
+.card {
+  background: var(--bg-elev); border: 1px solid var(--border);
+  border-radius: var(--radius); padding: 18px; margin-bottom: 16px;
+}
+.card h3 { margin: 0 0 4px; font-size: 15px; }
+.card p.hint { margin: 0 0 14px; color: var(--text-dim); font-size: 12.5px; }
+
+label.field { display: block; margin-bottom: 12px; }
+label.field > span { display: block; margin-bottom: 6px; color: var(--text-dim); font-size: 12.5px; }
+input[type='text'], input[type='number'], textarea {
+  width: 100%; background: var(--bg); color: var(--text);
+  border: 1px solid var(--border); border-radius: 9px; padding: 10px 12px;
+  font-size: 13.5px; font-family: inherit; resize: vertical;
+}
+input:focus, textarea:focus { outline: none; border-color: var(--accent); }
+textarea { min-height: 96px; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; font-size: 12.5px; }
+
+.row { display: flex; gap: 12px; }
+.row > * { flex: 1; }
+
+button.primary {
+  background: var(--accent); color: #fff; border: none; border-radius: 9px;
+  padding: 11px 20px; font-size: 14px; font-weight: 600; cursor: pointer;
+}
+button.primary:hover { background: var(--accent-dim); }
+button.primary:disabled { opacity: .5; cursor: not-allowed; }
+button.ghost {
+  background: var(--bg-elev2); color: var(--text); border: 1px solid var(--border);
+  border-radius: 9px; padding: 11px 16px; font-size: 13.5px; cursor: pointer;
+}
+button.ghost:hover { border-color: var(--accent); }
+.actions { display: flex; gap: 10px; align-items: center; flex-wrap: wrap; margin-top: 4px; }
+
+.dropzone {
+  border: 2px dashed var(--border); border-radius: var(--radius);
+  padding: 30px; text-align: center; color: var(--text-dim); cursor: pointer;
+  transition: .15s; background: var(--bg);
+}
+.dropzone.drag { border-color: var(--accent); color: var(--text); background: var(--bg-elev2); }
+.dropzone strong { color: var(--text); }
+
+.tag { display: inline-block; padding: 2px 8px; border-radius: 999px; font-size: 11px;
+  background: var(--bg-elev2); border: 1px solid var(--border); color: var(--text-dim); }
+.tag.ok { color: var(--accent); border-color: var(--accent); }
+.tag.warn { color: var(--warn); border-color: var(--warn); }
+.tag.err { color: var(--danger); border-color: var(--danger); }
+
+.jobs { list-style: none; margin: 0; padding: 0; }
+.job { background: var(--bg); border: 1px solid var(--border); border-radius: 10px;
+  padding: 12px 14px; margin-bottom: 10px; }
+.job-head { display: flex; align-items: center; gap: 10px; }
+.job-name { font-weight: 600; font-size: 13.5px; word-break: break-all; flex: 1; }
+.job-meta { color: var(--text-dim); font-size: 12px; }
+.bar { height: 7px; background: var(--bg-elev2); border-radius: 999px; overflow: hidden; margin-top: 9px; }
+.bar > i { display: block; height: 100%; width: 0; background: linear-gradient(90deg, var(--accent), #34d67f);
+  transition: width .2s ease; }
+.job-actions { margin-top: 8px; display: flex; gap: 8px; }
+.job-actions a, .job-actions button {
+  font-size: 12px; color: var(--accent); background: none; border: none; cursor: pointer; padding: 0; text-decoration: none; }
+
+.steps { counter-reset: s; padding-left: 0; list-style: none; margin: 0; }
+.steps li { position: relative; padding: 6px 0 14px 40px; border-left: 2px solid var(--border); margin-left: 12px; }
+.steps li:last-child { border-left-color: transparent; }
+.steps li::before {
+  counter-increment: s; content: counter(s);
+  position: absolute; left: -13px; top: 2px; width: 24px; height: 24px; border-radius: 50%;
+  background: var(--accent); color: #fff; display: grid; place-items: center; font-size: 12px; font-weight: 700;
+}
+.steps code, code.inline { background: var(--bg-elev2); padding: 1px 6px; border-radius: 5px;
+  font-family: ui-monospace, Menlo, monospace; font-size: 12px; color: var(--accent); }
+
+.notice { border-radius: 10px; padding: 11px 14px; font-size: 12.5px; margin-bottom: 14px; }
+.notice.info { background: rgba(7,193,96,.08); border: 1px solid var(--accent); color: var(--text); }
+.notice.warn { background: rgba(255,176,32,.09); border: 1px solid var(--warn); color: var(--text); }
+
+.kbd { font-family: ui-monospace, Menlo, monospace; background: var(--bg-elev2);
+  border: 1px solid var(--border); border-radius: 5px; padding: 1px 6px; font-size: 12px; }
+a { color: var(--accent); }
+footer { text-align: center; color: var(--text-dim); font-size: 12px; padding: 16px; }
+.hidden { display: none !important; }
+
+</style>
+</head>
+<body>
+
+<div class="app">
+  <header class="topbar">
+    <div class="logo">微</div>
+    <div>
+      <div class="title">微信视频号下载器 · 本地解密</div>
+      <div class="subtitle">纯浏览器端运算 · 不上传任何数据</div>
+    </div>
+    <div class="spacer"></div>
+    <button id="theme-btn" class="icon-btn" title="切换主题">🌙</button>
+  </header>
+  <main>
+    <div class="notice info">
+      已经用浏览器 / 下载工具把<strong>加密的视频号视频</strong>存到本地了？在这里选择文件并填入
+      <code class="inline">decode_key</code>，即可在本机解密为可正常播放的 MP4。整个过程<b>完全在你的浏览器里完成</b>。
+    </div>
+    <div class="card">
+      <h3>① 选择加密视频文件</h3>
+      <div class="dropzone" id="dropzone">
+        <p>把加密视频拖到这里，或 <strong>点击选择文件</strong></p>
+        <p id="local-file-name" class="job-meta"></p>
+        <input type="file" id="local-file" class="hidden" />
+      </div>
+      <label class="field" style="margin-top:14px">
+        <span>② 填入 decode_key（纯数字）</span>
+        <input type="text" id="local-key" placeholder="例如 2136343393" />
+      </label>
+      <div class="actions">
+        <button class="primary" id="local-go" disabled>③ 解密并下载</button>
+        <span id="local-status" class="job-meta"></span>
+      </div>
+    </div>
+    <div class="card">
+      <h3>如何获取加密视频与 decode_key</h3>
+      <ol class="steps">
+        <li>电脑浏览器打开 <code>https://channels.weixin.qq.com/</code>，找到目标视频。</li>
+        <li>按 <span class="kbd">F12</span> → <b>Network（网络）</b> 面板，然后播放视频。</li>
+        <li>找到含 <code>object_desc</code> 的接口，记下 <code>media[0].url</code> 与 <code>media[0].decode_key</code>。</li>
+        <li>浏览器打开该 <code>url</code> 直接把视频下载到本地（此时是加密的，只能播放前几秒）。</li>
+        <li>回到本页选择它 + 填 <code>decode_key</code>，点解密即可。</li>
+      </ol>
+      <div class="notice info" style="margin-top:6px">
+        想要「粘贴链接自动下载」或「网页端一键捕获」？请使用完整版：桌面 App 或
+        <code class="inline">npm run web</code> 本地服务（见项目 README）。
+      </div>
+    </div>
+    <div class="card">
+      <h3>解密原理</h3>
+      <p class="hint">微信视频号只加密文件前 128KB（131072 字节）。加密使用以 <code class="inline">decode_key</code>
+        为种子的 ISAAC-64 伪随机数生成器生成 128KB 密钥流，再对文件头部逐字节 XOR。本页用同样算法生成密钥流并再做一次
+        XOR 即可还原。核心算法已与公开 Go 参考实现逐字节比对一致。</p>
+    </div>
+  </main>
+  <footer>仅供个人学习与备份自己发布的内容使用，请遵守相关平台条款与法律法规。</footer>
+</div>
+
+
+<script>/**
+ * 微信视频号视频解密核心 —— 纯 JavaScript 实现（Node 与浏览器通用）。
+ *
+ * 原理：微信视频号仅对视频文件的前 131072 字节（128KB）做加密，其余为明文。
+ * 加密使用 ISAAC-64 伪随机数生成器，以接口返回的 decode_key 作为种子生成
+ * 128KB 密钥流，再对文件头部逐字节做 XOR。解密即再做一次相同的 XOR。
+ *
+ * ISAAC-64 变体算法移植自 ltaoo/wx_channels_download（其源自
+ * Hanson/WechatSphDecrypt），已用 Go 参考实现逐字节比对验证一致。
+ *
+ * 该文件不依赖任何运行环境特定 API，可在 Node.js 与浏览器中直接使用。
+ */
+(function (root, factory) {
+  const mod = factory();
+  if (typeof module !== 'undefined' && module.exports) {
+    module.exports = mod;
+  } else {
+    root.WxDecrypt = mod;
+  }
+})(typeof self !== 'undefined' ? self : this, function () {
+  'use strict';
+
+  // 加密作用的字节数（密钥流长度）
+  const KEYSTREAM_SIZE = 131072;
+  const MASK = (1n << 64n) - 1n; // uint64 掩码
+  const GOLDEN = 0x9e3779b97f4a7c13n;
+
+  const u64 = (x) => x & MASK;
+  const shl = (x, n) => (x << n) & MASK; // 逻辑左移（uint64）
+  const shr = (x, n) => (x & MASK) >> n; // 逻辑右移（uint64）
+
+  // ISAAC-64 上下文
+  class RandCtx64 {
+    constructor(seed) {
+      this.randCnt = 255;
+      this.seed = new Array(256).fill(0n);
+      this.mm = new Array(256).fill(0n);
+      this.aa = 0n;
+      this.bb = 0n;
+      this.cc = 0n;
+      this._init(u64(seed));
+    }
+
+    _mix(s) {
+      // s: 长度为 8 的 BigInt 数组 [a,b,c,d,e,f,g,h]
+      let [a, b, c, d, e, f, g, h] = s;
+      a = u64(a - e); f ^= shr(h, 9n); h = u64(h + a);
+      b = u64(b - f); g ^= shl(a, 9n); a = u64(a + b);
+      c = u64(c - g); h ^= shr(b, 23n); b = u64(b + c);
+      d = u64(d - h); a ^= shl(c, 15n); c = u64(c + d);
+      e = u64(e - a); b ^= shr(d, 14n); d = u64(d + e);
+      f = u64(f - b); c ^= shl(e, 20n); e = u64(e + f);
+      g = u64(g - c); d ^= shr(f, 17n); f = u64(f + g);
+      h = u64(h - d); e ^= shl(g, 14n); g = u64(g + h);
+      s[0] = a; s[1] = b; s[2] = c; s[3] = d;
+      s[4] = e; s[5] = f; s[6] = g; s[7] = h;
+    }
+
+    _init(encKey) {
+      const s = [GOLDEN, GOLDEN, GOLDEN, GOLDEN, GOLDEN, GOLDEN, GOLDEN, GOLDEN];
+
+      this.seed[0] = encKey;
+      for (let i = 1; i < 256; i++) this.seed[i] = 0n;
+
+      for (let i = 0; i < 4; i++) this._mix(s);
+
+      for (let i = 0; i < 256; i += 8) {
+        for (let j = 0; j < 8; j++) s[j] = u64(s[j] + this.seed[i + j]);
+        this._mix(s);
+        for (let j = 0; j < 8; j++) this.mm[i + j] = s[j];
+      }
+
+      for (let i = 0; i < 256; i += 8) {
+        for (let j = 0; j < 8; j++) s[j] = u64(s[j] + this.mm[i + j]);
+        this._mix(s);
+        for (let j = 0; j < 8; j++) this.mm[i + j] = s[j];
+      }
+
+      this._isaac64();
+    }
+
+    _isaac64() {
+      this.cc = u64(this.cc + 1n);
+      this.bb = u64(this.bb + this.cc);
+
+      for (let i = 0; i < 256; i++) {
+        switch (i % 4) {
+          case 0: this.aa = u64(~(this.aa ^ shl(this.aa, 21n))); break;
+          case 1: this.aa ^= shr(this.aa, 5n); break;
+          case 2: this.aa ^= shl(this.aa, 12n); break;
+          case 3: this.aa ^= shr(this.aa, 33n); break;
+        }
+        this.aa = u64(this.aa + this.mm[(i + 128) % 256]);
+        const x = this.mm[i];
+        const y = u64(this.mm[Number(shr(x, 3n) % 256n)] + this.aa + this.bb);
+        this.mm[i] = y;
+        this.bb = u64(this.mm[Number(shr(y, 11n) % 256n)] + x);
+        this.seed[i] = this.bb;
+      }
+    }
+
+    next() {
+      const result = this.seed[this.randCnt];
+      if (this.randCnt === 0) {
+        this._isaac64();
+        this.randCnt = 255;
+      } else {
+        this.randCnt--;
+      }
+      return result;
+    }
+  }
+
+  /**
+   * 生成指定长度的密钥流。
+   * @param {number|bigint|string} decodeKey 接口返回的 decode_key
+   * @param {number} length 密钥流字节数（默认 131072）
+   * @returns {Uint8Array}
+   */
+  function generateKeystream(decodeKey, length = KEYSTREAM_SIZE) {
+    const key = BigInt(decodeKey);
+    const ctx = new RandCtx64(key);
+    const out = new Uint8Array(length);
+    for (let i = 0; i < length; i += 8) {
+      let rnd = ctx.next();
+      // BigEndian 写入 8 字节
+      for (let j = 0; j < 8; j++) {
+        const idx = i + j;
+        if (idx >= length) break;
+        out[idx] = Number(shr(rnd, BigInt((7 - j) * 8)) & 0xffn);
+      }
+    }
+    return out;
+  }
+
+  /**
+   * 就地解密：对 data 的前 KEYSTREAM_SIZE 字节做 XOR。
+   * @param {Uint8Array} data 加密视频数据（会被就地修改）
+   * @param {number|bigint|string} decodeKey
+   * @returns {Uint8Array} 同一个 data 引用
+   */
+  function decryptInPlace(data, decodeKey) {
+    const encLen = Math.min(KEYSTREAM_SIZE, data.length);
+    const ks = generateKeystream(decodeKey, encLen);
+    for (let i = 0; i < encLen; i++) data[i] ^= ks[i];
+    return data;
+  }
+
+  /**
+   * 返回解密后的新数组（不修改入参）。
+   */
+  function decrypt(data, decodeKey) {
+    const copy = data instanceof Uint8Array ? new Uint8Array(data) : Uint8Array.from(data);
+    return decryptInPlace(copy, decodeKey);
+  }
+
+  /**
+   * 校验解密结果是否为合法 MP4（偏移 4 处应为 'ftyp'）。
+   */
+  function isValidMp4(data) {
+    if (data.length < 8) return false;
+    return data[4] === 0x66 && data[5] === 0x74 && data[6] === 0x79 && data[7] === 0x70; // 'ftyp'
+  }
+
+  return {
+    KEYSTREAM_SIZE,
+    RandCtx64,
+    generateKeystream,
+    decryptInPlace,
+    decrypt,
+    isValidMp4,
+  };
+});
+</script>
+<script>
+(function(){
+  'use strict';
+  var $=function(id){return document.getElementById(id)};
+  var root=document.documentElement;
+  $('theme-btn').addEventListener('click',function(){
+    var next=root.getAttribute('data-theme')==='dark'?'light':'dark';
+    root.setAttribute('data-theme',next);
+    $('theme-btn').textContent=next==='dark'?'🌙':'☀️';
+    try{localStorage.setItem('theme',next)}catch(e){}
+  });
+  try{var s=localStorage.getItem('theme');if(s){root.setAttribute('data-theme',s);$('theme-btn').textContent=s==='dark'?'🌙':'☀️';}}catch(e){}
+  function fmt(n){if(!n)return'0 B';var u=['B','KB','MB','GB'],i=0;while(n>=1024&&i<3){n/=1024;i++}return n.toFixed(i?1:0)+' '+u[i]}
+  var dz=$('dropzone'),fi=$('local-file'),file=null;
+  dz.addEventListener('click',function(){fi.click()});
+  dz.addEventListener('dragover',function(e){e.preventDefault();dz.classList.add('drag')});
+  dz.addEventListener('dragleave',function(){dz.classList.remove('drag')});
+  dz.addEventListener('drop',function(e){e.preventDefault();dz.classList.remove('drag');if(e.dataTransfer.files[0])sel(e.dataTransfer.files[0])});
+  fi.addEventListener('change',function(){if(fi.files[0])sel(fi.files[0])});
+  function sel(f){file=f;$('local-file-name').textContent=f.name+'  ('+fmt(f.size)+')';$('local-go').disabled=false}
+  $('local-go').addEventListener('click',async function(){
+    if(!file)return;
+    var key=$('local-key').value.replace(/[^\d]/g,'');
+    if(!key){alert('请输入 decode_key（纯数字）。');return}
+    $('local-status').textContent='解密中…';
+    try{
+      var buf=new Uint8Array(await file.arrayBuffer());
+      window.WxDecrypt.decryptInPlace(buf,key);
+      var valid=window.WxDecrypt.isValidMp4(buf);
+      var name=file.name.replace(/\.(mp4|f0|bin|dat)$/i,'')+'_decrypted.mp4';
+      var blob=new Blob([buf],{type:'video/mp4'});
+      var a=document.createElement('a');a.href=URL.createObjectURL(blob);a.download=name;
+      document.body.appendChild(a);a.click();a.remove();setTimeout(function(){URL.revokeObjectURL(a.href)},4000);
+      $('local-status').innerHTML=valid?'<span class="tag ok">成功</span> 已识别到 MP4 签名，文件已开始下载。':'<span class="tag warn">已保存</span> 未检测到 MP4 签名，decode_key 可能不匹配。';
+    }catch(err){$('local-status').innerHTML='<span class="tag err">失败</span> '+err.message}
+  });
+})();
+</script>
+
+</body>
+</html>

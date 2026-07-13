@@ -1,0 +1,62 @@
+{
+  "name": "wechat-video-downloader",
+  "version": "1.0.0",
+  "description": "微信视频号下载器 —— 下载并解密视频号视频/直播回放（网页版 + 桌面 dmg 应用）",
+  "author": "allen",
+  "license": "MIT",
+  "main": "src/main/main.js",
+  "scripts": {
+    "start": "electron .",
+    "web": "node src/server/web.js",
+    "test": "node test/decrypt.test.js",
+    "dist:mac": "electron-builder --mac dmg",
+    "dist:win": "electron-builder --win nsis",
+    "dist:linux": "electron-builder --linux AppImage",
+    "dist": "electron-builder -mwl"
+  },
+  "dependencies": {},
+  "devDependencies": {
+    "electron": "^31.0.0",
+    "electron-builder": "^24.13.3"
+  },
+  "build": {
+    "appId": "com.allen.wechatvideodownloader",
+    "productName": "微信视频号下载器",
+    "directories": {
+      "output": "dist",
+      "buildResources": "build"
+    },
+    "files": [
+      "src/**/*",
+      "!src/server/**",
+      "package.json"
+    ],
+    "extraMetadata": {
+      "main": "src/main/main.js"
+    },
+    "mac": {
+      "category": "public.app-category.utilities",
+      "target": [
+        { "target": "dmg", "arch": ["arm64", "x64"] }
+      ],
+      "icon": "build/icon.png",
+      "identity": null
+    },
+    "dmg": {
+      "title": "微信视频号下载器",
+      "contents": [
+        { "x": 130, "y": 220 },
+        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+      ]
+    },
+    "win": {
+      "target": ["nsis"],
+      "icon": "build/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage"],
+      "icon": "build/icon.png",
+      "category": "Utility"
+    }
+  }
+}

@@ -1,0 +1,134 @@
+<!DOCTYPE html>
+<html lang="zh-CN" data-theme="dark">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>微信视频号下载器</title>
+  <link rel="stylesheet" href="styles.css" />
+</head>
+<body>
+  <div class="app">
+    <header class="topbar">
+      <div class="logo">微</div>
+      <div>
+        <div class="title">微信视频号下载器</div>
+        <div class="subtitle">下载并解密视频号视频 · 直播回放</div>
+      </div>
+      <div class="spacer"></div>
+      <span id="env-badge" class="tag">…</span>
+      <button id="theme-btn" class="icon-btn" title="切换主题">🌙</button>
+    </header>
+
+    <nav class="tabs">
+      <button data-tab="smart" class="active">智能下载</button>
+      <button data-tab="local">本地解密</button>
+      <button data-tab="help">使用帮助</button>
+    </nav>
+
+    <main>
+      <!-- ============ 智能下载 ============ -->
+      <section class="panel active" id="panel-smart">
+        <div id="web-warn" class="notice warn hidden">
+          当前为「纯网页模式」，浏览器安全策略禁止跨域抓取视频，<b>智能下载不可用</b>。
+          请改用「本地解密」，或下载桌面版 App / 用 <code class="inline">npm run web</code> 启动本地服务。
+        </div>
+        <div class="card">
+          <h3>智能下载</h3>
+          <p class="hint">粘贴视频号接口返回的 JSON（含 <code class="inline">url</code> 与 <code class="inline">decode_key</code>），
+            或分别填写视频直链与 decode_key。程序会自动下载并解密为标准 MP4。</p>
+
+          <label class="field">
+            <span>① 粘贴接口 JSON / 视频链接（可选，自动识别 url 与 decode_key）</span>
+            <textarea id="smart-text" placeholder='例如：{"data":{"object_desc":{"media":[{"url":"https://finder.video.qq.com/...","decode_key":2136343393}]}}}'></textarea>
+          </label>
+          <div class="row">
+            <label class="field">
+              <span>② 视频直链 URL</span>
+              <input type="text" id="smart-url" placeholder="https://finder.video.qq.com/..." />
+            </label>
+            <label class="field">
+              <span>③ decode_key（纯数字）</span>
+              <input type="text" id="smart-key" placeholder="例如 2136343393" />
+            </label>
+          </div>
+          <label class="field">
+            <span>文件名（可选）</span>
+            <input type="text" id="smart-title" placeholder="留空则自动命名" />
+          </label>
+          <div class="actions">
+            <button class="ghost" id="smart-parse">识别链接与 key</button>
+            <button class="primary" id="smart-go">开始下载并解密</button>
+            <button class="ghost" id="choose-dir">选择保存目录…</button>
+            <span id="dir-label" class="job-meta"></span>
+          </div>
+        </div>
+
+        <div class="card" id="jobs-card">
+          <h3>下载任务</h3>
+          <p class="hint">支持同时进行多个任务。</p>
+          <ul class="jobs" id="jobs"></ul>
+        </div>
+      </section>
+
+      <!-- ============ 本地解密 ============ -->
+      <section class="panel" id="panel-local">
+        <div class="notice info">
+          已经用浏览器 / 下载工具把<strong>加密视频文件</strong>存到本地了？在这里选择文件并填入
+          <code class="inline">decode_key</code>，即可在本机完成解密（<b>纯本地运算，不上传任何数据</b>）。
+        </div>
+        <div class="card">
+          <h3>本地文件解密</h3>
+          <div class="dropzone" id="dropzone">
+            <p>把加密的视频文件拖到这里，或 <strong>点击选择文件</strong></p>
+            <p id="local-file-name" class="job-meta"></p>
+            <input type="file" id="local-file" class="hidden" />
+          </div>
+          <label class="field" style="margin-top:14px">
+            <span>decode_key（纯数字）</span>
+            <input type="text" id="local-key" placeholder="例如 2136343393" />
+          </label>
+          <div class="actions">
+            <button class="primary" id="local-go" disabled>解密并保存</button>
+            <span id="local-status" class="job-meta"></span>
+          </div>
+        </div>
+      </section>
+
+      <!-- ============ 使用帮助 ============ -->
+      <section class="panel" id="panel-help">
+        <div class="card">
+          <h3>如何获取视频链接与 decode_key</h3>
+          <p class="hint">视频号视频是加密的，需要「视频直链」和「decode_key」两样东西才能解密。以下是不用装证书的通用方法：</p>
+          <ol class="steps">
+            <li>用电脑浏览器打开 <code>https://channels.weixin.qq.com/</code>，登录后找到目标视频；或在微信中「复制链接」后用浏览器打开。</li>
+            <li>按 <span class="kbd">F12</span> 打开开发者工具，切到 <b>Network（网络）</b> 面板，勾选保留日志。</li>
+            <li>播放该视频，在请求列表里筛选 <code>finderGetCommentDetail</code> 或包含 <code>object_desc</code> 的接口。</li>
+            <li>在返回 JSON 里找到 <code>media[0].url</code>（视频直链）和 <code>media[0].decode_key</code>（数字）。</li>
+            <li>把整段 JSON 粘贴到「智能下载」的输入框，点<b>识别</b>后开始下载；或手动填入两个字段。</li>
+          </ol>
+          <div class="notice info" style="margin-top:6px">
+            也可以先用浏览器直接把视频直链下载成 <code class="inline">.mp4</code>（此时是加密的、只能播放前几秒），
+            再到「本地解密」页选它 + 填 <code class="inline">decode_key</code> 得到可正常播放的视频。
+          </div>
+        </div>
+        <div class="card">
+          <h3>解密原理</h3>
+          <p class="hint">
+            微信视频号只加密文件<b>前 128KB（131072 字节）</b>，其余为明文。加密使用以 <code class="inline">decode_key</code>
+            为种子的 ISAAC-64 伪随机数生成器产生 128KB 密钥流，再对文件头部逐字节 XOR。本工具用同样算法生成密钥流并再做一次
+            XOR 即可还原。核心算法为纯 JavaScript 实现，已与公开的 Go 参考实现逐字节比对一致。
+          </p>
+        </div>
+      </section>
+    </main>
+
+    <footer>
+      仅供个人学习与备份自己发布的内容使用，请遵守相关平台条款与法律法规。
+    </footer>
+  </div>
+
+  <!-- 共享解密核心（浏览器端本地解密使用） -->
+  <script src="../shared/decrypt.js"></script>
+  <script src="app.js"></script>
+</body>
+</html>

@@ -1,0 +1,67 @@
+name: 构建桌面安装包
+
+# 在 macOS / Windows / Linux runner 上打包，产物作为 Artifact 上传。
+# 手动触发（Actions 页面点 Run workflow），或推 tag v* 时自动构建并发布 Release。
+
+on:
+  workflow_dispatch:
+  push:
+    tags:
+      - 'v*'
+
+permissions:
+  contents: write
+
+jobs:
+  build:
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - os: macos-latest
+            script: dist:mac
+            artifact: dmg
+            pattern: 'dist/*.dmg'
+          - os: windows-latest
+            script: dist:win
+            artifact: windows-exe
+            pattern: 'dist/*.exe'
+          - os: ubuntu-latest
+            script: dist:linux
+            artifact: linux-appimage
+            pattern: 'dist/*.AppImage'
+    runs-on: ${{ matrix.os }}
+    defaults:
+      run:
+        working-directory: wechat-video-downloader
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: 安装依赖
+        run: npm install
+
+      - name: 运行测试
+        run: npm test
+
+      - name: 打包
+        run: npm run ${{ matrix.script }}
+        env:
+          # 不做代码签名（个人使用）；如需签名请配置证书相关 secrets
+          CSC_IDENTITY_AUTO_DISCOVERY: 'false'
+
+      - name: 上传产物
+        uses: actions/upload-artifact@v4
+        with:
+          name: ${{ matrix.artifact }}
+          path: wechat-video-downloader/${{ matrix.pattern }}
+          if-no-files-found: warn
+
+      - name: 发布 Release（仅打 tag 时）
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v2
+        with:
+          files: wechat-video-downloader/${{ matrix.pattern }}
