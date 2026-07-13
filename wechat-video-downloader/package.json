@@ -14,9 +14,10 @@
     "dist:linux": "electron-builder --linux AppImage",
     "dist": "electron-builder -mwl"
   },
-  "dependencies": {},
   "devDependencies": {
-    "electron": "^31.0.0",
+    "@electron/packager": "^18.3.6",
+    "@electron/universal": "^3.0.6",
+    "electron": "^31.7.7",
     "electron-builder": "^24.13.3"
   },
   "build": {
@@ -37,7 +38,13 @@
     "mac": {
       "category": "public.app-category.utilities",
       "target": [
-        { "target": "dmg", "arch": ["arm64", "x64"] }
+        {
+          "target": "dmg",
+          "arch": [
+            "arm64",
+            "x64"
+          ]
+        }
       ],
       "icon": "build/icon.png",
       "identity": null
@@ -45,16 +52,28 @@
     "dmg": {
       "title": "微信视频号下载器",
       "contents": [
-        { "x": 130, "y": 220 },
-        { "x": 410, "y": 220, "type": "link", "path": "/Applications" }
+        {
+          "x": 130,
+          "y": 220
+        },
+        {
+          "x": 410,
+          "y": 220,
+          "type": "link",
+          "path": "/Applications"
+        }
       ]
     },
     "win": {
-      "target": ["nsis"],
+      "target": [
+        "nsis"
+      ],
       "icon": "build/icon.png"
     },
     "linux": {
-      "target": ["AppImage"],
+      "target": [
+        "AppImage"
+      ],
       "icon": "build/icon.png",
       "category": "Utility"
     }

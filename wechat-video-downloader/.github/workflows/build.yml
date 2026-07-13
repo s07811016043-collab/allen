@@ -6,6 +6,8 @@ name: 构建桌面安装包
 on:
   workflow_dispatch:
   push:
+    branches:
+      - claude/wechat-video-downloader-app-yepzb8
     tags:
       - 'v*'
 
