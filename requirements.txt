@@ -1,0 +1,8 @@
+# Agent 框架依赖（会话启动 hook 自动安装，见 .claude/hooks/session-start.sh）
+claude-agent-sdk==0.2.116
+langgraph==1.2.9
+langchain==1.3.13
+langchain-anthropic
+openai-agents==0.18.2
+smolagents==1.26.0
+anthropic==0.116.0
