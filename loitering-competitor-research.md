@@ -135,7 +135,44 @@ Ring 因云端人脸在美国多地无法上线、遭 EFF 抗议；Nest 熟人�
 
 ---
 
-## 6. 参考资料
+## 6. 算法效果与真实徘徊事件 Case 调研
+
+### 6.1 先说结论：行业没有可比的准召数据
+
+- **厂商侧**：7 家竞品均**不公开**任何徘徊/人脸/检测的精确率、召回率或误报率指标。唯一的数字是 eufy 宣传 BionicMind 自学习后人脸识别"可达 99.9%"，属营销口径，无测试集、无 FAR 条件，不可采信为对标基线。
+- **第三方侧**：Tom's Guide、Wirecutter、RTINGS、Security.org 等评测机构做过**人形/包裹检测与 AI 描述的横评**，但全部是少量场景的手工定性测试；**没有任何机构建立过"徘徊事件"的标准化测试集与量化评测**。这直接印证本报告第 4 章建议：我方 PRD 的量化准召承诺（P≥90%/R≥85%、FAR≤1 次/路/天）在行业内没有对标物，本身就是差异化资产。
+
+### 6.2 第三方横评的可用数据点
+
+| 来源 | 测试对象 | 关键结论 |
+| --- | --- | --- |
+| Tom's Guide 六摄像头 AI 横评（2026） | Nest、Arlo、Wyze、Ring、Blink、eufy | 定性排名：**Google Nest 的生成式 AI 体验最完善**（描述质量、对话式搜索）；Arlo/Blink 的 AI 几乎全依赖云端+订阅；Nest 人形检测在端侧、活动区域免费；eufy 人形检测在 HomeBase 3 本地免订阅。未给出准召数字 |
+| SmartHomeExplorer 聚合评分（聚合 Wirecutter/Tom's Guide/RTINGS/Security.org，2026-05） | 12 款摄像头 | eufy SoloCam S340 综合分最高（8.7）；Wyze Cam v4 误报率显著高于 Arlo/eufy。**极端 case：某受测摄像头 8 小时发出 47 条误报，却漏掉了真实的包裹小偷**——说明"告警多"与"抓得住"完全是两回事，与我方"FAR 与召回并列考核"的口径一致 |
+| Ring Video Descriptions 上手实测（MakeUseOf 等） | Ring AI 描述 | 认包裹"多数时候准确"，偶有描述错误；Ring 为此内置 VLM 实时护栏 + 用户纠错反馈训练机制 |
+
+### 6.3 真实徘徊/识别事件 Case 库（来自评测与用户论坛）
+
+以下 case 全部来自公开评测和厂商社区，按"对我方 PRD 的映射"整理：
+
+| # | Case（来源） | 现象 | 对我方 PRD 的映射 |
+| --- | --- | --- | --- |
+| C1 | Aqara G5 Pro 评测（HomeKitNews） | **15 岁少年因为走得慢，被系统判定为"逗留"触发告警**——慢速路过被误判徘徊 | 直接对应 4.3"缓慢直线路过排除"开关的设计动机；也说明纯时长阈值方案（我方本期口径）必然产生此类误报，需在测试集中放入"慢速路过"负样本并监控其占比 |
+| C2 | Aqara G5 Pro 多篇评测（Basic Tutorials / Matter Alpha） | 出厂默认**偏敏感**，"不想每分钟收推送就得手动调灵敏度"；但夜间零误报，明显好于被雨点和飞虫频繁触发的前代 Reolink | 对应我方灵敏度三档设计与 7.5 夜间指标单列；"雨/虫触发"是夜间红外 FAR 的主要来源，验收负样本必须覆盖 |
+| C3 | eufy 社区（官方论坛） | **"每一个新访客都被误识别成已有家庭成员"，数月未新增任何新人员进库**——自学习系统把陌生人强行归入熟人 | 这是开放集识别（陌生人拒识）失效的典型案例，直接对应我方 S2 槽"陌生人被误认成熟人 FPIR≤1%"指标与"身份不确定输出 unknown 三态"设计；也提示自学习机制必须有拒识下限，不能为"越用越准"牺牲拒识 |
+| C4 | Google Nest 社区 + 媒体报道（9to5Google/Pocketables） | Familiar Faces **八年口碑不佳**：天天见的人认不出、妻子与陌生人混淆、小孩与来访朋友混淆；迁移 Gemini 后一度全设备识别停摆；**Gemini 日报把误识别结果写进每日总结**，放大了错误的可见性 | 两个教训：① 人脸库质量管理（低质样本清理、最新样本自动更新、点赞/点踩反馈）是长期运营能力，Google 2026 年的修复三件套值得直接吸收进我方 4.5；② LLM 摘要会放大上游识别错误——我方"固定文案 + LLM 仅补充、描述与词槽冲突时以词槽为准"的双层设计正是针对此风险 |
+| C5 | Ring Familiar Faces（TechCrunch 等） | 云端人脸导致伊利诺伊/得州/波特兰无法上线，EFF 持续抗议 | 合规 case，见第 4 章发现 5 |
+| C6 | Reolink 官方支持文档与社区 | Zone Loitering 需 ≥4 点多边形圈定；官方建议**白天灵敏度 10–50、夜间 1–10 分开调**；误报主因是雨、虫、小动物 | 竞品中唯一与我方"圈定区域 + 徘徊"形态一致的落地实现；其"日夜灵敏度分开配置"的做法可作为我方灵敏度档位按布防时段自动切换的依据 |
+| C7 | Aqara G4 门铃徘徊检测参数（官方 FAQ） | 逗留判定时长**默认仅 3 秒**、可配置；文档明确提示"设太短会频繁触发、耗电" | 竞品的消费级门铃把阈值压到 3s 换"不漏"，代价是误报和功耗——反衬我方 30s 默认值站在"少而准"一侧，且"阈值开放用户设置"有明确的竞品先例 |
+
+### 6.4 对我方的三点行动建议
+
+1. **自建对比评测**：行业没有公开徘徊基准 → 采购 Reolink（有明确徘徊侦测）与 Aqara G5 Pro（有逗留告警）各 1–2 台，用我方第 9 章自建测试集的同一批片段跑同口径对比（事件级 P/R + FAR/日），形成内部对标数据。这是目前唯一能获得竞品真实准召的方法，成本低、两周可完成。
+2. **把 C1–C4 case 直接转化为测试用例**：慢速路过、默认灵敏度下的推送频率、陌生人强行归熟人、人脸库脏样本累积，全部纳入验收测试集的负样本与长稳测试项。
+3. **运营指标补位**：竞品的教训集中在"上线后劣化"（人脸库变脏、误报累积导致用户关功能）。建议在 PRD 北极星中的"用户告警关闭率 ≤5%"之外，增加上线后周期性回归：熟人库月度抽检正确率、FAR 周报，防止 C3/C4 式的长期劣化。
+
+---
+
+## 7. 参考资料
 
 - eufy：[HomeBase S380 Smart Features（日报含陌生人徘徊）](https://www.eufy.com/security-features)；[eufy 边缘 AI 发布稿（BionicMind）](https://www.prnewswire.com/news-releases/eufy-security-ushers-in-a-new-era-of-smart-home-security---powered-at-the-edge-by-ai-machine-learning-301637186.html)；[HomeBase 3 产品页（本地 50 人脸）](https://www.eufy.com/products/t80301d1)
 - Reolink：[ReoNeura 官方页（本地 AI 视频搜索/摘要）](https://reolink.com/lp/reoneura/)；[ReoNeura 生态解读（徘徊/越线/入侵三件套）](https://www.reichelt.com/magazin/en/news-en/reoneura-reolinks-ai-ecosystem-redefines-video-surveillance/)；[本地 AI Hub 免订阅报道](https://www.techlicious.com/blog/reolinks-brings-ai-home-without-the-cloud-or-a-monthly-fee/)；[CES 2026 AI Hub 预告](https://eftm.com/2025/12/reolink-teases-details-on-new-reoneura-ai-hub-and-new-cameras-coming-at-ces-2026-270105)
@@ -144,3 +181,4 @@ Ring 因云端人脸在美国多地无法上线、遭 EFF 抗议；Nest 熟人�
 - Google Nest：[Gemini for Home 相机功能官方说明](https://support.google.com/googlenest/answer/15542305)；[Familiar Faces 改进报道（9to5Google）](https://9to5google.com/2025/12/22/gemini-home-familiar-face-updates/)；[Google Home Premium 说明](https://home.google.com/get-inspired/simpler-smarter-living-with-gemini-for-home/)
 - Amazon Ring：[Ring AI 功能官方页](https://ring.com/ring-ai-features)；[Familiar Faces 推送与争议（TechCrunch）](https://techcrunch.com/2025/12/09/amazons-ring-rolls-out-controversial-ai-powered-facial-recognition-feature-to-video-doorbells/)；[4K 相机与 AI 发布（含"生面孔停留"话术）](https://www.aboutamazon.com/news/devices/ring-camera-4k-home-security)；[Alexa+ 对话式门铃](https://techcrunch.com/2025/12/18/amazons-new-alexa-feature-adds-conversational-ai-to-ring-doorbells/)
 - Arlo：[Arlo Secure 6 AI 功能官方 FAQ](https://kb.arlo.com/000063416/What-new-AI-features-are-available-for-Arlo-Secure)；[Event Captions 与 Video Search 发布稿](https://securitybrief.com.au/story/arlo-secure-6-adds-ai-event-captions-natural-video-search)；[Advanced AI Detections（Custom Detection）说明](https://kb.arlo.com/000063412/What-are-Arlo-s-new-Advanced-AI-Detections-and-how-do-they-work)
+- 算法效果与 Case（第 6 章）：[Tom's Guide 六摄像头 AI 横评](https://www.tomsguide.com/home/smart-home/which-security-camera-has-the-best-ai-we-put-six-to-the-test-from-google-ring-blink-and-others-to-find-out)；[SmartHomeExplorer 聚合评分（含 47 条误报 case）](https://www.smarthomeexplorer.com/guides/best-smart-security-cameras-2026)；[Aqara G5 Pro 评测：慢走少年被判逗留（HomeKitNews）](https://homekitnews.com/2025/03/17/aqara-g5-pro-outdoor-cam-poe-version-review/)；[Aqara G5 Pro 评测：默认偏敏感/夜间零误报（Basic Tutorials）](https://basic-tutorials.com/reviews/gadget-reviews/aqara-camera-hub-g5-pro/)；[eufy 社区：新访客全部被误识别为家人](https://community.eufy.com/t/face-recognition-inaccuracy-every-new-visitor-misidentified/5632296)；[Nest Familiar Faces 长期失准与 Gemini 修复（Pocketables）](https://pocketables.com/2025/12/its-sucked-for-eight-years-but-google-finally-fixing-familiar-faces-due-to-gemini.html)；[Google Home 修复 Familiar Faces（9to5Google）](https://9to5google.com/2026/05/06/google-home-nest-cam-familiar-faces-improvements/)；[Nest 社区：识别停摆投诉帖](https://www.googlenestcommunity.com/t5/Cameras-and-Doorbells/Familiar-face-detection-is-absolutely-failing-since-migration-to-google/m-p/766503)；[Reolink 周界防护与徘徊配置指南](https://support.reolink.com/articles/43590651628697-Comprehensive-Guide-to-Reolink-Perimeter-Protection-and-Smart-Event-Detection/)；[Reolink 误报排查（日夜灵敏度建议）](https://support.reolink.com/articles/900000628726-How-to-Reduce-False-Alarms-of-Motion-Detection/)；[Aqara G4 门铃 FAQ（逗留默认 3s）](https://www.aqara.com/en/product/smart-video-doorbell-g4/faq/)；[Ring Video Descriptions 官方说明](https://ring.com/support/articles/97l0i/Ring-AI-Video-Descriptions-Single-Event-Alert-Beta)；[Ring AI 描述上手（MakeUseOf）](https://www.makeuseof.com/ring-detailed-alerts-ai/)
