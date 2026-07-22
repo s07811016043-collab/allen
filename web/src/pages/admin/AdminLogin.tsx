@@ -1,6 +1,6 @@
 import { useState } from 'react'
 import { Link, useNavigate } from 'react-router-dom'
-import { ADMIN_EMAIL, ADMIN_PASSWORD, K_ADMIN_SESSION } from '../../admin/adminData'
+import { authenticateAdmin, K_ADMIN_SESSION } from '../../admin/adminData'
 
 export default function AdminLogin() {
   const nav = useNavigate()
@@ -9,11 +9,12 @@ export default function AdminLogin() {
   const [error, setError] = useState('')
 
   const submit = () => {
-    if (email.trim().toLowerCase() === ADMIN_EMAIL && password === ADMIN_PASSWORD) {
-      localStorage.setItem(K_ADMIN_SESSION, JSON.stringify({ email: ADMIN_EMAIL, at: Date.now() }))
+    const acct = authenticateAdmin(email, password)
+    if (acct) {
+      localStorage.setItem(K_ADMIN_SESSION, JSON.stringify({ email: acct.email, role: acct.role, at: Date.now() }))
       nav('/admin/invites')
     } else {
-      setError('邮箱或密码不正确')
+      setError('邮箱或密码不正确,或账号已被停用')
     }
   }
 

@@ -36,6 +36,37 @@ export const K_ADMIN_SESSION = 'adm_session'
 export const ADMIN_EMAIL = '111@qq.com'
 export const ADMIN_PASSWORD = '111'
 
+export interface AdminAccount {
+  email: string
+  password: string
+  role: 'super' | 'ops'
+  status: 'active' | 'disabled'
+  createdAt: string
+}
+
+const K_ADMINS = 'adm_accounts'
+
+// Seed the default admin; whoever logs into it first is the super admin.
+export function loadAdmins(): AdminAccount[] {
+  const list = load<AdminAccount[]>(K_ADMINS, [])
+  if (list.length === 0) {
+    const seed: AdminAccount[] = [{
+      email: ADMIN_EMAIL, password: ADMIN_PASSWORD, role: 'super', status: 'active',
+      createdAt: new Date().toISOString(),
+    }]
+    save(K_ADMINS, seed)
+    return seed
+  }
+  return list
+}
+export const saveAdmins = (a: AdminAccount[]) => save(K_ADMINS, a)
+
+export function authenticateAdmin(email: string, password: string): AdminAccount | null {
+  const acct = loadAdmins().find((a) => a.email.toLowerCase() === email.trim().toLowerCase())
+  if (!acct || acct.status !== 'active' || acct.password !== password) return null
+  return acct
+}
+
 export function load<T>(key: string, fallback: T): T {
   try {
     const raw = localStorage.getItem(key)
