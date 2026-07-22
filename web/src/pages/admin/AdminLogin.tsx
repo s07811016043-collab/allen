@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { ADMIN_EMAIL, ADMIN_PASSWORD, K_ADMIN_SESSION } from '../../admin/adminData'
 
 export default function AdminLogin() {
@@ -19,6 +19,7 @@ export default function AdminLogin() {
 
   return (
     <div className="login-page">
+      <Link to="/login" className="back-link">← 返回用户登录</Link>
       <div className="login-hero">
         <h1>调研平台 · 管理后台</h1>
         <p>仅限内部运营与项目管理员使用</p>

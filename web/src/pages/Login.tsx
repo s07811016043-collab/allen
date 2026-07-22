@@ -76,7 +76,7 @@ export default function Login() {
         </label>
         {error && <p className="error">{error}</p>}
       </div>
-      <p className="admin-entry"><Link to="/admin/login">Admin</Link></p>
+      <p className="admin-entry"><Link to="/admin/login">管理员登录</Link></p>
     </div>
   )
 }
