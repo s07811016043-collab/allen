@@ -42,6 +42,7 @@ export function MediaTile({ media, watermark, selected, onClick, onWatched, big 
 }) {
   const videoRef = useRef<HTMLVideoElement>(null)
   const [done, setDone] = useState(false)
+  const [failed, setFailed] = useState(false)
 
   useEffect(() => {
     const el = videoRef.current
@@ -52,11 +53,19 @@ export function MediaTile({ media, watermark, selected, onClick, onWatched, big 
         onWatched(media.id)
       }
     }
+    // PRD 5.5.2 load-failure fallback: an unplayable video must not block
+    // submission, so it is exempted from the watch gate.
+    const fail = () => {
+      setFailed(true)
+      if (!done) { setDone(true); onWatched(media.id) }
+    }
     el.addEventListener('timeupdate', check)
     el.addEventListener('ended', check)
+    el.addEventListener('error', fail)
     return () => {
       el.removeEventListener('timeupdate', check)
       el.removeEventListener('ended', check)
+      el.removeEventListener('error', fail)
     }
   }, [done, media.id, onWatched])
 
@@ -74,6 +83,7 @@ export function MediaTile({ media, watermark, selected, onClick, onWatched, big 
       {media.type === 'video' && media.durationSec && (
         <span className="tile-duration">{media.durationSec}s</span>
       )}
+      {failed && <span className="tile-failed">⚠ video unavailable</span>}
       {selected && <span className="tile-check">✓</span>}
       <span className="watermark">{watermark}</span>
     </div>
