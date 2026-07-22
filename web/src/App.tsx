@@ -7,6 +7,8 @@ import RateAesthetic from './pages/RateAesthetic'
 import RateKeyword from './pages/RateKeyword'
 import Rewards from './pages/Rewards'
 import Profile from './pages/Profile'
+import AdminLogin from './pages/admin/AdminLogin'
+import AdminLayout from './pages/admin/AdminLayout'
 import { BottomNav, TopBar } from './components'
 
 function RequireAuth({ children }: { children: JSX.Element }) {
@@ -18,6 +20,18 @@ function RequireAuth({ children }: { children: JSX.Element }) {
 
 export default function App() {
   const { user } = useStore()
+  const loc = useLocation()
+  const isAdmin = loc.pathname.startsWith('/admin')
+
+  if (isAdmin) {
+    return (
+      <Routes>
+        <Route path="/admin/login" element={<AdminLogin />} />
+        <Route path="/admin/*" element={<AdminLayout />} />
+      </Routes>
+    )
+  }
+
   return (
     <div className="app">
       <TopBar />

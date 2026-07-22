@@ -1,7 +1,7 @@
 import { useState } from 'react'
-import { useNavigate } from 'react-router-dom'
+import { Link, useNavigate } from 'react-router-dom'
 import { useStore } from '../store'
-import { VALID_INVITE_CODES } from '../mock'
+import { consumeInvite, isValidInvite } from '../admin/adminData'
 
 export default function Login() {
   const { t, login } = useStore()
@@ -14,7 +14,7 @@ export default function Login() {
   const [error, setError] = useState('')
 
   const checkInvite = () => {
-    if (!VALID_INVITE_CODES.includes(invite.trim().toUpperCase())) {
+    if (!isValidInvite(invite)) {
       setError(t('inviteInvalid'))
       return false
     }
@@ -24,6 +24,7 @@ export default function Login() {
   const finish = (userEmail: string) => {
     if (!consent) { setError(t('consentRequired')); return }
     if (!checkInvite()) return
+    consumeInvite(invite)
     login(userEmail, invite.trim().toUpperCase())
     nav('/')
   }
@@ -75,6 +76,7 @@ export default function Login() {
         </label>
         {error && <p className="error">{error}</p>}
       </div>
+      <p className="admin-entry"><Link to="/admin/login">Admin</Link></p>
     </div>
   )
 }
