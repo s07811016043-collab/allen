@@ -1,0 +1,546 @@
+name,url,region,language,source_type,category,crawl_method,priority,usable,http_status,origin,evidence_note
+RadarAI,https://radarai.top,国内,中文,AI 工具/产品发现,国内 AI 新闻资讯媒体（25个）,page/firecrawl,P1,yes,200,Top200+known-url,AI 趋势监控与行业资讯聚合平台，强调技术趋势、开源项目和工具生态
+腾讯科技,https://news.qq.com,国内,中文,政策/安全/治理,国内 AI 新闻资讯媒体（25个）,page/firecrawl,P1,yes,200,Top200+known-url,覆盖互联网大厂、AI 产品、产业政策和科技公司动态
+财联社 AI daily,https://cls.cn,国内,中文,政策/安全/治理,国内 AI 新闻资讯媒体（25个）,page/firecrawl,P1,yes,200,Top200+known-url,财联社旗下 AI 前沿产品，聚焦 AI 公司、资本市场和政策
+36氪 AI 频道,https://36kr.com/information/AI/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,创投媒体 AI 频道，覆盖创业、投融资和商业模式
+AI 工具集日报,https://ai-bot.cn/daily-ai-news/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,每日 AI 资讯、热点、动态、融资、产品发布
+DeepTech 深科技,https://www.deeptechchina.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,覆盖 AI、生命科学、芯片、新材料等硬科技
+IT 之家,https://ithome.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,科技资讯门户，AI 板块覆盖大量产业新闻和产品发布
+新智元,https://aiera.com.cn,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,AI 社交资讯+专家智库+产业生态平台
+新浪科技-人工智能,https://tags.news.sina.com.cn/人工智能,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,新浪旗下 AI 新闻聚合页，实时滚动快讯
+智东西,https://zhidx.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,智能产业媒体，聚焦芯片、汽车、机器人、AI 硬件
+科技行者,https://www.techwalker.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,关注 AI 创业、硬科技、云计算、开源和全球科技趋势
+量子位,https://qbitai.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,追踪 AI 新趋势，擅长把技术突破写成有传播力的科技故事
+钛媒体,https://tmtpost.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,从科技商业、资本、监管和公司竞争角度观察 AI
+雷峰网,https://leiphone.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,专注 AI、硬科技、智能驾驶、机器人、芯片
+无矩 AI,https://iaipie.com,国内,中文,模型/评测,国内 AI 新闻资讯媒体（25个）,page/firecrawl,P1,yes,200,Top200+known-url,每日 AI 行业资讯速览，覆盖大模型、芯片、云、Agent 等赛道
+AI 科技评论,https://www.leiphone.com/category/ai,国内,中文,研究/论文,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,偏技术与产业结合，关注论文、模型和研究进展
+机器之心,https://jiqizhixin.com,国内,中文,研究/论文,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,国内最具影响力的 AI 专业媒体，技术深度与学术性最强
+甲子光年,https://www.jazzyear.com/,国内,中文,研究/论文,国内 AI 新闻资讯媒体（25个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,重视科技产业研究、公司案例和商业趋势
+Simon Willison Weblog,https://simonwillison.net/tags/ai/,国外,英文,AI 工具/产品发现,独立技术观察,rss/page/firecrawl,P1,yes,200,新增50,LLM 工具、模型发布、AI 工程实践和安全观察
+Artificial Intelligence News,https://artificialintelligence-news.com,国外,英文,政策/安全/治理,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,page/firecrawl,P1,yes,200,Top200+known-url,AI 行业新闻聚合，覆盖技术突破、产品发布和政策
+EU AI Policy,https://digital-strategy.ec.europa.eu/en/policies/european-approach-artificial-intelligence,国外,英文,政策/安全/治理,政府/政策,rss/page/firecrawl,P1,yes,200,新增50,欧盟 AI Act、政策指南、实施进展
+Google AI on The Keyword,https://blog.google/technology/ai/,国外,英文,政策/安全/治理,官方产品/公司,rss/page/firecrawl,P1,yes,200,新增50,Google AI 产品、政策、应用与公司级发布
+METR Blog,https://metr.org/blog/,国外,英文,政策/安全/治理,AI 评测/安全,rss/page/firecrawl,P1,yes,200,新增50,前沿模型能力评测、危险能力、自动化研发任务
+Microsoft AI Blog,https://blogs.microsoft.com/ai/,国外,英文,政策/安全/治理,官方产品/公司,rss/page/firecrawl,P1,yes,200,新增50,Microsoft AI 战略、Copilot、产业合作与政策
+NIST CAISI,https://www.nist.gov/caisi,国外,英文,政策/安全/治理,政府/标准,rss/page/firecrawl,P1,yes,200,新增50,美国 AI 标准、安全、红队评测、测试方法
+OECD AI Policy Observatory,https://oecd.ai/,国外,英文,政策/安全/治理,政策数据库,rss/page/firecrawl,P1,yes,200,新增50,全球 AI 政策、国家策略、指标和报告
+Stanford AI Index,https://hai.stanford.edu/ai-index,国外,英文,政策/安全/治理,数据报告,rss/page/firecrawl,P1,yes,200,新增50,AI Index 年度报告、产业数据、模型趋势、政策数据
+AI Business,https://aibusiness.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,403,Top200+known-url,企业级 AI 商业新闻，覆盖 AI 战略、采购和实施
+AI Magazine,https://aimagazine.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,聚焦 AI 高管与运营层面，含思想领袖访谈、真实案例和战略洞察
+AI News,https://ainews.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,快速覆盖机器人、NLP、神经网络进展，提供网络研讨会和播客
+AI TechPark,https://aitechpark.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,AI 技术与企业应用媒体，关注 AI 基础设施、云和边缘计算
+AWS Machine Learning Blog,https://aws.amazon.com/blogs/machine-learning/,国外,英文,新闻/媒体,云与企业 AI,rss/page/firecrawl,P1,yes,200,新增50,AWS AI/ML 产品、架构实践、客户案例
+Analytics Insight,https://analyticsinsight.net,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,2016 年成立，专注 AI、大数据、 fintech，提供深度报告、专家访谈和趋势分析
+Bloomberg AI,https://bloomberg.com/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,403,Top200+known-url,财经媒体 AI 板块，关注 AI 资本市场、芯片和巨头动态
+DATACONOMY,https://dataconomy.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,数据与 AI 产业媒体，关注大数据、AI 治理和企业数字化
+Engadget AI,https://engadget.com/tag/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,消费电子与科技媒体 AI 栏目
+Financial Times AI,https://ft.com/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,403,Top200+known-url,财经媒体 AI 板块，关注 AI 对商业和经济的影响
+Forbes AI,https://forbes.com/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,商业媒体 AI 板块，含 AI 专栏作家和榜单
+Google Cloud AI & ML Blog,https://cloud.google.com/blog/products/ai-machine-learning,国外,英文,新闻/媒体,云与企业 AI,rss/page/firecrawl,P1,yes,200,新增50,Vertex AI、Gemini 企业应用、AI 基础设施案例
+KDnuggets,https://kdnuggets.com,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,1997 年创立的数据科学/AI/ML 老牌媒体，由 Gregory Piatetsky-Shapiro 运营，深度文章与教程
+LangChain Blog,https://blog.langchain.com/,国外,英文,新闻/媒体,AI 应用开发,rss/page/firecrawl,P1,yes,200,新增50,Agent、RAG、LangGraph、LLM 应用工程实践
+LlamaIndex Blog,https://www.llamaindex.ai/blog,国外,英文,新闻/媒体,AI 应用开发,rss/page/firecrawl,P1,yes,200,新增50,RAG、Agent、企业知识库、框架更新
+Readwrite AI,https://readwrite.com/category/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,403,Top200+known-url,科技媒体 AI 板块，覆盖 AI 趋势、产品和创业
+Reuters Technology,https://reuters.com/technology/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,401,Top200+known-url,通讯社 AI 新闻，权威快讯和全球视角
+TechCrunch AI,https://techcrunch.com/category/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,创投科技媒体，AI 板块覆盖创业公司、融资、产品发布
+The Information AI,https://theinformation.com/topics/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,403,Top200+known-url,付费科技深度报道，AI 独家内幕和产业分析
+Unite.AI,https://unite.ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,AI 新闻与教育平台，覆盖机器学习、机器人、AI 伦理和初创公司动态
+VentureBeat AI,https://venturebeat.com/category/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,429,Top200+known-url,全球知名科技媒体 AI 栏目，聚焦 AI 创业、企业应用、投融资和商业化案例
+WSJ AI,https://wsj.com/tech/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,limited,401,Top200+known-url,华尔街日报 AI 板块，企业与资本视角
+Wired AI,https://wired.com/tag/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,科技文化媒体，深度长文和 AI 社会议题
+ZDNET AI,https://zdnet.com/topic/artificial-intelligence,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,企业 IT 视角的 AI 报道，关注企业应用和采购
+Artificial Analysis,https://artificialanalysis.ai/,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P1,yes,200,新增50,模型价格、速度、质量、API 对比和趋势
+Azure AI Foundry Blog,https://techcommunity.microsoft.com/category/ai/blog/azure-ai-foundry-blog,国外,英文,模型/评测,云与企业 AI,rss/page/firecrawl,P1,yes,200,新增50,Azure AI Foundry、企业开发、模型部署实践
+Hugging Face Blog,https://huggingface.co/blog,国外,英文,模型/评测,开源模型/社区,rss/page/firecrawl,P1,yes,200,新增50,模型发布、数据集、推理、开源生态和教程
+LMArena,https://lmarena.ai/,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P1,yes,200,新增50,Chatbot Arena 模型对战、排行榜、偏好评测
+LiveBench,https://livebench.ai/,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P1,yes,200,新增50,去污染 LLM benchmark、推理/编码/数学等任务
+MarkTechPost,https://marktechpost.com,国外,英文,模型/评测,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,page/firecrawl,P1,yes,200,Top200+known-url,AI 与营销科技媒体，深度报道大模型、NLP、计算机视觉和企业 AI 应用
+OpenAI Cookbook,https://cookbook.openai.com/,国外,英文,模型/评测,AI 应用开发,rss/page/firecrawl,P1,yes,200,新增50,OpenAI API 示例、RAG、Agent、评测与工程实践
+Our World in Data AI,https://ourworldindata.org/artificial-intelligence,国外,英文,模型/评测,数据报告,rss/page/firecrawl,P1,yes,200,新增50,AI 指标、模型能力、社会影响数据可视化
+SWE-bench,https://www.swebench.com/,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P1,yes,200,新增50,真实软件工程任务的 LLM 编码能力评测
+The Verge AI,https://theverge.com/ai-artificial-intelligence,国外,英文,模型/评测,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,page/firecrawl,P1,yes,200,Top200+known-url,科技文化媒体 AI 频道，产品评测和产业报道兼顾
+Allen Institute for AI Blog,https://allenai.org/blog,国外,英文,研究/论文,研究机构,rss/page/firecrawl,P1,yes,200,新增50,Ai2 模型、数据集、开放科学和 NLP 研究
+Anthropic Alignment Science,https://alignment.anthropic.com/,国外,英文,研究/论文,AI 安全,rss/page/firecrawl,P1,yes,200,新增50,Anthropic 对齐、安全、可解释性研究
+Apple Machine Learning Research,https://machinelearning.apple.com/,国外,英文,研究/论文,官方研究,rss/page/firecrawl,P1,yes,200,新增50,Apple ML 论文、设备端模型、隐私计算研究
+Ars Technica AI,https://arstechnica.com/ai,国外,英文,研究/论文,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,技术深度报道，覆盖 AI 研究、政策和产业
+Berkeley AI Research Blog,https://bair.berkeley.edu/blog/,国外,英文,研究/论文,高校研究,rss/page/firecrawl,P1,yes,200,新增50,BAIR 实验室研究进展、论文解读、机器人/LLM/视觉
+Epoch AI,https://epoch.ai/,国外,英文,研究/论文,数据/研究,rss/page/firecrawl,P1,yes,200,新增50,AI 训练算力、模型规模、趋势数据和分析
+Google Research Blog,https://research.google/blog/,国外,英文,研究/论文,官方研究,rss/page/firecrawl,P1,yes,200,新增50,Google Research 最新论文、模型、数据集、AI 应用研究
+MIT Technology Review (AI),https://technologyreview.com/topic/artificial-intelligence,国外,英文,研究/论文,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,麻省理工旗下科技媒体，深度技术分析与 AI 社会影响研究，前沿趋势报道权威
+Stanford HAI News,https://hai.stanford.edu/news,国外,英文,研究/论文,高校/政策,rss/page/firecrawl,P1,yes,200,新增50,Stanford HAI AI 研究、治理、社会影响新闻
+The Decoder,https://the-decoder.com,国外,英文,研究/论文,国外 AI 新闻媒体与科技媒体 AI 板块（30个）,rss/page/firecrawl,P1,yes,200,Top200+known-url,专注 AI 模型、研究和突破的英文媒体，深度技术报道
+UK AI Security Institute Blog,https://www.aisi.gov.uk/blog,国外,英文,研究/论文,政府/安全,rss/page/firecrawl,P1,yes,200,新增50,英国 AISI AI 安全评测、政策、研究合作
+360AI 导航,https://ai.hao.360.com,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,背靠 360 安全技术，整合自研产品，覆盖全场景 AI 需求
+AI 工具集,https://ai-bot.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,内容结构清晰，注重实用性与场景化推荐，含每日 AI 资讯
+AI 工具集导航,https://aitool-hub.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,收录 700+ 国内外优质 AI 工具，18 个分类，每日更新排行榜
+AIBase 导航,https://top.aibase.com,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,收录产品超 2.2 万，提供免费产品专区，分类清晰
+AIGC 工具导航,https://aigc.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,全网分类最全、收录最全的生成式 AI 工具导航
+AIHub,https://aihub.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,精选国内外 999+ 优质 AI 工具、资源和资讯
+AINav,https://ainav.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,中文 AI 工具导航站，整理最前沿的人工智能工具
+AITOP100,https://aitop100.cn,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,垂直 AI 赛道，聚合全球超 3000 款工具，含 AIGC 赛事和社区
+GitHubDaily,https://github.com/GitHubDaily/GitHubDaily,国内,中文,AI 工具/产品发现,国内 AI 公众号矩阵精选（20个）,github/rss-or-releases,P2,yes,200,Top200+known-url,长期推荐开源项目、开发工具和工程实践
+toolify.ai（中文版）,https://toolify.ai/zh/,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,limited,403,Top200+known-url,工具收录数量庞大，内容每日自动更新，分类系统清晰
+优设 AI 工具导航,https://hao.uisdc.com/ai/,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,优设网旗下，为 AI 创作者提供绘画、对话、翻译等导航
+图钉 AI 导航,https://tudingai.com,国内,中文,AI 工具/产品发现,国内 AI 工具导航站（12个）,page/firecrawl,P2,yes,200,Top200+known-url,分享优质 AI 工具，涵盖热门项目、前沿资讯及学习交流
+少数派 AI,https://sspai.com/tag/AI,国内,中文,AI 工具/产品发现,效率工具/AI,page,P2,yes,200,expanded,AI tools and workflows
+歸藏的 AI 工具箱,https://guizang.ai/,国内,中文,AI 工具/产品发现,国内 AI 公众号矩阵精选（20个）,page/firecrawl,P2,yes,200,Top200+known-url,实用派代表，工具收集、提示词、案例和工作流突出
+站长之家 AI,https://ai.chinaz.com/,国内,中文,AI 工具/产品发现,AI 工具/资讯,page,P2,yes,200,expanded,AI tools and news
+逛逛 GitHub,https://github.com/521xueweihan/HelloGitHub,国内,中文,AI 工具/产品发现,国内 AI 公众号矩阵精选（20个）,github/rss-or-releases,P2,yes,200,Top200+known-url,发现开源项目、工具库、模型应用和代码仓库
+51CTO AI,https://www.51cto.com/ai/,国内,中文,新闻/媒体,开发者媒体/AI,page,P2,yes,200,expanded,AI developer content
+AIGC 资源社,https://aigc.cnblogs.com/,国内,中文,新闻/媒体,AIGC 资源,page,P2,yes,200,expanded,AI resources
+APPSO,https://www.ifanr.com/app,国内,中文,新闻/媒体,国内 AI 公众号矩阵精选（20个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,把 AI 产品放进真实工作流里讲
+CAAI 中国人工智能学会,https://www.caai.cn/,国内,中文,新闻/媒体,AI 学会/新闻,page,P2,yes,200,expanded,AI society updates
+Datawhale GitHub,https://github.com/datawhalechina,国内,中文,新闻/媒体,AI 学习/开源,page,P2,yes,200,expanded,open-source learning
+OpenMMLab,https://openmmlab.com/,国内,中文/英文,新闻/媒体,开源 AI 框架,page,P2,yes,200,expanded,AI open-source updates
+Z Finance,https://www.zfinance.com/,国内,中文,新闻/媒体,国内 AI 公众号矩阵精选（20个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,从财经和科技交叉角度观察 AI
+优设 AIGC,https://www.uisdc.com/tag/aigc,国内,中文,新闻/媒体,设计/AIGC,page,P2,yes,200,expanded,AI design news
+开源中国 AI,https://www.oschina.net/news/widgets/_news_index_all_list?type=ajax&p=1&q=AI,国内,中文,新闻/媒体,开源/开发者媒体,page,P2,yes,200,expanded,AI open-source news
+爱范儿 AI,https://www.ifanr.com/tag/ai,国内,中文,新闻/媒体,科技媒体/AI,page,P2,yes,200,expanded,AI product news
+AI 产品榜,https://www.aicpb.com/,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,按月发布全球 AI 产品网站榜和应用榜，由 AICPB 发布
+AIGCRank,https://aigcrank.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 排行榜平台，提供全球、中国及出海 AI 网站流量排行
+MiniMax News,https://www.minimaxi.com/news,国内,中文/英文,模型/评测,模型官方动态,page,P2,yes,200,expanded,MiniMax updates
+ModelScope 论文/模型,https://www.modelscope.cn/models,国内,中文,模型/评测,模型社区,page,P2,yes,200,expanded,model releases
+ModelScope 魔搭社区,https://modelscope.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,阿里达摩院推出，12 万+ 开源模型，国内最大 AI 模型共享平台
+Moonshot AI News,https://www.moonshot.cn/news,国内,中文,模型/评测,模型官方动态,page,P2,yes,200,expanded,Kimi updates
+OpenCompass Leaderboard,https://rank.opencompass.org.cn/,国内,中文/英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,LLM benchmark leaderboard
+OpenCompass 司南,https://opencompass.org.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,面向大模型的开源评测开放平台
+PaddlePaddle News,https://www.paddlepaddle.org.cn/news,国内,中文,模型/评测,AI 框架/模型,page,P2,yes,200,expanded,Paddle updates
+Qwen GitHub Releases,https://github.com/QwenLM/Qwen/releases,国内,英文,模型/评测,开源模型发布,page,P2,yes,200,expanded,Qwen releases
+SuperCLUE,https://superclueai.com,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,中文通用大模型综合性测评基准
+华为盘古,https://www.huaweicloud.com/product/pangu.html,国内,中文,模型/评测,模型产品/云,page,P2,yes,200,expanded,Pangu updates
+宝玉 AI,https://baoyu.io/,国内,中文,模型/评测,国内 AI 公众号矩阵精选（20个）,page/firecrawl,P2,yes,200,Top200+known-url,贴近开发者，关注大模型应用、提示词、Agent、AI 编程
+新榜,https://newrank.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,中国最早最权威的新媒体内容产业大数据平台，含 AI 公众号排名
+智谱开放平台,https://open.bigmodel.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,GLM 系列大模型 API 平台
+智谱清言/GLM 新闻,https://www.zhipuai.cn/news,国内,中文,模型/评测,模型官方动态,page,P2,yes,200,expanded,GLM updates
+火山方舟,https://volcengine.com/product/ark,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,字节跳动旗下大模型服务平台
+百川智能 News,https://www.baichuan-ai.com/home,国内,中文,模型/评测,模型官方动态,page,P2,yes,200,expanded,Baichuan updates
+百度文心,https://yiyan.baidu.com/,国内,中文,模型/评测,模型产品,page,P2,yes,200,expanded,ERNIE product updates
+腾讯混元,https://hunyuan.tencent.com/,国内,中文,模型/评测,模型产品,page,P2,yes,200,expanded,Hunyuan updates
+讯飞星火,https://xfyun.cn,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,科大讯飞大模型平台，提供星火认知大模型 API
+讯飞星火新闻,https://xinghuo.xfyun.cn/,国内,中文,模型/评测,模型产品,page,P2,yes,200,expanded,Spark updates
+通义千问博客,https://qwenlm.github.io/blog/,国内,中文/英文,模型/评测,模型官方博客,page,P2,yes,200,expanded,Qwen model releases
+通义实验室,https://tongyi.aliyun.com/,国内,中文,模型/评测,国内 AI 公众号矩阵精选（20个）,page/firecrawl,P2,yes,200,Top200+known-url,关注通义千问、国产大模型能力、模型应用生态
+阿里云百炼,https://bailian.aliyun.com,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台（12个）,page/firecrawl,P2,yes,200,Top200+known-url,阿里云大模型服务平台，支持通义千问等模型
+零一万物 News,https://www.lingyiwanwu.com/,国内,中文,模型/评测,模型官方动态,page,P2,yes,200,expanded,01.AI updates
+魔乐社区,https://modelers.cn/,国内,中文,模型/评测,AI 模型社区,page,P2,yes,200,expanded,model community
+CSDN,https://csdn.net,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,国内最大开发者社区，拥有 AI 社区云板块
+Gitee 码云,https://gitee.com,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,国内代码托管平台，拥有大量 AI 开源项目镜像
+SegmentFault 思否,https://segmentfault.com,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,中文开发者社区，覆盖 AI 技术文章和讨论
+上海 AI Lab,https://www.shlab.org.cn/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,Shanghai AI Lab
+之江实验室 AI,https://www.zhejianglab.com/,国内,中文,研究/论文,AI 研究,page,P2,yes,200,expanded,Zhejiang Lab updates
+华为诺亚方舟实验室,https://www.noahlab.com.hk/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,Huawei Noah research
+夕小瑶科技说,https://www.xiaoyaocode.com/,国内,中文,研究/论文,国内 AI 公众号矩阵精选（20个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,把模型、论文和行业新闻讲得轻松，适合入门到进阶
+字节 Seed,https://seed.bytedance.com/,国内,中文/英文,研究/论文,AI 研究/模型,page,P2,yes,200,expanded,ByteDance Seed research
+掘金,https://juejin.cn/ai,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,面向全球中文开发者的技术内容分享与交流平台，AI 板块活跃
+智源研究院,https://www.baai.ac.cn/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,BAAI updates
+智源社区,https://hub.baai.ac.cn,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,"北京智源人工智能研究院发起，""没有围墙的 AI 实验室""，20 万注册会员"
+清华 AIR,https://air.tsinghua.edu.cn/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,AI research institute
+清华 KEG,https://keg.cs.tsinghua.edu.cn/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,knowledge engineering research
+烯牛数据,https://xiniudata.com,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,新一代科创数据引擎，涵盖科创企业、创投机构等数据
+百度研究院,https://research.baidu.com/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,Baidu Research
+腾讯 AI Lab,https://ai.tencent.com/ailab/zh/index,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,Tencent AI research
+艾瑞咨询,https://iresearch.cn,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投（8个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,国内领先的新经济产业数据挖掘和分析机构，发布 AI 行业研究报告
+阿里达摩院,https://damo.alibaba.com/,国内,中文/英文,研究/论文,AI 研究,page,P2,yes,200,expanded,Alibaba DAMO research
+鹏城实验室,https://www.pcl.ac.cn/,国内,中文,研究/论文,AI 研究,page,P2,yes,200,expanded,Peng Cheng Lab updates
+OpenXLab,https://openxlab.org.cn/,国内,中文,社区/开源,AI 开源社区,page,P2,yes,200,expanded,models/datasets/apps
+AI Agents Directory,https://aiagentsdirectory.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,发现和标准化 AI 代理，1000+ 解决方案
+AI Chief,https://aichief.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,AI 工具与资讯平台
+AI Mojo,https://aimojo.io,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具目录
+AI Parabellum,https://aiparabellum.com/,国外,英文,AI 工具/产品发现,AI 工具导航,page,P2,yes,200,expanded,AI tool discovery
+AI Tool Directory,https://tooldirectory.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,2473+ AI 工具，30+ 分类，每日更新
+AI Tools Directory,https://aitoolsdirectory.com/,国外,英文,AI 工具/产品发现,AI 工具导航,page,P2,yes,200,expanded,AI tool discovery
+AIPURE,https://aipure.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具聚合
+AITrove,https://aitrove.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,策展 AI 工具目录，含视频预览
+AIValley.ai,https://aivalley.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具发现平台
+Aitoolnet,https://aitoolnet.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,综合目录，展示 16000+ AI 工具
+Aitools.fyi,https://aitools.fyi,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,简单 AI 驱动解决方案目录
+Altern,https://altern.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 社区和资源中心，为研究人员和开发者提供交流
+Best AI Websites,https://bestaiwebsites.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具、资源和教程目录
+Creati.ai,https://creati.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,发现和比较 AI 工具、代理和 MCPs
+Dang.ai,https://dang.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具目录
+Easy with AI,https://easywithai.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,各分类顶级 AI 工具策划平台，含免费工具和教育资源
+Foundr AI,https://foundr.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具目录，覆盖视频、图像、生产力等领域
+FutureTools.io,https://futuretools.io,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,精选 AI 工具平台，专注生产力、媒体创作和营销解决方案
+Futurepedia,https://futurepedia.io,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,综合性 AI 资源平台，提供目录、指南和社区互动
+Insidr AI Directory,https://insidr.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,教育用户实践使用 AI 的目录
+OpenFuture AI,https://openfuture.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,AI 工具发现
+OpenTools,https://opentools.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 行业概览，含趋势、投资和收购机会洞察
+Openpedia,https://openpedia.org,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,广泛 AI 工具目录，50+ 分类，每日更新
+PitchWall,https://pitchwall.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具与创业发现平台
+Powerusers.ai,https://powerusers.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具综合目录，提升商业生产力
+Product Hunt,https://producthunt.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,用户发现和分享新科技产品的平台，含大量 AI 工具每日发布
+RankmyAI,https://rankmyai.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,最大独立 AI 工具和公司目录，覆盖 62000+ 解决方案，数据驱动评估
+SERP,https://serp.ai,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具综合目录，跨多类别评论和分类
+SaaS AI Tools,https://saasaitools.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,生成式 AI 工具综合目录，每日更新
+The AI Library,https://theailibrary.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具库
+The AI Surf,https://theaisurf.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 工具目录，SEO 优势优先列表
+Toolify Directory,https://www.toolify.ai/,国外,英文,AI 工具/产品发现,AI 工具导航,page,P2,yes,200,expanded,AI tool discovery
+TopAI.tools,https://topai.tools,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,limited,403,Top200+known-url,可搜索 AI 工具目录，收录 19000+ 工具
+What's The Big Data?,https://whatsthebigdata.com,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,大数据、AI 和机器学习平台，含新闻、专家洞察和指南
+WhatTheAI.tech,https://whattheai.tech,国外,英文,AI 工具/产品发现,国外 AI 工具导航与发现平台（40个）,page/firecrawl,P2,yes,200,Top200+known-url,拥有 10000+ AI 工具，覆盖 278 个分类
+AI Tool Report,https://www.aitoolreport.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Ahead of AI,https://magazine.sebastianraschka.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每月2次
+AlphaSignal,https://alphasignal.ai/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Ben's Bites,https://www.bensbites.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Deep Learning Weekly,https://www.deeplearningweekly.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Exponential View,https://www.exponentialview.co/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Future Tools Newsletter,https://www.futuretools.io/newsletter,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周2次
+Import AI,https://importai.substack.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Interconnects,https://www.interconnects.ai/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周1-3次
+Last Week in AI,https://lastweekin.ai/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+Latent Space,https://www.latent.space/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日+每周
+Marvelous MLOps,https://marvelousmlops.substack.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,不定期
+Mindstream,https://www.mindstream.news/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+Smol AI News (swyx),https://buttondown.com/ainews,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+Superhuman AI,https://www.superhuman.ai/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+TLDR AI,https://tldr.tech/ai,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+The Algorithmic Bridge,https://thealgorithmicbridge.substack.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+The Batch,https://www.deeplearning.ai/the-batch/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周
+The Neuron,https://www.theneurondaily.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+The Rundown AI,https://www.therundown.ai/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每日
+TheSequence,https://thesequence.substack.com/,国外,英文,Newsletter,国外 AI Newsletter 订阅（22个）,rss/email/page,P2,yes,200,Top200+known-url,每周2次
+There's An AI For That,https://theresanaiforthat.com,国外,英文,Newsletter,国外 AI 工具导航与发现平台（40个）,rss/email/page,P2,yes,200,Top200+known-url,全球最大 AI 工具数据库，广泛分类，支持工具提交和 AI 新闻订阅
+Ada Lovelace Institute,https://www.adalovelaceinstitute.org/,国外,英文,政策/安全/治理,政策/社会影响,rss/page/firecrawl,P2,yes,200,新增50,AI 数据治理、公共政策和技术社会影响
+Center for Democracy & Technology AI,https://cdt.org/area-of-focus/artificial-intelligence/,国外,英文,政策/安全/治理,AI 政策/权益,page,P2,limited,403,expanded,civil rights and AI
+Cloudflare AI Blog,https://blog.cloudflare.com/tag/ai/,国外,英文,政策/安全/治理,AI Infra 与边缘计算,rss/page/firecrawl,P2,yes,200,新增50,Workers AI、AI Gateway、推理基础设施和安全
+Convergence Analysis,https://www.convergenceanalysis.org/,国外,英文,政策/安全/治理,AI 政策/安全,page,P2,yes,200,expanded,AI governance analysis
+Electronic Frontier Foundation AI,https://www.eff.org/issues/ai,国外,英文,政策/安全/治理,AI 政策/权益,page,P2,yes,200,expanded,AI civil liberties
+Future of Life Institute AI,https://futureoflife.org/artificial-intelligence/,国外,英文,政策/安全/治理,AI 安全/政策,rss/page/firecrawl,P2,yes,200,新增50,AI 安全、监管、政策倡议、指数报告
+Global Center on AI Governance,https://www.globalcenter.ai/,国外,英文,政策/安全/治理,AI 治理,page,P2,yes,200,expanded,AI governance
+IAPP Global AI Law Tracker,https://iapp.org/resources/article/global-ai-legislation-tracker,国外,英文,政策/安全/治理,AI 政策/法规,page,P2,yes,200,expanded,AI legislation tracker
+Institute for AI Policy and Strategy,https://www.iaps.ai/,国外,英文,政策/安全/治理,AI 政策/安全,page,P2,yes,200,expanded,AI policy strategy
+LessWrong,https://lesswrong.com,国外,英文,政策/安全/治理,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,理性主义社区，AI 安全和对齐讨论深度高
+UNESCO AI Ethics Observatory,https://www.unesco.org/ethics-ai/en,国外,英文,政策/安全/治理,AI 政策/治理,page,P2,yes,200,expanded,global AI governance
+AI Incident Database,https://incidentdatabase.ai/,国外,英文,新闻/媒体,AI 事故数据库,page,P2,yes,200,expanded,AI incidents
+AI Standards Hub,https://aistandardshub.org/,国外,英文,新闻/媒体,AI 标准,page,P2,yes,200,expanded,AI standards
+AMD AI Blog,https://www.amd.com/en/developer/resources/technical-articles.html,国外,英文,新闻/媒体,AI 芯片/工程,page,P2,yes,200,expanded,AI hardware/software
+AlgorithmWatch,https://algorithmwatch.org/en/,国外,英文,新闻/媒体,算法治理,page,P2,yes,200,expanded,algorithmic accountability
+Andrej Karpathy Blog,https://karpathy.github.io/,国外,英文,新闻/媒体,AI 技术深度,page,P2,yes,200,expanded,AI technical notes
+Anyscale Blog,https://www.anyscale.com/blog,国外,英文,新闻/媒体,AI Infra 与工程,rss/page/firecrawl,P2,yes,200,新增50,Ray、分布式训练、推理、LLM 应用基础设施
+Arize AI Blog,https://arize.com/blog/,国外,英文,新闻/媒体,ML/LLM 可观测性,rss/page,P2,yes,200,expanded,AI observability
+Atlassian AI Blog,https://www.atlassian.com/blog/artificial-intelligence,国外,英文,新闻/媒体,企业协作/AI,page,P2,yes,200,expanded,AI collaboration tools
+Axios AI+,https://www.axios.com/technology/artificial-intelligence,国外,英文,新闻/媒体,科技媒体/AI,page,P2,limited,403,expanded,AI industry news
+BBC AI,https://www.bbc.com/news/topics/cx1m7zg01xyt,国外,英文,新闻/媒体,综合媒体/AI,page,P2,yes,200,expanded,AI public news
+BetaList AI,https://betalist.com/topics/artificial-intelligence,国外,英文,新闻/媒体,产品发现/AI,page,P2,yes,200,expanded,startup discovery
+Box AI Blog,https://blog.box.com/blog/ai/,国外,英文,新闻/媒体,企业内容 AI,page,P2,limited,403,expanded,enterprise content AI
+Canva AI Blog,https://www.canva.com/newsroom/news/,国外,英文,新闻/媒体,设计 AI,page,P2,limited,403,expanded,Canva AI/product news
+Cerebras Blog,https://www.cerebras.ai/blog,国外,英文,新闻/媒体,AI 芯片/推理,rss/page,P2,yes,200,expanded,AI chips
+Chroma Blog,https://www.trychroma.com/blog,国外,英文,新闻/媒体,向量数据库/RAG,page,P2,yes,200,expanded,RAG infrastructure
+Codeium Blog,https://codeium.com/blog,国外,英文,新闻/媒体,AI 编程,page,P2,yes,200,expanded,AI coding tools
+Comet Blog,https://www.comet.com/site/blog/,国外,英文,新闻/媒体,MLOps,rss/page,P2,yes,200,expanded,ML experiments and LLMOps
+CoreWeave Blog,https://www.coreweave.com/blog,国外,英文,新闻/媒体,GPU 云/算力,rss/page,P2,yes,200,expanded,GPU infra
+Crusoe Blog,https://www.crusoe.ai/blog,国外,英文,新闻/媒体,AI 数据中心/算力,page,P2,yes,200,expanded,AI datacenter infra
+Cursor Blog,https://www.cursor.com/blog,国外,英文,新闻/媒体,AI 编程,rss/page,P2,yes,200,expanded,AI coding product updates
+Descript Blog,https://www.descript.com/blog,国外,英文,新闻/媒体,音视频 AI,rss/page,P2,yes,200,expanded,creator AI tools
+Distill,https://distill.pub/,国外,英文,新闻/媒体,AI 技术深度,page,P2,yes,200,expanded,visual ML explanations
+EU-Startups AI,https://www.eu-startups.com/tag/artificial-intelligence/,国外,英文,新闻/媒体,欧洲创投/AI,page,P2,limited,403,expanded,AI startups Europe
+Elastic Search Labs,https://www.elastic.co/search-labs,国外,英文,新闻/媒体,搜索/RAG,page,P2,yes,200,expanded,search and RAG
+ElevenLabs Blog,https://elevenlabs.io/blog,国外,英文,新闻/媒体,语音 AI,rss/page,P2,yes,200,expanded,voice AI product updates
+Eugene Yan Blog,https://eugeneyan.com/,国外,英文,新闻/媒体,AI 工程/推荐系统,rss/page,P2,yes,200,expanded,ML systems
+Fast Company AI,https://www.fastcompany.com/section/artificial-intelligence,国外,英文,新闻/媒体,商业媒体/AI,page,P2,limited,403,expanded,AI business news
+Fortune AI,https://fortune.com/tag/artificial-intelligence/,国外,英文,新闻/媒体,商业媒体/AI,page,P2,yes,200,expanded,AI business news
+GeekWire AI,https://www.geekwire.com/tag/artificial-intelligence/,国外,英文,新闻/媒体,科技媒体/AI,page,P2,limited,403,expanded,AI startup and tech news
+Global Index on Responsible AI,https://www.global-index.ai/,国外,英文,新闻/媒体,AI 治理数据,page,P2,yes,200,expanded,responsible AI index
+Grammarly Blog AI,https://www.grammarly.com/blog/ai/,国外,英文,新闻/媒体,写作 AI,rss/page,P2,yes,200,expanded,writing AI product updates
+Groq Blog,https://groq.com/blog/,国外,英文,新闻/媒体,推理芯片/AI Infra,rss/page,P2,yes,200,expanded,inference infra
+HeyGen Blog,https://www.heygen.com/blog,国外,英文,新闻/媒体,视频 AI,rss/page,P2,yes,200,expanded,avatar/video AI
+InfoQ AI/ML,https://www.infoq.com/ai-ml-data-eng/,国外,英文,新闻/媒体,开发者媒体,rss/page/firecrawl,P2,yes,200,新增50,AI/ML/Data Engineering 新闻、架构和实践
+Intel AI Blog,https://community.intel.com/t5/Blogs/Tech-Innovation/Artificial-Intelligence-AI/bg-p/artificial-intelligence,国外,英文,新闻/媒体,AI 芯片/工程,page,P2,limited,403,expanded,AI hardware/software
+Jay Alammar Blog,https://jalammar.github.io/,国外,英文,新闻/媒体,AI 技术深度,page,P2,yes,200,expanded,visual explainers
+JetBrains AI Blog,https://blog.jetbrains.com/ai/,国外,英文,新闻/媒体,AI 编程,rss/page,P2,yes,200,expanded,developer AI tools
+Kaggle Competitions,https://www.kaggle.com/competitions,国外,英文,新闻/媒体,AI 竞赛/数据集,page,P2,yes,200,expanded,ML competitions
+Lambda Labs Blog,https://lambdalabs.com/blog,国外,英文,新闻/媒体,GPU 云/算力,rss/page,P2,yes,200,expanded,GPU infra
+Langfuse Blog,https://langfuse.com/blog,国外,英文,新闻/媒体,LLMOps/可观测性,rss/page,P2,yes,200,expanded,LLM observability
+Lil'Log,https://lilianweng.github.io/,国外,英文,新闻/媒体,AI 技术深度,page,P2,yes,200,expanded,technical explainers
+Microlaunch AI,https://microlaunch.net/,国外,英文,新闻/媒体,产品发现/AI,page,P2,yes,200,expanded,startup discovery
+MongoDB AI Blog,https://www.mongodb.com/blog/channel/artificial-intelligence,国外,英文,新闻/媒体,数据库/RAG,page,P2,yes,200,expanded,AI data apps
+Morning Brew AI,https://www.morningbrew.com/tag/artificial-intelligence,国外,英文,新闻/媒体,商业媒体/AI,page,P2,yes,200,expanded,AI business news
+Neo4j GraphRAG Blog,https://neo4j.com/blog/tag/graphrag/,国外,英文,新闻/媒体,GraphRAG,page,P2,yes,200,expanded,GraphRAG and knowledge graphs
+Neptune.ai Blog,https://neptune.ai/blog,国外,英文,新闻/媒体,MLOps,rss/page,P2,limited,403,expanded,ML experiment tracking
+Notion AI Blog,https://www.notion.com/blog/topic/ai,国外,英文,新闻/媒体,生产力 AI,page,P2,yes,200,expanded,Notion AI updates
+OECD AI Incidents Monitor,https://oecd.ai/en/incidents,国外,英文,新闻/媒体,AI 事故数据库,page,P2,yes,200,expanded,AI incidents
+Oracle AI Blog,https://blogs.oracle.com/ai-and-datascience/,国外,英文,新闻/媒体,云与企业 AI,rss/page,P2,limited,403,expanded,enterprise AI
+Perplexity Blog,https://www.perplexity.ai/hub/blog,国外,英文,新闻/媒体,AI 产品/搜索,page/rss-check,P2,limited,403,expanded,product and model updates
+Phoenix Blog,https://arize.com/blog/tag/phoenix/,国外,英文,新闻/媒体,LLM 可观测性,page,P2,yes,200,expanded,open-source LLM observability
+Pinecone Blog,https://www.pinecone.io/blog/,国外,英文,新闻/媒体,向量数据库/RAG,rss/page,P2,yes,200,expanded,RAG infrastructure
+Qdrant Blog,https://qdrant.tech/blog/,国外,英文,新闻/媒体,向量数据库/RAG,rss/page,P2,yes,200,expanded,RAG infrastructure
+Recraft Blog,https://www.recraft.ai/blog,国外,英文,新闻/媒体,设计/图像 AI,page,P2,yes,200,expanded,creative AI updates
+RunPod Blog,https://www.runpod.io/blog,国外,英文,新闻/媒体,GPU 云/推理,rss/page,P2,yes,200,expanded,GPU infra
+SAP AI News,https://news.sap.com/tags/artificial-intelligence/,国外,英文,新闻/媒体,企业 AI,page,P2,yes,200,expanded,SAP AI updates
+SambaNova Blog,https://sambanova.ai/blog,国外,英文,新闻/媒体,AI 芯片/企业 AI,page,P2,yes,200,expanded,AI chips and enterprise AI
+Sifted AI,https://sifted.eu/tags/artificial-intelligence,国外,英文,新闻/媒体,欧洲创投/AI,page,P2,limited,403,expanded,AI startups Europe
+SiliconANGLE AI,https://siliconangle.com/tag/ai/,国外,英文,新闻/媒体,企业科技/AI,page,P2,yes,200,expanded,enterprise AI news
+Stack Overflow AI Blog,https://stackoverflow.blog/ai/,国外,英文,新闻/媒体,开发者媒体,rss/page/firecrawl,P2,yes,200,新增50,开发者生态、AI 编程、调查和工程实践
+Suno Blog,https://suno.com/blog,国外,英文,新闻/媒体,音乐 AI,page,P2,yes,200,expanded,music AI updates
+Synthesia Blog,https://www.synthesia.io/blog,国外,英文,新闻/媒体,视频 AI,rss/page,P2,yes,200,expanded,enterprise video AI
+Tabnine Blog,https://www.tabnine.com/blog/,国外,英文,新闻/媒体,AI 编程,rss/page,P2,yes,200,expanded,AI coding tools
+The Guardian AI,https://www.theguardian.com/technology/artificialintelligenceai,国外,英文,新闻/媒体,综合媒体/AI,page,P2,yes,200,expanded,AI public news
+The Register AI,https://www.theregister.com/software/ai_ml/,国外,英文,新闻/媒体,技术媒体/AI,rss/page,P2,yes,200,expanded,AI technical news
+Udio Blog,https://www.udio.com/blog,国外,英文,新闻/媒体,音乐 AI,page,P2,yes,200,expanded,music AI updates
+Weaviate Blog,https://weaviate.io/blog,国外,英文,新闻/媒体,向量数据库/RAG,rss/page,P2,yes,200,expanded,RAG infrastructure
+WhyLabs Blog,https://whylabs.ai/blog,国外,英文,新闻/媒体,AI 可观测性,page,P2,yes,200,expanded,model monitoring
+Windsurf Blog,https://windsurf.com/blog,国外,英文,新闻/媒体,AI 编程,page,P2,yes,200,expanded,AI coding product updates
+Workday AI Blog,https://blog.workday.com/en-us/artificial-intelligence.html,国外,英文,新闻/媒体,企业 AI,page,P2,yes,200,expanded,HR/finance AI
+Aider Blog,https://aider.chat/blog/,国外,英文,模型/评测,AI 编程/评测,page,P2,yes,200,expanded,AI coding and benchmark updates
+Aider LLM Leaderboards,https://aider.chat/docs/leaderboards/,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P2,yes,200,新增50,代码编辑模型排行榜、真实 repo 修改能力
+Baseten Blog,https://www.baseten.co/blog/,国外,英文,模型/评测,模型服务/Infra,rss/page/firecrawl,P2,yes,200,新增50,模型部署、推理优化、AI 应用生产化实践
+BenchLM,https://benchlm.ai/,国外,英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,LLM benchmark leaderboard
+BentoML Blog,https://www.bentoml.com/blog,国外,英文,模型/评测,模型部署/推理,rss/page,P2,yes,200,expanded,model serving
+BigCodeBench,https://bigcode-bench.github.io/,国外,英文,模型/评测,代码模型评测,page,P2,yes,200,expanded,code benchmark
+Evidently AI Blog,https://www.evidentlyai.com/blog,国外,英文,模型/评测,AI 评测/监控,rss/page,P2,yes,200,expanded,model monitoring and eval
+Fireworks AI Blog,https://fireworks.ai/blog,国外,英文,模型/评测,模型服务/Infra,rss/page/firecrawl,P2,yes,200,新增50,LLM 推理、模型部署、多模态和应用案例
+HELM,https://crfm.stanford.edu/helm/,国外,英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,Holistic Evaluation of Language Models
+Hugging Face Open LLM Leaderboard,https://huggingface.co/spaces/open-llm-leaderboard/open_llm_leaderboard,国外,英文,模型/评测,开源模型榜单,page,P2,yes,200,expanded,open LLM leaderboard
+Humanloop Blog,https://humanloop.com/blog,国外,英文,模型/评测,LLMOps/评测,page,P2,yes,200,expanded,LLM product evals
+LLM Stats,https://llm-stats.com/,国外,英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,LLM model stats
+LiveCodeBench,https://livecodebench.github.io/,国外,英文,模型/评测,代码模型评测,page,P2,yes,200,expanded,code benchmark
+Luma AI Blog,https://lumalabs.ai/blog,国外,英文,模型/评测,多模态/视频模型,page,P2,yes,200,expanded,video and world model updates
+Midjourney Updates,https://updates.midjourney.com/,国外,英文,模型/评测,多模态/图像模型,page,P2,yes,200,expanded,image generation updates
+Mistral AI News,https://mistral.ai/news,国外,英文,模型/评测,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,Mistral AI 官方博客，开源模型发布
+Modal Blog,https://modal.com/blog,国外,英文,模型/评测,AI Infra 与工程,rss/page/firecrawl,P2,yes,200,新增50,GPU 云、模型训练/推理、AI 工程基础设施实践
+NVIDIA AI Blog,https://blogs.nvidia.com/blog/category/deep-learning,国外,英文,模型/评测,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,NVIDIA AI 博客，GPU、模型和基础设施
+Onyx LLM Leaderboard,https://onyx.app/llm-leaderboard,国外,英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,LLM benchmark leaderboard
+OpenAI Blog/Research,https://openai.com/research,国外,英文,模型/评测,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,limited,403,Top200+known-url,OpenAI 官方博客，模型发布和技术报告首发
+OpenRouter Rankings,https://openrouter.ai/rankings,国外,英文,模型/评测,模型生态/榜单,rss/page/firecrawl,P2,yes,200,新增50,开放模型使用热度、供应商和模型趋势
+Reddit r/LocalLLaMA,https://reddit.com/r/LocalLLaMA,国外,英文,模型/评测,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,本地部署大模型社区，开源模型和量化讨论
+Replicate Blog,https://replicate.com/blog,国外,英文,模型/评测,模型部署/开源模型,rss/page,P2,yes,200,expanded,model deployment
+Scale Labs Leaderboard,https://labs.scale.com/leaderboard,国外,英文,模型/评测,模型评测,rss/page/firecrawl,P2,yes,200,新增50,Scale expert-driven LLM benchmarks 和模型排名
+Stability AI,https://stability.ai/news,国外,英文,模型/评测,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,Stable Diffusion 母公司，图像/视频模型动态
+Vellum LLM Leaderboard,https://www.vellum.ai/llm-leaderboard,国外,英文,模型/评测,模型评测/榜单,page,P2,yes,200,expanded,LLM benchmark leaderboard
+Weights & Biases Blog,https://wandb.ai/site/articles/,国外,英文,模型/评测,MLOps/工程,rss/page/firecrawl,P2,yes,200,新增50,模型训练、评测、MLOps、LLM 实验管理
+xAI News,https://x.ai/news,国外,英文,模型/评测,官方实验室/模型发布,page/rss-check,P2,limited,403,expanded,frontier lab updates
+ACL Anthology,https://aclanthology.org/,国外,英文,研究/论文,NLP 论文,page,P2,yes,200,expanded,NLP papers
+AI Hub (Google),https://ai.google,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,Google AI 研究博客和模型发布
+AI Now Institute,https://ainowinstitute.org/,国外,英文,研究/论文,政策/社会影响,rss/page/firecrawl,P2,yes,200,新增50,AI 权力、治理、劳动、监管和社会影响研究
+AlphaXiv,https://alphaxiv.org,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,arXiv 论文在线讨论社区，可对论文逐句评论
+Anthropic News,https://anthropic.com/news,国外,英文,研究/论文,国外 AI 实验室博客与社区（16个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,Anthropic 官方博客，Claude 系列发布和安全研究
+Apollo Research Blog,https://www.apolloresearch.ai/blog,国外,英文,研究/论文,AI 安全,rss/page/firecrawl,P2,yes,200,新增50,模型欺骗、评估、可解释性、安全研究
+Brookings AI,https://www.brookings.edu/topic/artificial-intelligence/,国外,英文,研究/论文,AI 政策/社会,page,P2,yes,200,expanded,AI policy research
+Carnegie AI Governance,https://carnegieendowment.org/topic/artificial-intelligence,国外,英文,研究/论文,AI 政策/治理,page,P2,yes,200,expanded,AI policy research
+Center for AI Safety,https://safe.ai/,国外,英文,研究/论文,AI 安全,rss/page/firecrawl,P2,yes,200,新增50,AI 安全研究、声明、政策和风险分析
+Connected Papers,https://connectedpapers.com,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,输入一篇论文生成相关论文关系图，快速了解领域
+Daily Papers (AK),https://huggingface.co/papers,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,Hugging Face 每日精选论文，按社交媒体热度排序
+EleutherAI Blog,https://blog.eleuther.ai/,国外,英文,研究/论文,开源研究,rss/page/firecrawl,P2,yes,200,新增50,开源模型、评测、数据集和基础模型研究
+GitHub Trending,https://github.com/trending,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,github/rss-or-releases,P2,yes,200,Top200+known-url,实时热门开源项目，可按语言筛选 AI/Python 项目
+Google DeepMind Blog,https://deepmind.google/discover/blog,国外,英文,研究/论文,国外 AI 实验室博客与社区（16个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,DeepMind 官方博客，研究突破和产品动态
+Google Scholar,https://scholar.google.com,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,学术搜索引擎，可追踪 AI 论文引用和作者
+Google Scholar Alerts AI Search,https://scholar.google.com/scholar?q=artificial+intelligence,国外,英文,研究/论文,学术搜索,page,P2,yes,200,expanded,paper discovery
+GovAI,https://www.governance.ai/research,国外,英文,研究/论文,AI 治理/安全,page,P2,yes,200,expanded,AI governance research
+Hazy Research Blog,https://hazyresearch.stanford.edu/blog,国外,英文,研究/论文,AI 系统研究,page,P2,yes,200,expanded,AI systems
+Hugging Face,https://huggingface.co,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,全球最大开源模型托管平台，含模型库、数据集和 Spaces
+ICLR Blog,https://iclr-blogposts.github.io/,国外,英文,研究/论文,学术会议/论文解读,page,P2,yes,200,expanded,paper blogposts
+ICML News,https://icml.cc/Conferences/2026,国外,英文,研究/论文,学术会议,page,P2,yes,200,expanded,conference updates
+JMLR,https://www.jmlr.org/,国外,英文,研究/论文,机器学习期刊,page,P2,yes,200,expanded,ML research
+LAION Blog,https://laion.ai/blog/,国外,英文,研究/论文,开源研究,rss/page/firecrawl,P2,yes,200,新增50,开放数据集、多模态模型、开源 AI 研究
+Microsoft Research Blog,https://microsoft.com/en-us/research/blog,国外,英文,研究/论文,国外 AI 实验室博客与社区（16个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,微软研究院博客，MAI 系列、AI 研究和应用
+Nature AI Collection,https://www.nature.com/subjects/machine-learning,国外,英文,研究/论文,学术期刊,page,P2,yes,200,expanded,ML journal articles
+Nature Machine Intelligence,https://www.nature.com/natmachintell/,国外,英文,研究/论文,学术期刊,page,P2,yes,200,expanded,AI journal
+NeurIPS Blog,https://blog.neurips.cc/,国外,英文,研究/论文,学术会议,rss/page,P2,yes,200,expanded,conference updates
+OpenReview,https://openreview.net,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,顶会论文公开评审平台，ICLR/NeurIPS 等会议论文
+OpenReview Recent,https://openreview.net/group?id=all,国外,英文,研究/论文,论文/评审,page,P2,yes,200,expanded,paper review platform
+Papers with Code,https://paperswithcode.com,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,论文+代码+基准榜单三合一，按任务和领域组织
+Papers with Code SOTA,https://paperswithcode.com/sota,国外,英文,研究/论文,论文/榜单,page,P2,yes,200,expanded,SOTA benchmark tracking
+Paperscape,https://paperscape.org,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,arXiv 论文关系可视化，发现论文间的引用网络
+RAND AI,https://www.rand.org/topics/artificial-intelligence.html,国外,英文,研究/论文,AI 政策/安全,page,P2,yes,200,expanded,AI policy research
+Reddit r/MachineLearning,https://reddit.com/r/MachineLearning,国外,英文,研究/论文,国外 AI 实验室博客与社区（16个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,ML 专业社区，论文讨论、研究分享和 AMA
+Runway Blog,https://runwayml.com/blog,国外,英文,研究/论文,多模态/视频模型,rss/page,P2,yes,200,expanded,product and research updates
+Runway Research,https://research.runwayml.com/,国外,英文,研究/论文,多模态/视频模型,page,P2,yes,200,expanded,video model research
+Science Robotics,https://www.science.org/journal/scirobotics,国外,英文,研究/论文,机器人/AI 期刊,page,P2,limited,403,expanded,robotics research
+Sebastian Raschka Blog,https://sebastianraschka.com/blog/,国外,英文,研究/论文,技术深度,rss/page/firecrawl,P2,yes,200,新增50,LLM、深度学习、论文和工程实践解析
+Semantic Scholar,https://semanticscholar.org,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,AI 驱动的学术搜索引擎，由 AllenAI 开发
+The Gradient,https://thegradient.pub/,国外,英文,研究/论文,深度评论,rss/page/firecrawl,P2,yes,200,新增50,AI 研究、文化、产业和技术长文
+Together AI Blog,https://www.together.ai/blog,国外,英文,研究/论文,模型服务/Infra,rss/page/firecrawl,P2,yes,200,新增50,开源模型服务、推理优化、训练平台和研究更新
+arXiv (cs.AI),https://arxiv.org/list/cs.AI/recent,国外,英文,研究/论文,国外 AI 论文 / 模型 / 开源聚合（12个）,rss/page/firecrawl,P2,yes,200,Top200+known-url,AI 论文预印本权威来源，每日更新最新研究
+AI Stack Exchange,https://ai.stackexchange.com,国外,英文,社区/开源,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,AI 专门问答社区
+Character.AI Blog,https://blog.character.ai/,国外,英文,社区/开源,AI 产品/社区,rss/page,P2,yes,200,expanded,consumer AI product updates
+Cohere Blog,https://cohere.com/blog,国外,英文,社区/开源,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,Cohere 官方博客，企业级 LLM 应用
+GitHub Blog AI,https://github.blog/tag/ai/,国外,英文,社区/开源,AI 编程/开源,rss/page,P2,yes,200,expanded,GitHub Copilot and AI
+Hacker News,https://news.ycombinator.com,国外,英文,社区/开源,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,YC 旗下科技社区，AI 是热门话题，含 Show HN
+Indie Hackers AI,https://www.indiehackers.com/tag/artificial-intelligence,国外,英文,社区/开源,创业社区/AI,page,P2,yes,200,expanded,indie AI products
+Reddit r/artificial,https://reddit.com/r/artificial,国外,英文,社区/开源,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,通用 AI 新闻讨论社区
+Stack Overflow (AI),https://stackoverflow.com/questions/tagged/artificial-intelligence,国外,英文,社区/开源,国外 AI 实验室博客与社区（16个）,page/firecrawl,P2,yes,200,Top200+known-url,开发者问答社区 AI 标签
+Milvus Blog,https://milvus.io/blog,国外/国内,英文,新闻/媒体,向量数据库/RAG,rss/page,P2,yes,200,expanded,vector database updates
+Zilliz Blog,https://zilliz.com/blog,国外/国内,英文,新闻/媒体,向量数据库/RAG,rss/page,P2,yes,200,expanded,vector database updates
+虎嗅 AI 频道,https://huxiu.com/ainews/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,聚合创新信息，捕获精选、深度、犀利的商业科技资讯
+极客公园,https://geekpark.net/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,关注创新产品、科技公司和创始人，强调产品、组织和创业者视角
+太平洋科技,https://pconline.com.cn/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,科技媒体，关注 AI 产业融资分析和硬件产业链
+第一财经,https://yicai.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,从宏观经济、资本市场和企业竞争角度报道 AI
+AIbase 新闻,https://news.aibase.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,AI 垂直媒体，20000+ AI 产品数据库，每日 AI 日报
+AIbase 日报,https://news.aibase.com/zh/daily,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,每天三分钟关注 AI 行业趋势，精选重要 AI 行业新闻
+快科技 AI,https://news.mydrivers.com/tag/ai.htm,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,科技资讯门户 AI 板块，覆盖大量产业新闻和产品发布
+猫目AI 资讯,https://maomu.com/news,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,每日更新全球及国内 AI 行业资讯，涵盖大模型、技术应用、政策动向
+AITNT,https://www.aitntnews.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P1,yes,200,expanded,AI 每日新闻聚合平台，中英文双语
+数据猿,https://www.datayuan.cn/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,大数据与产业数字化媒体，关注数据智能和 AI 产业化
+InfoQ 中文站,https://www.infoq.cn/,国内,中文,新闻/媒体,开发者媒体/AI,page,P2,yes,200,expanded,面向软件开发与架构读者，关注 AI 工程化、架构和云原生
+深圳湾,https://www.shenzhenware.com/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,智能硬件媒体和社区，关注软硬结合的场景和交互创新
+必应 AI 日报,https://aivertical.chinacloudsites.cn/,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page,P2,yes,200,expanded,必应旗下 AI 资讯平台，每日精选全球 AI 最新进展
+百度千帆大模型平台,https://cloud.baidu.com/qianfan,国内,中文,模型/评测,国内 AI 模型 / 开发 / 评测平台,page,P2,yes,200,expanded,企业级一站式大模型开发及应用开发平台
+百度 AI Studio,https://aistudio.baidu.com/,国内,中文,模型/评测,AI 框架/模型,page,P2,yes,200,expanded,飞桨星河社区，人工智能学习与实训社区，提供免费 GPU 算力
+百度 AI 开放平台,https://ai.baidu.com/,国内,中文,模型/评测,模型产品/云,page,P2,yes,200,expanded,提供语音、图像、NLP 等多项 AI 技术服务
+OpenI 启智社区,https://openi.org.cn/,国内,中文,模型/评测,AI 开源社区,page,P2,yes,200,expanded,新一代人工智能开源开放平台，基于鹏城云脑提供普惠算力
+阿里天池,https://tianchi.aliyun.com/,国内,中文,模型/评测,AI 竞赛/数据集,page,P2,yes,200,expanded,阿里云旗下开发者竞赛平台，提供百万奖金大赛
+和鲸 ModelWhale,https://modelwhale.com/,国内,中文,模型/评测,数据科学平台,page,P2,yes,200,expanded,数据科学协同平台，提供在线 Jupyter 环境和 GPU 算力
+华为 AI Gallery,https://developer.huawei.com/,国内,中文,模型/评测,AI 框架/模型,page,P2,yes,200,expanded,华为云 AI 开发者社区，提供模型市场和应用案例
+火山引擎,https://www.volcengine.com/,国内,中文,模型/评测,云与企业 AI,page,P2,yes,200,expanded,字节跳动旗下云服务平台，含大模型服务
+AtomGit/GitCode,https://gitcode.com/,国内,中文,社区/开源,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,开放原子开源基金会联合 CSDN 推出的开源与 AI 协作平台
+AI 部落,https://aiclubs.cn/,国内,中文,社区/开源,AI 开发者社区,page,P2,yes,200,expanded,汇聚魔搭、飞桨、华为 AI Gallery 等多元化 AI 开发者社区导航
+V2EX,https://v2ex.com/,国内,中文,社区/开源,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,创意工作者社区，技术讨论活跃
+集智俱乐部,https://swarma.org/,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,复杂性科学和 AI 研究社区，学术讲座和论文解读
+PaperWeekly,https://paperweekly.net/,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,AI 论文学术社区，论文推荐和解读
+IT桔子,https://www.itjuzi.com/,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,创投数据库，覆盖 AI 创业公司、融资和投资机构
+鲸准,https://rong.36kr.com/,国内,中文,研究/论文,国内 AI 社区 / 学术 / 创投,page,P2,yes,200,expanded,36氪旗下创投数据平台，覆盖 AI 融资事件
+CLUE 中文语言理解测评,https://cluebenchmarks.com/,国内,中文,模型/评测,模型评测,page,P2,yes,200,expanded,中文语言理解测评基准，SuperCLUE 的前身
+艾媒咨询,https://www.iiimedia.com/,国内,中文,研究/论文,国内 AI 行业研究报告,page,P2,yes,200,expanded,AI 行业研究报告和新经济产业数据分析
+IDC中国,https://www.idc.com/,国内,中文,研究/论文,国内 AI 行业研究报告,page,P2,yes,200,expanded,AI 行业数据、市场分析和预测报告
+极客时间,https://time.geekbang.org/,国内,中文,研究/论文,AI 教育平台,page,P3,yes,200,expanded,技术学习平台，含 AI 和大模型课程
+网易云课堂,https://study.163.com/,国内,中文,研究/论文,AI 教育平台,page,P3,yes,200,expanded,在线学习平台，含 AI 课程
+慕课网,https://www.imooc.com/,国内,中文,研究/论文,AI 教育平台,page,P3,yes,200,expanded,IT 技能学习平台，含 AI 和机器学习课程
+中国大学MOOC,https://www.icourse163.org/,国内,中文,研究/论文,AI 教育平台,page,P3,yes,200,expanded,高校在线课程平台，含 AI 学术课程
+阿里云开发者,https://developer.aliyun.com/,国内,中文,新闻/媒体,大厂资讯渠道,page,P2,yes,200,expanded,阿里云 AI 开发者内容和实践案例
+百度开发者,https://developer.baidu.com/,国内,中文,新闻/媒体,大厂资讯渠道,page,P2,yes,200,expanded,百度 AI 开发者内容和工具文档
+腾讯云开发者,https://cloud.tencent.com/developer/,国内,中文,新闻/媒体,大厂资讯渠道,page,P2,yes,200,expanded,腾讯云 AI 开发者社区和技术文章
+AIToolsRecap,https://aitoolsrecap.com/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P1,yes,200,expanded,AI 每日新闻总结，含深度分析和分类
+AI Flash Report,https://aiflashreport.com/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P1,yes,200,expanded,每日 AI 模型发布日报，含历史归档
+LM Market Cap,https://lmmarketcap.com/,国外,英文,模型/评测,模型评测/榜单,page,P1,yes,200,expanded,57 家厂商 345 个模型追踪，模型发布日历
+AI Daily Brief,https://aidailybrief.ai/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P2,yes,200,expanded,每日 AI 简报，覆盖模型、研究、政策
+AI Agent Store,https://aiagentstore.ai/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P2,yes,200,expanded,Agent 专项新闻和产品发现
+CNBC AI,https://www.cnbc.com/artificial-intelligence/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P2,yes,200,expanded,财经电视媒体 AI 板块，关注 AI 股票和产业
+Inside AI,https://inside.com/ai,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P2,yes,200,expanded,每日 AI 简报媒体，精选全球 AI 重要动态
+AI Trends,https://aitrends.com/,国外,英文,新闻/媒体,国外 AI 新闻媒体与科技媒体 AI 板块,page,P2,yes,200,expanded,企业 AI 应用趋势媒体，关注 AI 在商业中的落地
+SemiAnalysis,https://semianalysis.com/,国外,英文,研究/论文,AI 半导体/产业分析,page,P2,yes,200,expanded,AI 半导体产业深度分析和研究报告
+AI Snake Oil,https://aisnakeoil.com/,国外,英文,研究/论文,AI 政策/社会,page,P2,yes,200,expanded,AI 骗局、误导和政策分析，学术视角
+Crescendo AI,https://www.crescendo.ai/,国外,英文,新闻/媒体,AI 融资追踪,page,P2,yes,200,expanded,最新 AI 创业融资和 VC 投资交易追踪
+AI Funding.me,https://aifunding.me/,国外,英文,新闻/媒体,AI 融资追踪,page,P2,yes,200,expanded,AI 融资轮次、收购和交易追踪
+快科技,https://www.mydrivers.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,原驱动之家，运营25年+，24小时滚动更新，覆盖IT/数码/AI全领域，无反爬限制
+中关村在线,https://www.zol.com.cn/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,消费电子评测权威，硬件参数库最全，含AI产品频道
+太平洋电脑网,https://www.pconline.com.cn/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,老牌IT门户，含AI/智能频道
+泡泡网,https://www.pcpop.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,数码消费电子资讯与产品评测
+IT168,https://www.it168.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,IT产品报价+资讯，企业IT视角
+天极网,https://www.yesky.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,老牌IT门户，含AI频道
+牛华网,https://www.niuhua.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,专业科技生活娱乐门户，覆盖AI/数码
+科客网,https://www.keke.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,科技产品评测与资讯
+威锋网,https://www.feng.com/,国内,中文,新闻/媒体,综合科技门户（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,苹果生态+科技资讯，千万果粉大本营
+砍柴网,https://www.ikanchai.com/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,国内知名中文科技媒体，科技传送门旗下
+新智派,https://www.xinzhipai.com/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,全球智能科技新媒体
+人工智能日报网,https://www.aidaily.com/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,AI全链条覆盖，擅长大模型/硬件拆解和可视化报道
+至顶科技,https://www.zhiding.cn/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,企业级AI+技术决策者视角，选型参考
+第一新声,https://www.diyixinsheng.com/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,聚焦AI全产业链，从基础设施到科技创投
+DOIT传媒,https://www.doit.com.cn/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,数据产业媒体，关注算力/存力/AI/云计算
+芯榜,https://www.xinbang.com/,国内,中文,新闻/媒体,AI/科技垂直媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,芯片+半导体产业媒体，数据和排名细
+虎嗅网,https://www.huxiu.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,商业深度分析，观点犀利，擅长拆解科技公司商业模式
+品玩,https://www.pingwest.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,硅谷+AI科技，全球化视野
+晚点LatePost,https://www.latepost.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,深度调查报道，独家内幕，AI领域重磅选题
+亿欧网,https://www.iyiou.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,科技+产业+投资信息平台和智库
+投资界,https://www.pedaily.cn/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,创业与投资资讯平台，AI融资动态
+创业邦,https://www.cyzone.cn/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,关注创新经济及其推动者，AI创业公司动态
+i黑马,https://www.iheima.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,创业创新服务平台，AI创业+投融资
+投中网,https://www.chinaventure.com.cn/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,聚焦创新经济+投资，AI资本视角
+蓝鲸财经,https://www.lanjinger.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,财经信息服务平台，AI+资本市场
+199IT,https://www.199it.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,中文互联网数据研究资讯中心，AI数据报告
+三言科技,https://www.sanyankeji.com/,国内,中文,新闻/媒体,商业科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,聚焦新未来新科技
+网易科技,https://tech.163.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,网易科技频道，独特视角呈现科技大事
+搜狐科技,https://it.sohu.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,搜狐网科技频道，互联网+智能硬件+创投
+凤凰网科技,https://tech.ifeng.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,全球视角科技资讯，直击真相
+环球网科技,https://tech.huanqiu.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,不一样的IT视角，国际科技报道
+光明网科技,https://tech.gmw.cn/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,官方背景科技频道，AI政策与成果
+中华网科技,https://tech.china.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,中华网科技频道，综合科技资讯
+和讯科技,https://tech.hexun.com/,国内,中文,新闻/媒体,门户科技频道（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,和讯网核心资讯频道，科技+财经交叉
+赛迪网,https://www.ccidnet.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,中国信息产业风向标，工信部背景
+比特网,https://www.chinabyte.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,中国第一家IT互联网媒体
+极客网,https://www.fromgeek.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,科技使能新商业，企业AI应用
+爱集微,https://www.ijiwei.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,全电子行业产业链资讯，芯片/半导体
+驱动中国,https://news.qudong.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,国内知名科技媒体，硬件+AI
+科技讯,https://www.kejixun.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,综合科技生活门户
+速途网,https://www.sootoo.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,全面关注互联网热点话题
+DoNews,https://www.donews.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,创新无边界，互联网+AI产业
+Bianews鞭牛士,https://www.bianews.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,准确快速有深度的科技媒体
+互联网的一些事,https://www.yixieshi.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,聚焦互联网前沿
+IT时代网,https://www.ittime.com.cn/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,源自《IT时代周刊》深度报道，产业公信力强
+ITBear,https://www.itbear.com.cn/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,新锐资讯平台
+TechWeb,https://www.techweb.com.cn/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,领先的互联网消费互动媒体
+前瞻网,https://www.qianzhan.com/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,产业研究型资讯服务平台，AI产业趋势
+C114通信网,https://www.c114.com.cn/,国内,中文,新闻/媒体,行业/产业媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,通信行业垂直门户，AI+通信
+CSDN,https://www.csdn.net/,国内,中文,新闻/媒体,开发者社区/技术媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,国内最大开发者社区，AI专栏内容丰富
+思否SegmentFault,https://segmentfault.com/,国内,中文,新闻/媒体,开发者社区/技术媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,开发者问答+技术文章，AI技术实践
+开源中国,https://www.oschina.net/,国内,中文,新闻/媒体,开发者社区/技术媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,开源项目+技术资讯，AI开源动态
+少数派,https://sspai.com/,国内,中文,新闻/媒体,消费/数码科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,效率工具+AI应用体验，高质量年轻用户
+数字尾巴,https://www.digitaling.info/,国内,中文,新闻/媒体,消费/数码科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,上手体验+影像+便携数码，质感调性高
+极果,https://www.jiguo.com/,国内,中文,新闻/媒体,消费/数码科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,全球好物消费推荐平台，AI+消费电子
+雷科技,https://www.leikeji.com/,国内,中文,新闻/媒体,消费/数码科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,关注科技价值，AI产品评测
+爱搞机,https://www.igao7.com/,国内,中文,新闻/媒体,消费/数码科技媒体（新增高优）,rss/page/firecrawl,P1,yes,200,expanded-56,智能硬件玩家聚合地
+Readhub AI,https://readhub.cn/news/ai,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page/firecrawl,P1,yes,200,用户指定补充,AI动态聚合平台，每日精选AI热点快讯，覆盖大模型、芯片、融资、产品发布等全维度动态
+HEX2027 AI 资讯日报,https://hex2027.com,国内,中文,新闻/媒体,国内 AI 新闻资讯媒体,page/firecrawl,P1,yes,200,用户指定补充,AI行业资讯日报，聚焦AI产业趋势、大模型发布、融资动态和技术前沿
+BestBlogs.dev,https://www.bestblogs.dev,国外,英文,新闻/媒体,AI Native 深度文章,page/firecrawl,P1,yes,200,用户指定补充,高质量内容发现平台，每日精选AI深度文章，涵盖Agent产品更新、AI Native实践、本地AI等
+zartbot,https://zartbot.com,国内,中文,AI 工具/产品发现,AI Native 深度文章,page/rss,P1,yes,200,用户指定补充,AI技术深度分析博客，聚焦大模型架构、推理优化、AI系统设计和工程实践
+百度搭子,https://dazi.baidu.com,国内,中文,AI 工具/产品发现,AI 产品官方/深度解读,page/firecrawl,P1,yes,200,用户指定补充,百度AI智能体产品官方页面，覆盖产品更新、功能发布和应用场景
+腾讯元宝,https://yuanbao.tencent.com,国内,中文,AI 工具/产品发现,AI 产品官方/深度解读,page/firecrawl,P1,yes,200,用户指定补充,腾讯AI助手产品官方页面，覆盖模型更新、智能体功能和产品动态
+夸克 AI,https://quark.sm.cn,国内,中文,AI 工具/产品发现,AI 产品官方/深度解读,page/firecrawl,P1,yes,200,用户指定补充,阿里夸克AI搜索产品官方页面，覆盖AI搜索、智能问答和产品更新
+豆包,https://www.doubao.com,国内,中文,AI 工具/产品发现,AI 产品官方/深度解读,page/firecrawl,P1,yes,200,用户指定补充,字节跳动豆包AI助手产品官方页面，覆盖模型更新、智能体功能和产品动态
+界面新闻 AI,https://www.jiemian.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,商业科技媒体，覆盖AI产业动态、融资和大公司报道，有AI频道
+澎湃新闻 AI,https://www.thepaper.cn/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,时政思想媒体，科技频道覆盖AI动态，有AI专题标签页
+央视网科技,https://news.cctv.com/technology/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,page/firecrawl,P1,yes,200,发散补充,中央广播电视总台旗下，权威科技报道，AI政策与产业动态
+科技日报,https://www.stdaily.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,科技部主管科技媒体，覆盖AI前沿研究、产业政策和重大突破
+人民网科技,http://it.people.com.cn/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,人民日报旗下科技频道，AI政策法规、产业新闻权威发布
+新华网科技,http://www.xinhuanet.com/tech/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,新华社旗下科技频道，AI产业动态、重大突破和官方政策报道
+中国新闻网科技,https://www.chinanews.com.cn/it/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,中新社旗下科技频道，覆盖AI产业动态和国际科技新闻
+观察者网科技,https://www.guancha.cn/Science/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,时事评论媒体科技板块，关注AI产业竞争、芯片和大国博弈
+华尔街见闻AI,https://wallstreetcn.com/news/ai,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,金融资讯平台AI专门频道，7x24小时滚动覆盖AI产业、融资和资本动态
+财新网科技,https://www.caixin.com/tech/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,财经深度媒体科技频道，AI行业深度调查和独家报道
+格隆汇AI,https://www.gelonghui.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,港美股财经资讯平台，覆盖AI概念股、上市公司动态和融资
+经济观察网,https://www.eeo.com.cn/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,经济观察报旗下，AI产业商业化和企业级应用报道
+21世纪经济报道,https://www.21jingji.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,南方财经旗下，AI产业经济分析、企业AI应用和资本市场报道
+中国科学报,https://news.sciencenet.cn/,国内,中文,研究/论文,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,中国科学院主管，AI学术研究、科研突破和政策解读
+钛媒体AI频道,https://www.tmtpost.com/tag/AI,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,钛媒体AI专门标签页，聚焦大模型、算力芯片、AI应用和产业落地
+IT之家AI板块,https://www.ithome.com/tag/AI/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,IT之家AI专门标签页，每日更新大量AI新闻，无反爬限制，WebFetch可直接读取
+财联社电报,https://www.cls.cn/telegraph,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,财联社7x24小时电报快讯，AI突发新闻最快来源，逐条滚动推送
+东方财富科技,https://tech.eastmoney.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,东方财富科技频道，AI概念股、产业动态和市场分析
+雪球科技,https://xueqiu.com/,国内,中文,新闻/媒体,国内科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,投资者社区，AI概念讨论、研报分享和产业分析
+Techmeme,https://www.techmeme.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,硅谷公认最快科技新闻聚合器，按热度实时排序，AI板块密度极高，分钟级更新
+Semafor,https://www.semafor.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,2022年创立的新锐科技媒体，AI报道速度快、质量高，有专门Tech频道
+Platformer,https://www.platformer.news/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,Casey Newton创立的科技平台媒体，AI企业动态、安全政策深度报道
+AP News AI,https://apnews.com/hub/artificial-intelligence,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,美联社AI频道，通讯社权威快讯，全球AI新闻第一手来源
+The Economist AI,https://www.economist.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,经济学人，AI商业影响、地缘政治和监管深度分析，全球视角
+IEEE Spectrum AI,https://spectrum.ieee.org/artificial-intelligence,国外,英文,研究/论文,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,IEEE旗下技术媒体AI频道，工程技术视角，芯片、自动驾驶、机器人深度报道
+CNET AI,https://www.cnet.com/tech/ai/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,全球消费电子评测权威CNET的AI频道，AI产品评测、工具推荐和消费指南
+BGR AI,https://bgr.com/tech/artificial-intelligence/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,消费科技媒体，AI产品发布、消费AI工具和科技新闻
+Tom's Hardware AI,https://www.tomshardware.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,硬件评测权威，AI芯片、GPU、数据中心硬件和AI硬件产业链深度报道
+Gizmodo AI,https://gizmodo.com/science/artificial-intelligence,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,科技文化媒体，AI社会影响、消费AI产品和科技争议报道
+Mashable AI,https://mashable.com/category/artificial-intelligence,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,数字文化媒体，AI工具评测、消费AI应用和科技趋势
+TechRadar AI,https://www.techradar.com/ai,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,欧洲权威科技评测媒体，AI产品评测、AI工具推荐和消费指南
+TNW Neural,https://thenextweb.com/neural,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,The Next Web旗下AI专门频道，欧洲AI创业、政策和产品动态
+Futurism,https://futurism.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,前沿科技媒体，AI突破、AI争议和未来趋势报道，批判性视角
+Computerworld AI,https://www.computerworld.com/category/artificial-intelligence/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,企业IT媒体，AI企业应用、AI合规和企业级AI部署报道
+Scientific American AI,https://www.scientificamerican.com/artificial-intelligence/,国外,英文,研究/论文,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,科学美国人AI频道，AI研究突破、科学应用和AI伦理深度报道
+BetaKit,https://betakit.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,加拿大创投科技媒体，AI创业公司融资、产品发布和产业动态
+Tech Policy Press,https://techpolicy.press/,国外,英文,政策/安全/治理,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,AI政策深度跟踪，出口管制、AI监管和安全政策分析
+AI Frontiers,https://ai-frontiers.org/,国外,英文,政策/安全/治理,国外科技媒体AI板块（发散补充）,page/firecrawl,P2,yes,200,发散补充,聚焦AI与地缘政治，芯片出口管制分析质量极高
+Nextgov,https://www.nextgov.com/,国外,英文,政策/安全/治理,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,美国联邦政府IT与AI采购动态，政策落地第一手信息
+Stratechery,https://stratechery.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,Ben Thompson的独立科技商业分析，AI产业战略、商业模式和竞争格局深度洞察
+Business Insider AI,https://www.businessinsider.com/tech,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,商业内幕科技板块，AI产业动态、大公司AI战略和商业分析
+PulseAugur,https://pulseaugur.com/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,page/firecrawl,P2,yes,200,发散补充,AI新闻聚合追踪器，抓取50+规范来源并去重聚合为单一故事报道
+Council on Foreign Relations AI,https://www.cfr.org/,国外,英文,政策/安全/治理,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P2,yes,200,发散补充,外交关系委员会，AI竞争、芯片政策和地缘政治深度分析
+The Export Practitioner,https://exportprac.com/,国外,英文,政策/安全/治理,国外科技媒体AI板块（发散补充）,page/firecrawl,P2,yes,200,发散补充,出口管制专业站，BIS规则变动、执法案例和AI芯片出口政策跟踪
+CNBC Technology,https://www.cnbc.com/technology/,国外,英文,新闻/媒体,国外科技媒体AI板块（发散补充）,rss/page/firecrawl,P1,yes,200,发散补充,CNBC科技频道，AI股票、芯片产业和科技巨头动态，财经视角
+One Useful Thing (Ethan Mollick),https://www.oneusefulthing.org/,国外,英文,Newsletter,独立AI分析博客（发散补充）,rss/email/page,P1,yes,200,发散补充,Wharton教授Ethan Mollick的AI实践博客，前沿模型真实能力测试和AI应用深度分析
+Marcus on AI (Gary Marcus),https://garymarcus.substack.com/,国外,英文,Newsletter,独立AI分析博客（发散补充）,rss/email/page,P2,yes,200,发散补充,Gary Marcus的AI批判性分析博客，LLM局限性、AI泡沫和AI认知科学深度讨论
+Lenny's Newsletter,https://www.lennysnewsletter.com/,国外,英文,Newsletter,独立AI分析博客（发散补充）,rss/email/page,P2,yes,200,发散补充,PM社区Newsletter，AI产品管理、OpenAI/Anthropic/Notion等PM访谈和AI产品深度
+No Priors Podcast,https://www.nopriors.com/,国外,英文,Newsletter,独立AI分析博客（发散补充）,rss/page,P2,yes,200,发散补充,AI研究访谈播客，邀请顶会作者和AI安全研究员，模型对齐、可解释性和前沿科研
+Reddit r/singularity,https://reddit.com/r/singularity,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,AGI讨论社区，AI突破新闻和未来预测讨论，400万+成员
+Reddit r/ChatGPT,https://reddit.com/r/ChatGPT,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,ChatGPT用户社区，560万+成员，AI产品体验、提示词和应用讨论
+Reddit r/OpenAI,https://reddit.com/r/OpenAI,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,OpenAI社区，GPT模型发布、DALL-E和OpenAI产品动态讨论
+Reddit r/StableDiffusion,https://reddit.com/r/StableDiffusion,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,Stable Diffusion图像生成社区，模型微调、提示词和工作流优化
+Reddit r/ClaudeAI,https://reddit.com/r/ClaudeAI,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,Claude AI社区，Claude模型能力、使用技巧和产品更新讨论
+Reddit r/AI_Agents,https://reddit.com/r/AI_Agents,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P2,yes,200,发散补充,2026年增长最快的AI子版块，自主Agent、多Agent系统和浏览器Agent讨论
+Reddit r/Midjourney,https://reddit.com/r/Midjourney,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P3,yes,200,发散补充,Midjourney图像生成社区，AI艺术创作和提示词优化
+Reddit r/SunoAI,https://reddit.com/r/SunoAI,国外,英文,社区/开源,Reddit AI社区（发散补充）,page/firecrawl,P3,yes,200,发散补充,Suno AI音乐生成社区，AI音乐创作和模型更新讨论
+Lex Fridman Podcast,https://www.youtube.com/@LexFridman,国外,英文,社区/开源,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,MIT研究员AI深度访谈播客，2-4小时超长对话，覆盖Altman/Karpathy/LeCun/Hinton等顶级AI人物
+Dwarkesh Patel,https://www.youtube.com/@DwarkeshPatel,国外,英文,社区/开源,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,经济学人称为硅谷最火AI播客，工业一线AI建造者访谈，聚焦模型缩放和产业落地
+Two Minute Papers,https://www.youtube.com/@TwoMinutePapers,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,AI研究论文快速解读频道，2分钟解读最新AI论文，覆盖面广
+AI Explained,https://www.youtube.com/@aiexplained-official,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,AI研究论文深度解读频道，比摘要更深入，前沿模型能力分析和Benchmark解读
+Matthew Berman,https://www.youtube.com/@matthew_berman,国外,英文,AI 工具/产品发现,YouTube/Podcast AI频道（发散补充）,page/rss,P3,yes,200,发散补充,AI工具实测和演示频道，前沿AI产品体验和比较
+Andrej Karpathy YouTube,https://www.youtube.com/@AndrejKarpathy,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,前OpenAI/Tesla AI负责人，Transformer原理、软件2.0和AI教育深度讲解
+Yannic Kilcher,https://www.youtube.com/@YannicKilcher,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P2,yes,200,发散补充,AI论文全文精读频道，每篇论文逐行讲解，面向开发者和研究者
+3Blue1Brown,https://www.youtube.com/@3blue1brown,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P3,yes,200,发散补充,数学可视化频道，AI算法原理直观讲解，Transformer/GPT原理动画解析
+a16z YouTube,https://www.youtube.com/@a16z,国外,英文,社区/开源,YouTube/Podcast AI频道（发散补充）,page/rss,P3,yes,200,发散补充,Andreessen Horowitz风投官方频道，AI创业、商业模式和投资视角
+DeepLearningAI,https://www.youtube.com/@Deeplearningai,国外,英文,研究/论文,YouTube/Podcast AI频道（发散补充）,page/rss,P3,yes,200,发散补充,Andrew Ng创办的DeepLearning.AI官方频道，AI教育和实践应用
