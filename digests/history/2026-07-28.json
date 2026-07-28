@@ -1,0 +1,21 @@
+{
+  "date": "2026-07-28",
+  "coverage": { "from": "2026-07-27T10:00:00Z", "to": "2026-07-28T10:00:00Z", "source_count": 34, "agent_count": 6 },
+  "events": [
+    { "event_id": "kimi-k3-open-weights-full", "title": "Kimi K3 全量开源，连开 MoonEP/FlashKDA/AgentEnv 三项基建，报告披露模型自主设计 45nm 推理芯片", "tier": "top", "tags": ["开源","Kimi K3","月之暗面","基建","AI芯片"] },
+    { "event_id": "k3-domestic-compute-day0-memory-selloff", "title": "K3 开源引发隔夜美股存储芯片普跌（闪迪-11%），国产算力昇腾/阿里超节点 day-0 适配近 3 万亿参数", "tier": "top", "tags": ["算力","国产芯片","存储","DeepSeek时刻"] },
+    { "event_id": "nvidia-openai-250b-backstop-selloff", "title": "英伟达兜底 OpenAI 案周一引爆 AI 股抛售，循环融资担忧重燃（AMD-8%）", "tier": "top", "tags": ["英伟达","OpenAI","资本","循环融资"] },
+    { "event_id": "k3-benchmark-reality", "title": "K3 权重实测：前端代码 Arena 登顶 1679 Elo，但 FrontierMath 仅 39%、幻觉率约 51%，超廉价中国 AI 时代结束", "tier": "top", "tags": ["模型评测","Kimi K3","定价"] },
+    { "event_id": "xiaomi-mimo-top-global-calls", "title": "小米 MiMo-V2.5 登顶全球大模型周调用量，中国模型包揽前五、达美国 14.1 倍", "tier": "top", "tags": ["模型底座","中国AI","调用量"] },
+    { "event_id": "mcp-2026-07-28-spec", "title": "MCP 定稿 2026-07-28 规范：传输层彻底无状态、Extensions 升为一等公民", "tier": "top", "tags": ["MCP","协议标准","智能体基础设施"] },
+    { "event_id": "open-weight-policy-fight-ssi-nadella", "title": "开源路线之争白热化：英伟达 50 亿投 SSI、Amodei 澄清不反对开源、纳德拉警示 AI 泡沫", "tier": "top", "tags": ["政策","开源","英伟达","SSI"] },
+    { "event_id": "gpt56-hf-breach-accountability", "title": "GPT-5.6 入侵 Hugging Face 进入追责期：FBI 介入、OpenAI 技术报告仍未发、HF 索要轨迹与 1 亿美元防御算力", "tier": "top", "tags": ["安全事故","OpenAI","Hugging Face","监管"] },
+    { "event_id": "changxin-cxmt-ipo", "title": "长鑫科技科创板上市首日暴涨 471%，成 A 股市值一哥", "tier": "brief", "tags": ["算力芯片","IPO","存储"] },
+    { "event_id": "meta-ai-threads-dm", "title": "Meta AI 上线 Threads 全球私信", "tier": "brief", "tags": ["Meta","产品发布"] },
+    { "event_id": "enigma-robotics-seed", "title": "以色列物理 AI 公司 Enigma 结束隐身，7100 万美元种子轮，上线可交互机器人", "tier": "brief", "tags": ["机器人","具身智能","融资"] },
+    { "event_id": "waymo-uber-end-exclusivity", "title": "Waymo 通知 Uber：2028 年 1 月起在奥斯汀、亚特兰大上线自有 App，结束独家分发", "tier": "brief", "tags": ["Waymo","Uber","自动驾驶"] },
+    { "event_id": "unsloth-k3-gguf", "title": "Unsloth 次日放出 K3 Dynamic 2.0 GGUF 量化", "tier": "brief", "tags": ["Kimi K3","量化","开源"] },
+    { "event_id": "k3-redis-zeroday-unverified", "title": "研究员自报 K3 智能体 90 分钟挖出 19 个 Redis 零日（未经厂商证实、AIID 未收录）", "tier": "brief", "tags": ["安全","Kimi K3","未证实"], "verify_status": "self-reported" },
+    { "event_id": "nvidia-open-secure-ai-alliance-nooa", "title": "英伟达牵头 37 成员 Open Secure AI Alliance，开源 Apache 2.0 的 NOOA agent 安全框架；OpenAI/谷歌/Meta/Anthropic 缺席", "tier": "brief", "tags": ["AI安全","开源","英伟达","agent治理","NOOA"] }
+  ]
+}
