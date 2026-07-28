@@ -13,7 +13,6 @@
     { "event_id": "changxin-cxmt-ipo", "title": "长鑫科技科创板上市首日暴涨 471%，成 A 股市值一哥", "tier": "brief", "tags": ["算力芯片","IPO","存储"] },
     { "event_id": "meta-ai-threads-dm", "title": "Meta AI 上线 Threads 全球私信", "tier": "brief", "tags": ["Meta","产品发布"] },
     { "event_id": "enigma-robotics-seed", "title": "以色列物理 AI 公司 Enigma 结束隐身，7100 万美元种子轮，上线可交互机器人", "tier": "brief", "tags": ["机器人","具身智能","融资"] },
-    { "event_id": "waymo-uber-end-exclusivity", "title": "Waymo 通知 Uber：2028 年 1 月起在奥斯汀、亚特兰大上线自有 App，结束独家分发", "tier": "brief", "tags": ["Waymo","Uber","自动驾驶"] },
     { "event_id": "unsloth-k3-gguf", "title": "Unsloth 次日放出 K3 Dynamic 2.0 GGUF 量化", "tier": "brief", "tags": ["Kimi K3","量化","开源"] },
     { "event_id": "k3-redis-zeroday-unverified", "title": "研究员自报 K3 智能体 90 分钟挖出 19 个 Redis 零日（未经厂商证实、AIID 未收录）", "tier": "brief", "tags": ["安全","Kimi K3","未证实"], "verify_status": "self-reported" },
     { "event_id": "nvidia-open-secure-ai-alliance-nooa", "title": "英伟达牵头 37 成员 Open Secure AI Alliance，开源 Apache 2.0 的 NOOA agent 安全框架；OpenAI/谷歌/Meta/Anthropic 缺席", "tier": "brief", "tags": ["AI安全","开源","英伟达","agent治理","NOOA"] }
