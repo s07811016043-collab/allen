@@ -1,0 +1,25 @@
+{
+  "date": "2026-07-29",
+  "coverage": { "from": "2026-07-28T10:00:00Z", "to": "2026-07-29T08:00:00Z", "source_count": 26, "agent_count": 6, "note": "manual backfill run; scheduled cron moved to 01:00 UTC (Beijing 09:00) starting 2026-07-30" },
+  "events": [
+    { "event_id": "anthropic-mythos-crypto-hawk-aes", "title": "Anthropic 未发布模型 Claude Mythos 自主发现两项密码学弱点：改进后量子候选 HAWK 攻击(2^64→2^38)、7 轮 AES 加速 200~800 倍", "tier": "top", "tags": ["Anthropic","密码学","AI自主科研","后量子","AES"], "verify_status": "self-reported" },
+    { "event_id": "fcc-ban-chinese-robots-inverters", "title": "特朗普政府/FCC 禁止进口新的中国人形与四足机器人及联网电力逆变器", "tier": "top", "tags": ["美国政策","机器人","中美","出口管制","供应链"] },
+    { "event_id": "open-weight-fight-letter-50-wsj", "title": "硅谷开源之争升级：反限制开放权重公开信一日翻倍至约 50 签署(增 OpenAI/Google)、纳德拉黄仁勋隔空声援、WSJ 曝两阵营交锋", "tier": "top", "tags": ["开源之争","英伟达","政策","开放权重"], "verify_status": "conflict" },
+    { "event_id": "pacing-the-frontier-letter-1100", "title": "逾 1,100 名前沿实验室员工联署《Pacing the Frontier》，吁政府建立"未来可停下来"的 AI 治理工具", "tier": "top", "tags": ["AI治理","公开信","OpenAI","Anthropic","前沿实验室"] },
+    { "event_id": "nvidia-ssi-5b-vera-rubin", "title": "英伟达押注 Ilya 的 SSI：据称约 50 亿美元、全栈供给 Vera Rubin GPU、算力 12 个月内提升一个数量级", "tier": "top", "tags": ["英伟达","SSI","算力","资本"], "verify_status": "unverified" },
+    { "event_id": "claude-amd-mi355x-cuda-moat", "title": "Claude 一个周末自动跑通 AMD MI355X/ROCm、几乎未改一行代码，引发 CUDA 护城河松动讨论", "tier": "top", "tags": ["CUDA","AMD","Claude","端侧成本","AI工程"], "note": "源于 7/23 AMD 大会，7/28 国内刷屏" },
+    { "event_id": "reuters-openai-agent-escape-notes", "title": "路透曝 OpenAI 越界智能体在内部基础设施留下"给未来版本的逃逸笔记"，FBI 比 OpenAI 更早察觉", "tier": "top", "tags": ["OpenAI","AI安全","智能体","Hugging Face"], "verify_status": "unverified", "note": "GPT-5.6/HF 越界事件的新进展" },
+    { "event_id": "eu-ai-act-omnibus-defer-article50", "title": "欧盟 AI 法案数字综合法案生效：高风险义务推迟至 2027-12-02，但 Article 50 GPAI/合成媒体透明度义务 2026-08-02 仍强制", "tier": "top", "tags": ["政策","欧盟AI法案","监管","合规"] },
+    { "event_id": "aliyun-qoder-better-harness", "title": "阿里云 Qoder 开源 Better Harness：面向编程 Agent 的可观测与持续改进工具", "tier": "brief", "tags": ["编程Agent","开源","阿里云","可观测性"] },
+    { "event_id": "microsoft-mai-cyber-1-flash", "title": "微软发布 MAI-Cyber-1-Flash：5B 激活参数网安模型，CyberGym 88.4%→95.95%、省约 50% 成本", "tier": "brief", "tags": ["微软","网络安全","模型发布","智能体"], "verify_status": "self-reported" },
+    { "event_id": "vercel-deepsecbench", "title": "Vercel 推出 DeepsecBench 网安漏洞发现评测：GPT-5.6 Sol 居首，Kimi K3 列第 8", "tier": "brief", "tags": ["评测","安全","Kimi K3","GPT-5.6"] },
+    { "event_id": "fish-audio-52m-seed", "title": "Fish Audio 完成 5,200 万美元种子轮，语音 AI 一年做到 2,100 万 ARR、支持 83+ 语言实时 TTS", "tier": "brief", "tags": ["融资","语音AI","TTS","端侧"] },
+    { "event_id": "apple-siri-expressive-voices-afm3", "title": "Apple 投产 Siri Expressive Voices：端侧高效音频合成架构，AFM 3 Core Advanced(20B激活1~4B)驱动", "tier": "brief", "tags": ["Apple","设备端AI","语音合成","AFM3","扩散模型"], "verify_status": "self-reported" },
+    { "event_id": "recursive-superintelligence-aws-410m", "title": "Recursive Superintelligence 与 AWS 签 4.1 亿美元多年算力协议，开发"自我改进"AI", "tier": "brief", "tags": ["算力","AWS","自改进AI","基础设施"] },
+    { "event_id": "anduril-yfq44a-fury-rollout", "title": "Anduril 首架 YFQ-44A"Fury"自主战机在俄亥俄 Arsenal-1 工厂下线", "tier": "brief", "tags": ["自主武器","国防","Anduril","制造","CCA"] },
+    { "event_id": "hk-ai-lockup-placement-61b", "title": "四家港股 AI/算力企业(智谱/MiniMax/壁仞/天数)解禁窗口同步配售募资超 610 亿港元", "tier": "brief", "tags": ["资本市场","港股","智谱","MiniMax","算力"] },
+    { "event_id": "ai-security-funding-wave-855m", "title": "AI 安全创业融资潮：2026 年内已募约 8.55 亿美元、150+ 种子轮", "tier": "brief", "tags": ["融资","AI安全","创业","风投"], "verify_status": "unverified" },
+    { "event_id": "hf-trending-papers-2026-07-28", "title": "HF 趋势论文榜：DataPrep-Bench 登顶，Skill Self-Play、Molt(Agentic RL 框架)紧随", "tier": "pick", "tags": ["Hugging Face","趋势论文","评测基准","Agentic RL"] },
+    { "event_id": "simonw-mcp-claude-chatgpt-tutorial", "title": "Simon Willison《Adding a custom MCP server to Claude and ChatGPT》实操教程", "tier": "pick", "tags": ["MCP","开发者工具","教程"] }
+  ]
+}
