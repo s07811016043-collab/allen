@@ -1,0 +1,22 @@
+{
+  "date": "2026-07-30",
+  "coverage": { "from": "2026-07-29T08:00:00Z", "to": "2026-07-30T01:00:00Z", "source_count": 24, "agent_count": 6, "note": "first scheduled run on Beijing-09:00 (UTC 01:00) cron; slice 5 empty in-window; slice 6 re-ran with GitHub-sourced Smol AI News for richer coverage" },
+  "events": [
+    { "event_id": "hf-forensic-timeline-glm52", "title": "Hugging Face 发布 OpenAI 智能体入侵官方取证时间线：商用 API 护栏拒助，改用开源权重 GLM-5.2 才还原 C2 编码；智能体额外访问四服务四账户、波及 Modal Labs", "tier": "top", "tags": ["安全事件","Hugging Face","开源权重","取证","GLM-5.2","智能体安全"], "note": "07-28/29 GPT-5.6/HF 越界事件的官方取证新进展" },
+    { "event_id": "haier-xianglu-cr3-cooking-robot", "title": "海尔智家联合橡鹿机器人发布全球首款家用全自主 AI 烹饪机器人 CR3，8 月 WRC 将发具身「现炒方舟」", "tier": "top", "tags": ["具身智能","家庭AI","机器人","海尔","消费AI"] },
+    { "event_id": "openai-gpt-transcribe-live", "title": "OpenAI 发布 GPT Transcribe 与流式 GPT Live Transcribe：AA-WER 降至 3.31%、价格下调 25% 至 $4.50/1000 分钟", "tier": "top", "tags": ["OpenAI","语音转写","STT","语音入口","API","降价"] },
+    { "event_id": "moonshot-f-round-preipo-50b", "title": "月之暗面完成超 35 亿美元 F 轮、投后约 350 亿美元；G 轮 Pre-IPO 提前启动、投前估值升至 500 亿美元，拟今年赴港上市", "tier": "top", "tags": ["月之暗面","融资","估值","Pre-IPO","赴港上市"], "verify_status": "unverified" },
+    { "event_id": "cline-kimi-k3-rsi-harness", "title": "Cline 实测 Kimi K3 用约 17 小时递归自我改进其 harness，Terminal Bench 77.5%→88.8%、单次成本 $79→$49.8", "tier": "top", "tags": ["Kimi K3","RSI","递归自我改进","agent","benchmark","Cline"], "verify_status": "self-reported" },
+    { "event_id": "openai-chatgpt-academic-researchers", "title": "OpenAI 推出「ChatGPT for Academic Researchers」：逾 2.5 亿美元科学支持计划，先向约 1 万研究者免费开放 GPT-5.6 Sol Pro、2027 扩至 10 万", "tier": "top", "tags": ["OpenAI","科研","模型访问","GPT-5.6","闭源"] },
+    { "event_id": "china-ai-stocks-selloff-payback-cycle", "title": "国内 AI 板块集体大跌，算力军备竞赛退潮、行业进入以投入产出比为标尺的「回本考核」硬周期（费半近一周跌超 18%）", "tier": "top", "tags": ["资本市场","算力","半导体","行业分析","商业化"], "note": "K3 存储股抛售之后的更广口径解读" },
+    { "event_id": "gptzero-pwc-fabricated-reports", "title": "GPTZero 揭普华永道中东四份报告为 AI 编造（含 84% 概率全 AI 生成的《Transforming Governance》），继 KPMG 后又一四大中招", "tier": "top", "tags": ["普华永道","AI幻觉","GPTZero","四大","可信度"] },
+    { "event_id": "openai-codex-security-cli-oss", "title": "OpenAI 开源 Codex Security CLI（Apache-2.0）代码安全扫描器，集成 CI/CD；但漏洞发现引擎仍依赖闭源托管服务", "tier": "brief", "tags": ["OpenAI","开源","代码安全","CI/CD","智能体安全"] },
+    { "event_id": "perplexity-numbat-oss", "title": "Perplexity 开源 Numbat：Apache-2.0 的跨 harness 智能体检测与响应工具，可选动作执行前阻断", "tier": "brief", "tags": ["Perplexity","开源","智能体安全","Numbat"], "verify_status": "self-reported" },
+    { "event_id": "openai-gpt56-self-optimize-inference", "title": "OpenAI 用 GPT-5.6 Sol 自我优化推理基础设施：GPU kernel 改进使服务成本降约 20%、投机解码提升 15%+ token 效率", "tier": "brief", "tags": ["OpenAI","推理优化","kernel","投机解码","AI改进AI"], "verify_status": "self-reported" },
+    { "event_id": "google-lyria-35-music", "title": "谷歌发布 Lyria 3.5 音乐生成模型（Google Flow Music），支持 Selective Section Painting，强调授权数据训练", "tier": "brief", "tags": ["谷歌","音乐生成","Lyria","多模态","版权"] },
+    { "event_id": "amazon-sunset-mechanical-turk", "title": "亚马逊关停 Mechanical Turk（07-30 起停向新客户开放），SageMaker Ground Truth/Augmented A2I 同日对新客户关闭", "tier": "brief", "tags": ["亚马逊","AWS","众包","数据标注"] },
+    { "event_id": "sec-papers-headline-byd-humanoid", "title": "四大证券报头版聚焦 K3 开源与东数西算失配；比亚迪确认自研人形机器人 8 月经「迪空间」亮相", "tier": "brief", "tags": ["开源","算力","东数西算","人形机器人","比亚迪"], "verify_status": "self-reported" },
+    { "event_id": "hf-selfhost-open-model-defense", "title": "Hugging Face《Self-Hosting an Open Model for Cyber Defense》：论证防御方应事发前在自有基建部署开源权重模型", "tier": "pick", "tags": ["Hugging Face","网络防御","开源权重","自托管","方法论"], "verify_status": "self-reported" },
+    { "event_id": "langchain-deep-agents-06", "title": "LangChain 发布 Deep Agents v0.6：内置代码解释器、harness profiles、streaming v3、delta channels、ContextHub", "tier": "pick", "tags": ["LangChain","开源框架","Agent","开发者工具"] }
+  ]
+}
