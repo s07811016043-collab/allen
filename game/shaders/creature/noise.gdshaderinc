@@ -1,3 +1,6 @@
+#ifndef PETALIA_NOISE_INC
+#define PETALIA_NOISE_INC
+
 // Shared procedural noise for Petalia's coat, skin and VFX shaders.
 //
 // Everything here is hash-based and texture-free on purpose: the pet ships as a
@@ -75,9 +78,22 @@ float pet_strands(vec2 p, vec2 dir, float freq, float stretch) {
 	return pet_fbm(t * freq, 3);
 }
 
+// Smooth unit ridge with an analytic derivative. Every strand, barb and scale
+// edge in the renderer is drawn with this profile: `x` is the normalised
+// distance across the feature, `value` peaks at 1 and reaches 0 at x = 1, and
+// `slope` is d(value)/dx. Differentiating the profile instead of finite
+// differencing a noise field is what keeps coat normals free of aliasing.
+float pet_ridge(float x, out float slope) {
+	float t = clamp(x, 0.0, 1.0);
+	slope = -6.0 * t * (1.0 - t);
+	return 1.0 - t * t * (3.0 - 2.0 * t);
+}
+
 // Cheap ordered dither, applied at the very end of shading. Eight-bit output
 // over a slow gradient bands visibly on large soft bodies; a sub-LSB dither
 // costs nothing and removes it entirely.
 float pet_dither(vec2 frag) {
 	return (pet_hash1(floor(frag)) - 0.5) / 255.0;
 }
+
+#endif

@@ -1,0 +1,6 @@
+[gd_scene load_steps=2 format=3 uid="uid://cvfxpreview001"]
+
+[ext_resource type="Script" path="res://vfx/vfx_preview.gd" id="1_preview"]
+
+[node name="VfxPreview" type="Node2D"]
+script = ExtResource("1_preview")

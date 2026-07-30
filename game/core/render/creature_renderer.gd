@@ -51,9 +51,28 @@ var brow_raise: float = 0.0     ## worry / curiosity lift
 var brow_furrow: float = 0.0    ## focus / annoyance
 var mouth_open: float = 0.0
 var cheek_puff: float = 0.0
-var light_dir := Vector3(-0.42, -0.62, 0.66).normalized()
-var ambient_tint := Color(0.62, 0.68, 0.82)
-var bounce_tint := Color(0.30, 0.28, 0.26)
+
+## The lighting rig. Three sources plus two ambients, matching the terms in
+## `lighting.gdshaderinc`. Defaults are the house key: warm, upper-front, on the
+## side the creature faces, with a cool kicker from behind. A room the pet sits
+## in can push these around (a bright window, a dim evening desktop) — that is
+## the intended way to make the pet belong to the player's desktop rather than
+## look pasted on top of it.
+var light_dir := Vector3(0.40, -0.66, 0.64).normalized()
+var key_color := Color(1.0, 0.955, 0.885)
+var key_energy: float = 1.02
+var rim_dir := Vector3(-0.78, -0.36, -0.50).normalized()
+var rim_color := Color(0.60, 0.75, 1.0)
+var rim_energy: float = 0.85
+var ambient_tint := Color(0.40, 0.50, 0.68)
+var ambient_energy: float = 0.26
+var bounce_tint := Color(0.38, 0.27, 0.19)
+var bounce_energy: float = 0.30
+var exposure: float = 1.0
+
+## Set by `PostStack` when it takes ownership of the filmic curve, so the body is
+## not tonemapped twice.
+var defer_tonemap: bool = false
 
 
 func _ready() -> void:
@@ -115,6 +134,10 @@ func _upload_static() -> void:
 	_mat.set_shader_parameter("coat_density", spec.coat_density)
 	_mat.set_shader_parameter("translucency", spec.translucency)
 	_mat.set_shader_parameter("roughness", spec.roughness)
+	# Lashes are a mammal feature. A bird with eyelashes reads as a cartoon, and
+	# a gecko with them reads as a mistake.
+	_mat.set_shader_parameter("eye_lash",
+		1.0 if spec.coat_surface == SDFPart.Surface.FUR else 0.0)
 
 
 func _process(_delta: float) -> void:
@@ -209,9 +232,29 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("mouth_open", mouth_open)
 	_mat.set_shader_parameter("cheek_puff", cheek_puff)
 	_mat.set_shader_parameter("light_dir", light_dir)
+	_mat.set_shader_parameter("key_color", key_color)
+	_mat.set_shader_parameter("key_energy", key_energy)
+	_mat.set_shader_parameter("rim_dir", rim_dir)
+	_mat.set_shader_parameter("rim_color", rim_color)
+	_mat.set_shader_parameter("rim_energy", rim_energy)
 	_mat.set_shader_parameter("ambient_tint", ambient_tint)
+	_mat.set_shader_parameter("ambient_energy", ambient_energy)
 	_mat.set_shader_parameter("bounce_tint", bounce_tint)
-	_mat.set_shader_parameter("px_per_unit", _pixels_per_unit)
+	_mat.set_shader_parameter("bounce_energy", bounce_energy)
+	_mat.set_shader_parameter("exposure", exposure)
+	_mat.set_shader_parameter("defer_tonemap", defer_tonemap)
+	# The on-screen pixel density, not the spec's nominal one: every coat
+	# level-of-detail decision keys off this, so a pet the player has scaled up
+	# has to be told it is bigger or its fur stays at desktop-size frequencies.
+	_mat.set_shader_parameter("px_per_unit", _pixels_per_unit * _view_scale())
+
+
+## Uniform screen scale currently applied to this node by its ancestors. Godot
+## allows non-uniform and skewed transforms; the coat only needs one number, so
+## take the geometric mean rather than an arbitrary axis.
+func _view_scale() -> float:
+	var s := global_scale.abs()
+	return maxf(sqrt(maxf(s.x * s.y, 1e-6)), 0.01)
 
 
 ## World-space (pixel) bounding rectangle, used for hit-testing and for the
