@@ -192,7 +192,9 @@ func _cell_fit(cell: Vector2, natural_h: float) -> float:
 	# body length rather than assuming an aspect ratio: species differ, and a
 	# reviewer looking at a cropped animal reports the crop, not the animal.
 	var span: float = _body_span() * _spec.pixels_per_unit
-	var by_w: float = (cell.x * (0.88 if strip > 0 else 0.92)) / maxf(span, 1.0)
+	# The margin has to absorb the tail: the span above is the bind pose, but the
+	# tail spring swings wider than the pose it was measured from.
+	var by_w: float = (cell.x * (0.84 if strip > 0 else 0.88)) / maxf(span, 1.0)
 	return minf(by_h, by_w)
 
 
@@ -306,9 +308,15 @@ func _drive(c: Creature, t: float) -> void:
 func _make_contact_shadow() -> Node2D:
 	var holder := Node2D.new()
 	var rect := ColorRect.new()
-	var w: float = _spec.adult_height * _spec.pixels_per_unit * 1.6
+	# Sized to the animal actually in frame, not to a guess: a long cat casts a
+	# long shadow, and a kitten a small one.
+	var w: float = _body_span() * _spec.pixels_per_unit * 1.05
 	rect.size = Vector2(w, w * 0.34)
-	rect.position = Vector2(-w * 0.5, -w * 0.13)
+	# The ellipse inside the shader is centred at UV y = 0.62, so the rect has to
+	# be offset by exactly that fraction of its own height for the shadow to land
+	# on the ground line rather than below it. Getting this wrong is what made
+	# the pet look like it was hovering over its own shadow.
+	rect.position = Vector2(-w * 0.5, -rect.size.y * 0.62)
 	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
 	var sh := Shader.new()
 	sh.code = """
