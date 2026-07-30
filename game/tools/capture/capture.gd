@@ -187,9 +187,27 @@ func _build_creature() -> void:
 ## on a contact sheet the width budget frequently wins.
 func _cell_fit(cell: Vector2, natural_h: float) -> float:
 	var by_h: float = (cell.y * (0.56 if strip > 0 else 0.62)) / maxf(natural_h, 1.0)
-	if strip <= 0:
-		return by_h
-	return minf(by_h, (cell.x * 0.88) / maxf(natural_h * 1.95, 1.0))
+	# A standing cat is about twice as long as it is tall, so fitting by height
+	# alone runs the rump and tail off the side of the frame. Measure the actual
+	# body length rather than assuming an aspect ratio: species differ, and a
+	# reviewer looking at a cropped animal reports the crop, not the animal.
+	var span: float = _body_span() * _spec.pixels_per_unit
+	var by_w: float = (cell.x * (0.88 if strip > 0 else 0.92)) / maxf(span, 1.0)
+	return minf(by_h, by_w)
+
+
+## Widest horizontal extent of the bind pose, in rig units.
+func _body_span() -> float:
+	var lo := INF
+	var hi := -INF
+	var live: Array[SDFPart] = []
+	for p in _spec.parts:
+		live.append(p.duplicate_part())
+	Growth.apply(_spec, live, growth)
+	for p in live:
+		lo = minf(lo, minf(p.a.x - p.radius_a, p.b.x - p.radius_b))
+		hi = maxf(hi, maxf(p.a.x + p.radius_a, p.b.x + p.radius_b))
+	return maxf(hi - lo, 0.1) if is_finite(lo) else 1.0
 
 
 ## Choose the grid that makes the creature largest. A single long row wastes

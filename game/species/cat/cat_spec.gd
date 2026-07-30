@@ -92,93 +92,114 @@ static func build() -> S:
 
 	var parts: Array[P] = []
 
+	# Proportions are the whole ballgame. A domestic cat is roughly 1.75 times as
+	# long from nose to rump as it is tall at the withers, with legs a little over
+	# half its standing height. Get that ratio wrong and no amount of coat shading
+	# rescues it — a short, tall body reads as a generic quadruped toy, which is
+	# exactly what the first pass produced.
+	#
+	# Withers sit at y = -0.90, the ear tips reach -1.16, and the body spans
+	# x = -0.81 (rump) to +0.77 (nose).
+
 	# --- far-side limbs (drawn behind the torso) ----------------------------
-	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.10, -0.52), Vector2(0.12, -0.28), 0.052, 0.040, COL_COAT_DARK, 0)
-	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.12, -0.28), Vector2(0.14, -0.03), 0.038, 0.030, COL_COAT_DARK, 0)
-	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.24, -0.50), Vector2(-0.30, -0.27), 0.075, 0.048, COL_COAT_DARK, 0)
-	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.30, -0.27), Vector2(-0.22, -0.03), 0.042, 0.031, COL_COAT_DARK, 0)
-	var ear_far := _part(&"ear_far", Vector2(0.40, -0.86), Vector2(0.36, -1.02), 0.062, 0.016, COL_COAT_DARK, 0)
+	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.24, -0.66), Vector2(0.26, -0.40), 0.054, 0.041, COL_COAT_DARK, 0)
+	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.26, -0.40), Vector2(0.25, -0.13), 0.039, 0.030, COL_COAT_DARK, 0)
+	var fl_far_p := _part(&"paw_fl_far", Vector2(0.25, -0.13), Vector2(0.30, -0.035), 0.030, 0.031, COL_COAT_DARK, 0)
+	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.52, -0.66), Vector2(-0.62, -0.42), 0.078, 0.049, COL_COAT_DARK, 0)
+	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.62, -0.42), Vector2(-0.49, -0.19), 0.043, 0.031, COL_COAT_DARK, 0)
+	var bl_far_p := _part(&"paw_bl_far", Vector2(-0.49, -0.19), Vector2(-0.44, -0.035), 0.030, 0.031, COL_COAT_DARK, 0)
+	var ear_far := _part(&"ear_far", Vector2(0.585, -1.005), Vector2(0.555, -1.155), 0.062, 0.016, COL_COAT_DARK, 0)
 	ear_far.height_scale = 0.30
 	ear_far.blend = 0.03
-	parts.append_array([fl_far_u, fl_far_l, bl_far_u, bl_far_l, ear_far])
+	parts.append_array([fl_far_u, fl_far_l, fl_far_p, bl_far_u, bl_far_l, bl_far_p, ear_far])
 
 	# --- torso --------------------------------------------------------------
-	var hip := _part(&"hip", Vector2(-0.28, -0.55), Vector2(-0.14, -0.57), 0.165, 0.175, COL_COAT)
-	hip.blend = 0.10
-	var torso := _part(&"torso", Vector2(-0.16, -0.57), Vector2(0.12, -0.58), 0.175, 0.160, COL_COAT)
-	torso.blend = 0.11
-	var chest := _part(&"chest", Vector2(0.10, -0.58), Vector2(0.20, -0.53), 0.155, 0.130, COL_COAT)
-	chest.blend = 0.10
-	var belly := _part(&"belly", Vector2(-0.14, -0.44), Vector2(0.10, -0.45), 0.075, 0.070, COL_BELLY)
-	belly.blend = 0.09
-	belly.coat_length = 1.3
-	var neck := _part(&"neck", Vector2(0.19, -0.60), Vector2(0.30, -0.71), 0.115, 0.105, COL_COAT)
-	neck.blend = 0.09
-	parts.append_array([hip, torso, chest, belly, neck])
+	# Four capsules rather than three: a cat's back is not a single tube, it dips
+	# behind the shoulder blades and rises again over the hips, and that dip is
+	# most of what reads as "cat" in silhouette.
+	var rump := _part(&"hip", Vector2(-0.62, -0.705), Vector2(-0.44, -0.735), 0.180, 0.196, COL_COAT)
+	rump.blend = 0.11
+	var torso := _part(&"torso", Vector2(-0.44, -0.735), Vector2(0.02, -0.728), 0.196, 0.190, COL_COAT)
+	torso.blend = 0.12
+	var chest := _part(&"chest", Vector2(0.02, -0.728), Vector2(0.26, -0.700), 0.190, 0.163, COL_COAT)
+	chest.blend = 0.11
+	var belly := _part(&"belly", Vector2(-0.38, -0.560), Vector2(0.10, -0.575), 0.078, 0.072, COL_BELLY)
+	belly.blend = 0.10
+	belly.coat_length = 1.35
+	var neck := _part(&"neck", Vector2(0.26, -0.745), Vector2(0.45, -0.858), 0.128, 0.110, COL_COAT)
+	neck.blend = 0.10
+	parts.append_array([rump, torso, chest, belly, neck])
 
 	# --- head ---------------------------------------------------------------
-	var skull := _part(&"head", Vector2(0.31, -0.75), Vector2(0.41, -0.74), 0.128, 0.122, COL_COAT)
-	skull.blend = 0.075
-	var cheek_l := _part(&"cheek", Vector2(0.36, -0.70), Vector2(0.44, -0.70), 0.096, 0.082, COL_COAT)
-	cheek_l.blend = 0.07
-	var muzzle := _part(&"muzzle", Vector2(0.44, -0.70), Vector2(0.505, -0.695), 0.062, 0.050, COL_MUZZLE, 2)
+	var skull := _part(&"head", Vector2(0.480, -0.902), Vector2(0.620, -0.886), 0.134, 0.127, COL_COAT)
+	skull.blend = 0.078
+	var cheek := _part(&"cheek", Vector2(0.550, -0.846), Vector2(0.655, -0.845), 0.104, 0.087, COL_COAT)
+	cheek.blend = 0.072
+	var muzzle := _part(&"muzzle", Vector2(0.658, -0.845), Vector2(0.733, -0.838), 0.061, 0.049, COL_MUZZLE, 2)
 	muzzle.blend = 0.045
 	muzzle.coat_length = 0.5
-	var chin := _part(&"chin", Vector2(0.44, -0.655), Vector2(0.48, -0.655), 0.042, 0.032, COL_BELLY, 2)
+	var chin := _part(&"chin", Vector2(0.652, -0.795), Vector2(0.700, -0.796), 0.042, 0.032, COL_BELLY, 2)
 	chin.blend = 0.04
-	var nose := _part(&"nose", Vector2(0.512, -0.706), Vector2(0.519, -0.702), 0.016, 0.013, COL_NOSE, 2)
+	var nose := _part(&"nose", Vector2(0.740, -0.853), Vector2(0.747, -0.849), 0.016, 0.013, COL_NOSE, 2)
 	nose.surface = P.Surface.SKIN
 	nose.blend = 0.012
 	nose.coat_length = 0.0
-	parts.append_array([skull, cheek_l, muzzle, chin, nose])
+	parts.append_array([skull, cheek, muzzle, chin, nose])
 
 	# --- near ear -----------------------------------------------------------
-	var ear_base := _part(&"ear_near", Vector2(0.33, -0.85), Vector2(0.285, -1.01), 0.066, 0.017, COL_COAT, 2)
+	var ear_base := _part(&"ear_near", Vector2(0.500, -1.000), Vector2(0.455, -1.160), 0.068, 0.017, COL_COAT, 2)
 	ear_base.height_scale = 0.32
 	ear_base.blend = 0.032
-	var ear_inner := _part(&"ear_near_inner", Vector2(0.322, -0.865), Vector2(0.292, -0.985), 0.040, 0.010, COL_INNER_EAR, 2)
+	var ear_inner := _part(&"ear_near_inner", Vector2(0.492, -1.015), Vector2(0.462, -1.135), 0.042, 0.010, COL_INNER_EAR, 2)
 	ear_inner.height_scale = 0.14
 	ear_inner.blend = 0.02
 	ear_inner.coat_length = 0.25
 	parts.append_array([ear_base, ear_inner])
 
 	# --- near limbs ---------------------------------------------------------
-	var fl_u := _part(&"leg_fl_upper", Vector2(0.13, -0.52), Vector2(0.16, -0.28), 0.056, 0.042, COL_COAT, 2)
-	var fl_l := _part(&"leg_fl_lower", Vector2(0.16, -0.28), Vector2(0.18, -0.035), 0.040, 0.031, COL_COAT, 2)
-	var fl_paw := _part(&"paw_fl", Vector2(0.175, -0.035), Vector2(0.215, -0.030), 0.034, 0.030, COL_COAT, 2)
+	var fl_u := _part(&"leg_fl_upper", Vector2(0.290, -0.665), Vector2(0.315, -0.400), 0.058, 0.043, COL_COAT, 2)
+	var fl_l := _part(&"leg_fl_lower", Vector2(0.315, -0.400), Vector2(0.305, -0.130), 0.041, 0.032, COL_COAT, 2)
+	var fl_paw := _part(&"paw_fl", Vector2(0.305, -0.130), Vector2(0.360, -0.032), 0.032, 0.033, COL_COAT, 2)
 	fl_paw.blend = 0.03
-	var bl_u := _part(&"leg_bl_upper", Vector2(-0.22, -0.50), Vector2(-0.28, -0.27), 0.082, 0.052, COL_COAT, 2)
-	bl_u.blend = 0.08
-	var bl_l := _part(&"leg_bl_lower", Vector2(-0.28, -0.27), Vector2(-0.20, -0.035), 0.045, 0.033, COL_COAT, 2)
-	var bl_paw := _part(&"paw_bl", Vector2(-0.205, -0.035), Vector2(-0.165, -0.030), 0.036, 0.031, COL_COAT, 2)
+	var bl_u := _part(&"leg_bl_upper", Vector2(-0.560, -0.680), Vector2(-0.660, -0.440), 0.086, 0.053, COL_COAT, 2)
+	bl_u.blend = 0.085
+	var bl_l := _part(&"leg_bl_lower", Vector2(-0.660, -0.440), Vector2(-0.520, -0.190), 0.046, 0.034, COL_COAT, 2)
+	var bl_paw := _part(&"paw_bl", Vector2(-0.520, -0.190), Vector2(-0.455, -0.032), 0.033, 0.034, COL_COAT, 2)
 	bl_paw.blend = 0.03
 	parts.append_array([fl_u, fl_l, fl_paw, bl_u, bl_l, bl_paw])
 
 	# --- tail ---------------------------------------------------------------
-	var tail_a := _part(&"tail_0", Vector2(-0.30, -0.58), Vector2(-0.44, -0.66), 0.052, 0.045, COL_COAT, 2)
-	var tail_b := _part(&"tail_1", Vector2(-0.44, -0.66), Vector2(-0.55, -0.80), 0.045, 0.038, COL_COAT, 2)
-	var tail_c := _part(&"tail_2", Vector2(-0.55, -0.80), Vector2(-0.57, -0.96), 0.038, 0.028, COL_COAT_DARK, 2)
+	var tail_a := _part(&"tail_0", Vector2(-0.630, -0.730), Vector2(-0.790, -0.800), 0.054, 0.046, COL_COAT, 2)
+	var tail_b := _part(&"tail_1", Vector2(-0.790, -0.800), Vector2(-0.905, -0.940), 0.046, 0.038, COL_COAT, 2)
+	var tail_c := _part(&"tail_2", Vector2(-0.905, -0.940), Vector2(-0.935, -1.090), 0.038, 0.027, COL_COAT_DARK, 2)
 	for t in [tail_a, tail_b, tail_c]:
 		t.blend = 0.05
 		t.coat_length = 1.6
 	parts.append_array([tail_a, tail_b, tail_c])
 
-	# Baby proportions: bigger head, shorter limbs, stubbier tail.
+	# Baby proportions. A kitten is compact, not merely small: the torso shortens
+	# faster than it thins, the legs stay stubby, and the tail is a fraction of
+	# adult length. The head is deliberately left near 1.0 here because
+	# `stage_head_bias` already enlarges it by 1.48 — stacking a second multiplier
+	# on top is what turned the first kitten into a featureless loaf.
 	for p in parts:
 		var id := String(p.id)
 		if id.begins_with("leg") or id.begins_with("paw"):
-			p.baby_length_scale = 0.62
-			p.baby_radius_scale = 1.12
+			p.baby_length_scale = 0.70
+			p.baby_radius_scale = 1.10
 		elif id.begins_with("tail"):
-			p.baby_length_scale = 0.55
-			p.baby_radius_scale = 1.25
+			p.baby_length_scale = 0.52
+			p.baby_radius_scale = 1.18
 		elif id.begins_with("ear"):
-			p.baby_radius_scale = 0.86
-			p.baby_length_scale = 0.7
+			p.baby_radius_scale = 0.80
+			p.baby_length_scale = 0.70
 		elif id in ["head", "cheek", "muzzle", "chin", "nose"]:
-			p.baby_radius_scale = 1.30
-		else:
 			p.baby_radius_scale = 1.06
+		elif id in ["hip", "torso", "chest", "belly"]:
+			p.baby_length_scale = 0.86
+			p.baby_radius_scale = 1.12
+		else:
+			p.baby_radius_scale = 1.04
 
 	# Grooming direction: fur flows back along the body, down the legs, and out
 	# along the tail. This is what the anisotropic coat shading reads.
@@ -200,8 +221,8 @@ static func build() -> S:
 	var eye_near: E = E.new()
 	eye_near.id = &"eye_near"
 	eye_near.bone = &"head"
-	eye_near.center = Vector2(0.408, -0.762)
-	eye_near.radius = 0.036
+	eye_near.center = Vector2(0.606, -0.888)
+	eye_near.radius = 0.040
 	eye_near.tilt = -0.20
 	eye_near.iris_ratio = 0.80
 	eye_near.pupil_ratio = 0.40
@@ -214,8 +235,8 @@ static func build() -> S:
 	var eye_far: E = E.new()
 	eye_far.id = &"eye_far"
 	eye_far.bone = &"head"
-	eye_far.center = Vector2(0.318, -0.775)
-	eye_far.radius = 0.026
+	eye_far.center = Vector2(0.502, -0.900)
+	eye_far.radius = 0.029
 	eye_far.tilt = -0.28
 	eye_far.iris_ratio = 0.80
 	eye_far.pupil_ratio = 0.40
