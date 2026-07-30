@@ -1,0 +1,5 @@
+.tools/
+game/.godot/
+game/.import/
+_captures/
+*.tmp
