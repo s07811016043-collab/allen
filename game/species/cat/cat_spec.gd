@@ -14,6 +14,7 @@ extends RefCounted
 
 const P := preload("res://core/creature/sdf_part.gd")
 const S := preload("res://core/creature/creature_spec.gd")
+const E := preload("res://core/creature/eye_spec.gd")
 
 # Palette slots, referenced by every part below.
 const COL_COAT := 0
@@ -193,4 +194,37 @@ static func build() -> S:
 			p.groom_angle = PI
 
 	s.parts = parts
+
+	# Cats get a near eye and a sliver of the far one, which is what sells the
+	# three-quarter head read without leaving 2D.
+	var eye_near: E = E.new()
+	eye_near.id = &"eye_near"
+	eye_near.bone = &"head"
+	eye_near.center = Vector2(0.408, -0.762)
+	eye_near.radius = 0.036
+	eye_near.tilt = -0.20
+	eye_near.iris_ratio = 0.80
+	eye_near.pupil_ratio = 0.40
+	eye_near.pupil_slit = 0.85
+	eye_near.iris_color = Color(0.62, 0.74, 0.24)
+	eye_near.limbal_color = Color(0.07, 0.10, 0.04)
+	eye_near.socket_depth = 0.30
+	eye_near.lid_palette_index = COL_COAT
+
+	var eye_far: E = E.new()
+	eye_far.id = &"eye_far"
+	eye_far.bone = &"head"
+	eye_far.center = Vector2(0.318, -0.775)
+	eye_far.radius = 0.026
+	eye_far.tilt = -0.28
+	eye_far.iris_ratio = 0.80
+	eye_far.pupil_ratio = 0.40
+	eye_far.pupil_slit = 0.85
+	eye_far.iris_color = Color(0.56, 0.68, 0.22)
+	eye_far.limbal_color = Color(0.06, 0.09, 0.04)
+	eye_far.socket_depth = 0.45
+	eye_far.lid_palette_index = COL_COAT
+
+	s.eyes = [eye_far, eye_near]
+	s.blink_interval = 4.2
 	return s

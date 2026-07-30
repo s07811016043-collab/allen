@@ -47,6 +47,13 @@ enum Locomotion {
 ## Specular roughness of the coat.
 @export_range(0.02, 1.0, 0.01) var roughness: float = 0.55
 
+@export_group("Face")
+## Up to `CreatureRenderer.MAX_EYES` eyes. Two for everything so far, but the
+## contract does not assume it.
+@export var eyes: Array[EyeSpec] = []
+## Resting blink interval in seconds; the rig jitters around this.
+@export_range(0.5, 20.0, 0.1) var blink_interval: float = 4.5
+
 @export_group("Growth")
 ## Real-world hours to advance one full stage at default pacing.
 @export_range(0.5, 400.0, 0.5) var hours_per_stage: float = 24.0

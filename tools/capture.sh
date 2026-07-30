@@ -29,6 +29,11 @@ done
 
 export LIBGL_ALWAYS_SOFTWARE=1
 export GALLIUM_DRIVER=llvmpipe
+# Several agents drive Godot against this one project tree at once. Godot
+# rewrites .godot/ (import metadata, shader cache) on every run, so serialise
+# invocations rather than letting two of them interleave writes.
+exec 9>"$ROOT/.tools/godot.lock"
+flock 9
 LOG=$(mktemp)
 timeout 300 xvfb-run -a -s "-screen 0 1920x1200x24" \
   "$GODOT" --path "$ROOT/game" res://tools/capture/capture.tscn \

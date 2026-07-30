@@ -5,6 +5,11 @@ set -uo pipefail
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 GODOT="$ROOT/.tools/Godot_v4.5-stable_linux.x86_64"
 export LIBGL_ALWAYS_SOFTWARE=1
+# Several agents drive Godot against this one project tree at once. Godot
+# rewrites .godot/ (import metadata, shader cache) on every run, so serialise
+# invocations rather than letting two of them interleave writes.
+exec 9>"$ROOT/.tools/godot.lock"
+flock 9
 LOG=$(mktemp)
 timeout 300 xvfb-run -a -s "-screen 0 1280x800x24" \
   "$GODOT" --path "$ROOT/game" --import --rendering-driver opengl3 >"$LOG" 2>&1

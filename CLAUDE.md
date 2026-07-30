@@ -20,6 +20,8 @@ tools/capture.sh --species=cat --growth=3 --out=_captures/cat_adult.png --size=5
 # Flags: --species=cat|dog|bird|reptile  --growth=0..3  --size=WxH
 #        --bg=checker|alpha|RRGGBB  --zoom=<f>  --contact=0|1  --pose=<name>
 #        --frames=<n>  (frames to settle before the shot)
+#        --focus=head  or --focus=<x,y> in rig units, to re-frame the shot.
+#                      A head close-up is `--focus=head --zoom=3.4`.
 
 # Compile-check the whole project without rendering (fast, catches parse errors).
 tools/check.sh

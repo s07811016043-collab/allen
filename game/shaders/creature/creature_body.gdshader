@@ -48,6 +48,19 @@ uniform vec4 ambient_tint : source_color = vec4(0.62, 0.68, 0.82, 1.0);
 uniform vec4 bounce_tint : source_color = vec4(0.30, 0.28, 0.26, 1.0);
 uniform float exposure : hint_range(0.1, 4.0) = 1.0;
 
+// eyes[i*4+0] = (center.x, center.y, radius, tilt)
+// eyes[i*4+1] = (iris_ratio, pupil_ratio, pupil_slit, blink)
+// eyes[i*4+2] = (iris.rgb, socket_depth)
+// eyes[i*4+3] = (gaze.x, gaze.y, lid_open, limbal_luminance)
+uniform vec4 eyes[16];
+uniform int eye_count = 0;
+uniform vec4 sclera_color : source_color = vec4(0.93, 0.92, 0.90, 1.0);
+
+uniform float brow_raise : hint_range(0.0, 1.0) = 0.0;
+uniform float brow_furrow : hint_range(0.0, 1.0) = 0.0;
+uniform float mouth_open : hint_range(0.0, 1.0) = 0.0;
+uniform float cheek_puff : hint_range(0.0, 1.0) = 0.0;
+
 const int MAT_FUR = 0;
 const int MAT_FEATHER = 1;
 const int MAT_SCALE = 2;
@@ -341,6 +354,101 @@ vec4 shade_layer(Field f, vec2 p, float layer_depth, vec2 frag) {
 }
 
 // ---------------------------------------------------------------------------
+// Eyes
+// ---------------------------------------------------------------------------
+
+// A wet sphere set into a socket. Drawn after the body so the lids can cut into
+// it, and so the cornea highlight sits on top of everything.
+vec4 shade_eye(int i, vec2 p, float unit_px) {
+	vec4 e0 = eyes[i * 4 + 0];
+	vec4 e1 = eyes[i * 4 + 1];
+	vec4 e2 = eyes[i * 4 + 2];
+	vec4 e3 = eyes[i * 4 + 3];
+
+	float R = e0.z;
+	if (R <= 1e-5) { return vec4(0.0); }
+
+	vec2 q = p - e0.xy;
+	float ct = cos(e0.w);
+	float st = sin(e0.w);
+	q = vec2(q.x * ct - q.y * st, q.x * st + q.y * ct);
+
+	float r = length(q);
+	float aa = unit_px * 0.9;
+	float ball = smoothstep(aa, -aa, r - R);
+	if (ball <= 0.001) { return vec4(0.0); }
+
+	// The iris rides on the surface of the eyeball, so gaze both translates it
+	// and foreshortens it toward the limb of the sphere.
+	vec2 gaze = e3.xy * (1.0 - e1.x) * R * 0.92;
+	vec2 iq = q - gaze;
+	float shift = length(gaze) / max(R, 1e-5);
+	float iris_r = R * e1.x * mix(1.0, 0.86, shift);
+
+	float ir = length(iq / vec2(mix(1.0, 0.9, abs(e3.x)), 1.0));
+
+	vec3 col = sclera_color.rgb;
+	// Sclera is not white: it is a translucent sphere shadowed by the socket.
+	col *= mix(0.55, 1.0, smoothstep(-R * 0.2, R * 0.9, -q.y));
+	col *= mix(1.0, 0.72, e2.w);
+
+	float iris_mask = smoothstep(aa, -aa, ir - iris_r);
+	// Radial fibres, denser toward the pupil, plus a bright collarette ring.
+	float ang = atan(iq.y, iq.x);
+	float fibre = pet_fbm(vec2(ang * 5.4, ir / max(iris_r, 1e-5) * 6.0), 3);
+	vec3 iris = e2.rgb * mix(0.72, 1.28, fibre * 0.5 + 0.5);
+	float t = clamp(ir / max(iris_r, 1e-5), 0.0, 1.0);
+	// Darken toward the limbal ring, brighten just inside it.
+	iris *= mix(1.18, 0.30, smoothstep(0.62, 1.0, t));
+	iris = mix(iris * 0.45, iris, smoothstep(0.0, 0.35, t));
+	col = mix(col, iris, iris_mask);
+
+	// Pupil: an ellipse whose x-radius collapses toward a slit for cats and
+	// geckos. Slit width also responds to pupil dilation, so a startled cat's
+	// eye visibly rounds out.
+	float pr = iris_r * e1.y;
+	vec2 pq = iq;
+	pq.x /= max(mix(1.0, 0.16 + 0.5 * e1.y, e1.z), 0.05);
+	float pupil = smoothstep(aa, -aa, length(pq) - pr);
+	col = mix(col, vec3(0.012, 0.012, 0.016), pupil);
+
+	// Corneal bulge: refraction is faked by lifting the normal over the iris,
+	// which is enough to make the eye read as a wet lens rather than a decal.
+	vec3 L = normalize(light_dir);
+	float dome = sqrt(max(0.0, 1.0 - pow(clamp(r / R, 0.0, 1.0), 2.0)));
+	vec3 n = normalize(vec3(q / max(R, 1e-5), dome * 1.35));
+	float ndl = max(dot(n, L), 0.0);
+	col *= mix(0.62, 1.15, ndl);
+
+	// Two catchlights: a hard key reflection and a soft fill. Two is the number
+	// that reads as alive; one reads as glass, three reads as a toy.
+	vec2 key = (-L.xy) * R * 0.46;
+	float k = smoothstep(R * 0.20, R * 0.02, length(q - key));
+	vec2 fillp = vec2(R * 0.30, R * 0.34);
+	float fillspec = smoothstep(R * 0.30, R * 0.06, length(q - fillp));
+	col += vec3(1.0) * k * 0.95;
+	col += vec3(0.75, 0.82, 0.95) * fillspec * 0.22;
+
+	// Contact shadow cast by the upper lid onto the eyeball.
+	col *= mix(1.0, 0.42, smoothstep(R * 0.15, -R * 0.75, q.y));
+
+	// Lids. `blink` closes them from both sides; `lid_open` is the resting
+	// aperture; brow controls skew the upper lid for expression.
+	// Rig space has +y pointing down, so the upper lid lives at negative y.
+	// Fully open still crops the ball slightly — an eye with no lid overlap
+	// reads as a startled cartoon, not as a resting animal.
+	float open = clamp(e3.z * (1.0 - e1.w), 0.0, 1.0);
+	float upper = -R * mix(0.02, 0.94, open) + brow_raise * R * 0.14 - brow_furrow * R * 0.18;
+	float lower = R * mix(-0.02, 1.00, open);
+	float lid = smoothstep(-aa, aa, q.y - upper) * smoothstep(aa, -aa, q.y - lower);
+	float alpha = ball * lid;
+
+	// A dark wet line where the lid meets the ball, on both edges.
+	float rim = smoothstep(R * 0.14, 0.0, abs(q.y - upper)) + smoothstep(R * 0.10, 0.0, abs(q.y - lower));
+	col *= mix(1.0, 0.25, clamp(rim, 0.0, 1.0) * 0.85);
+
+	return vec4(col, alpha);
+}
 
 void fragment() {
 	vec2 p = mix(bounds_min, bounds_max, UV);
@@ -355,6 +463,13 @@ void fragment() {
 		// Standard source-over, straight alpha.
 		acc.rgb = mix(acc.rgb, c.rgb, c.a);
 		acc.a = acc.a + c.a * (1.0 - acc.a);
+	}
+
+	for (int i = 0; i < 4; i++) {
+		if (i >= eye_count) { break; }
+		vec4 e = shade_eye(i, p, 1.0 / max(px_per_unit, 1.0));
+		acc.rgb = mix(acc.rgb, e.rgb, e.a);
+		acc.a = acc.a + e.a * (1.0 - acc.a);
 	}
 
 	if (acc.a <= 0.002) { discard; }

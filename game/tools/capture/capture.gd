@@ -18,6 +18,9 @@ extends Node2D
 ##   --zoom=<f>          extra scale on top of the spec's pixels_per_unit
 ##   --contact=<0|1>     draw the contact shadow and ground plane
 ##   --pose=<name>       named pose from the rig, when one is available
+##   --focus=<x,y>       rig-space point to centre in frame, e.g. `0.40,-0.78`
+##                       for a head close-up. Combine with --zoom.
+##   --focus=head        shorthand: centres on the first eye
 
 var species := &"cat"
 var growth := 3.0
@@ -27,6 +30,7 @@ var bg := "checker"
 var zoom := 1.0
 var draw_contact := true
 var pose := &"idle"
+var focus := ""
 
 var _frames := 0
 var _done := false
@@ -55,6 +59,7 @@ func _parse_args() -> void:
 			"zoom": zoom = float(kv[1])
 			"contact": draw_contact = kv[1] != "0"
 			"pose": pose = StringName(kv[1])
+			"focus": focus = kv[1]
 
 
 func _build_backdrop() -> void:
@@ -125,7 +130,24 @@ func _build_creature() -> void:
 	_renderer.scale = Vector2(fit, fit)
 	_renderer.position = Vector2(vp.x * 0.5, vp.y * 0.80)
 
-	if draw_contact:
+	# A focus point re-frames the shot around a rig-space location, so a
+	# reviewer can ask for a head close-up without recomputing the transform by
+	# hand. Zoomed shots are how face detail actually gets judged.
+	if focus != "":
+		var target := Vector2.ZERO
+		if focus == "head":
+			if not _spec.eyes.is_empty():
+				target = _spec.eyes[_spec.eyes.size() - 1].center
+			else:
+				target = Vector2(0.4, -0.75)
+			target *= _spec.scale_at(growth)
+		else:
+			var xy := focus.split(",")
+			if xy.size() == 2:
+				target = Vector2(float(xy[0]), float(xy[1]))
+		_renderer.position = Vector2(vp.x * 0.5, vp.y * 0.5) - target * _spec.pixels_per_unit * fit
+
+	if draw_contact and focus == "":
 		var shadow := _make_contact_shadow()
 		add_child(shadow)
 		move_child(shadow, 1)

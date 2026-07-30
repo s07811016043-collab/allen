@@ -14,6 +14,9 @@ extends Node2D
 const MAX_PARTS := 28
 const MAX_PALETTE := 12
 const VEC4S_PER_PART := 3
+## Eyes are packed separately from parts: four `vec4` each.
+const MAX_EYES := 4
+const VEC4S_PER_EYE := 4
 
 ## Rig-space padding added around the part bounds so coat fringe, rim light and
 ## contact shadow are never clipped by the quad edge.
@@ -25,10 +28,13 @@ var spec: CreatureSpec
 ## Live parts — the rig mutates these each frame. Distinct from `spec.parts`,
 ## which stays pristine as the bind pose.
 var live_parts: Array[SDFPart] = []
+## Live eye state, mutated by the rig each frame. Parallel to `spec.eyes`.
+var live_eyes: Array[EyeSpec.Live] = []
 
 var _rect: ColorRect
 var _mat: ShaderMaterial
 var _packed := PackedVector4Array()
+var _packed_eyes := PackedVector4Array()
 var _palette := PackedColorArray()
 var _bounds_min := Vector2.ZERO
 var _bounds_max := Vector2.ONE
@@ -39,6 +45,12 @@ var growth: float = 3.0
 var wetness: float = 0.0
 var fluff: float = 1.0
 var emotion_flush: float = 0.0
+## Facial expression channels, driven by the brain and written by the rig.
+## Range [0, 1] unless noted.
+var brow_raise: float = 0.0     ## worry / curiosity lift
+var brow_furrow: float = 0.0    ## focus / annoyance
+var mouth_open: float = 0.0
+var cheek_puff: float = 0.0
 var light_dir := Vector3(-0.42, -0.62, 0.66).normalized()
 var ambient_tint := Color(0.62, 0.68, 0.82)
 var bounce_tint := Color(0.30, 0.28, 0.26)
@@ -55,6 +67,7 @@ func _ready() -> void:
 	_rect.material = _mat
 	add_child(_rect)
 	_packed.resize(MAX_PARTS * VEC4S_PER_PART)
+	_packed_eyes.resize(MAX_EYES * VEC4S_PER_EYE)
 	_palette.resize(MAX_PALETTE)
 
 
@@ -70,6 +83,15 @@ func setup(p_spec: CreatureSpec) -> void:
 		Log.warn("CreatureRenderer", "%s declares %d parts; clamping to %d"
 			% [spec.species_id, live_parts.size(), MAX_PARTS])
 		live_parts.resize(MAX_PARTS)
+	live_eyes.clear()
+	for e in spec.eyes:
+		if e == null:
+			continue
+		var live := EyeSpec.Live.new()
+		live.copy_from(e)
+		live_eyes.append(live)
+	if live_eyes.size() > MAX_EYES:
+		live_eyes.resize(MAX_EYES)
 	_pixels_per_unit = spec.pixels_per_unit
 	_upload_static()
 
@@ -100,6 +122,7 @@ func _process(_delta: float) -> void:
 		return
 	_recompute_bounds()
 	_pack_parts()
+	_pack_eyes()
 	_upload_dynamic()
 
 
@@ -145,7 +168,34 @@ func _pack_parts() -> void:
 		_packed[base + 2] = Vector4(0.0, 0.0, 0.0, 0.0)
 
 
+## eyes[i*4+0] = (center.x, center.y, radius, tilt)
+## eyes[i*4+1] = (iris_ratio, pupil_ratio * pupil_scale, pupil_slit, blink)
+## eyes[i*4+2] = iris rgb, socket_depth
+## eyes[i*4+3] = (gaze.x, gaze.y, lid_open, limbal luminance)
+func _pack_eyes() -> void:
+	for i in live_eyes.size():
+		var e: EyeSpec.Live = live_eyes[i]
+		var b: int = i * VEC4S_PER_EYE
+		_packed_eyes[b] = Vector4(e.center.x, e.center.y, e.radius, e.tilt)
+		_packed_eyes[b + 1] = Vector4(e.iris_ratio,
+			clampf(e.pupil_ratio * e.pupil_scale, 0.04, 0.98), e.pupil_slit,
+			clampf(e.blink, 0.0, 1.0))
+		_packed_eyes[b + 2] = Vector4(e.iris_color.r, e.iris_color.g,
+			e.iris_color.b, e.socket_depth)
+		_packed_eyes[b + 3] = Vector4(clampf(e.gaze.x, -1.0, 1.0),
+			clampf(e.gaze.y, -1.0, 1.0), e.lid_open,
+			e.limbal_color.get_luminance())
+	for i in range(live_eyes.size(), MAX_EYES):
+		var b: int = i * VEC4S_PER_EYE
+		_packed_eyes[b] = Vector4(1e6, 1e6, 0.0, 0.0)
+		_packed_eyes[b + 1] = Vector4.ZERO
+		_packed_eyes[b + 2] = Vector4.ZERO
+		_packed_eyes[b + 3] = Vector4.ZERO
+
+
 func _upload_dynamic() -> void:
+	_mat.set_shader_parameter("eyes", _packed_eyes)
+	_mat.set_shader_parameter("eye_count", live_eyes.size())
 	_mat.set_shader_parameter("parts", _packed)
 	_mat.set_shader_parameter("part_count", live_parts.size())
 	_mat.set_shader_parameter("bounds_min", _bounds_min)
@@ -154,6 +204,10 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("wetness", wetness)
 	_mat.set_shader_parameter("fluff", fluff)
 	_mat.set_shader_parameter("emotion_flush", emotion_flush)
+	_mat.set_shader_parameter("brow_raise", brow_raise)
+	_mat.set_shader_parameter("brow_furrow", brow_furrow)
+	_mat.set_shader_parameter("mouth_open", mouth_open)
+	_mat.set_shader_parameter("cheek_puff", cheek_puff)
 	_mat.set_shader_parameter("light_dir", light_dir)
 	_mat.set_shader_parameter("ambient_tint", ambient_tint)
 	_mat.set_shader_parameter("bounce_tint", bounce_tint)
