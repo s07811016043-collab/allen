@@ -67,6 +67,17 @@ var carrier_accel := Vector2.ZERO
 ## Musculature thins toward the tip: each joint further out is this much softer
 ## and this much lighter, which is why the last third of a tail whips hardest.
 var falloff := 1.18
+## Seconds the chain trails its driver's orientation. Zero means it tracks.
+##
+## Inertia alone is not lag. A spring driven by acceleration still hangs off the
+## parent's *current* frame, so a tail on a hip that rotates — turning, pitching,
+## counter-rolling — sweeps around with it on the same frame and only the
+## overshoot is secondary. A real tail is still pointing where the hips were an
+## eighth of a second ago. Tracked here as a one-pole follower rather than a
+## delay line, because at the frequencies a tail cares about a one-pole's group
+## delay is its time constant, and it costs one float instead of a ring buffer;
+## `_write` is where it is composed with the spring's answer.
+var lag := 0.0
 
 var _driver_bone := -1
 var _prev_driver := Vector2.ZERO
@@ -75,6 +86,11 @@ var _accel := Vector2.ZERO
 var _prev_rot := 0.0
 var _prev_spin := 0.0
 var _alpha := 0.0
+var _lag_rot := 0.0
+## How far the driver has turned ahead of its own lagged copy, radians. Shared
+## out over the joints so the whole chain trails by this much, not each joint.
+var _trail := 0.0
+var _trail_share := 1.0
 var _primed := false
 
 
@@ -88,6 +104,7 @@ func setup(skeleton: RigSkeleton, bone_indices: PackedInt32Array, driver_bone: i
 		l.bone = i
 		l.arm = maxf(skeleton.bones[i].length, 0.01)
 		links.append(l)
+	_trail_share = 1.0 / float(maxi(links.size(), 1))
 
 
 func is_empty() -> bool:
@@ -154,6 +171,8 @@ func _track_driver(skeleton: RigSkeleton, dt: float) -> void:
 		_prev_rot = rot
 		_prev_spin = 0.0
 		_alpha = 0.0
+		_lag_rot = rot
+		_trail = 0.0
 		_primed = true
 		return
 	var v := (p - _prev_driver) / dt
@@ -167,6 +186,13 @@ func _track_driver(skeleton: RigSkeleton, dt: float) -> void:
 	_prev_rot = rot
 	_prev_spin = spin
 	_alpha = lerpf(_alpha, alpha, clampf(dt * 22.0, 0.0, 1.0))
+
+	if lag > 0.0:
+		_lag_rot += wrapf(rot - _lag_rot, -PI, PI) * clampf(dt / lag, 0.0, 1.0)
+		_trail = wrapf(rot - _lag_rot, -PI, PI)
+	else:
+		_lag_rot = rot
+		_trail = 0.0
 
 
 func _step(skeleton: RigSkeleton, h: float) -> void:
@@ -206,6 +232,18 @@ func _write(skeleton: RigSkeleton) -> void:
 		if mode == Mode.OFFSET:
 			skeleton.bones[l.bone].offset += l.pos
 		else:
-			skeleton.bones[l.bone].angle += l.angle
+			# The spring's answer, plus this joint's share of the trail. The trail
+			# is composed here rather than fed in as a rest-angle offset because
+			# the tail spring's natural frequency (0.8 Hz) sits well below a
+			# walking cadence (2 Hz): routed through the spring, a stride-rate lag
+			# came out attenuated to a sixth of itself and measured — A/B, tail-tip
+			# travel with the lag on and off — as a difference of two ten-thousandths
+			# of a unit. Kinematic lag and spring inertia are different things and
+			# they compose; cascading one through the other just deletes it.
+			#
+			# Shared out across the joints, because each contributes to the tip's
+			# total lag and applying the whole trail at every joint would multiply
+			# it by the chain length.
+			skeleton.bones[l.bone].angle += l.angle - _trail * _trail_share
 	if not links.is_empty():
 		skeleton.update_from(links[0].bone)

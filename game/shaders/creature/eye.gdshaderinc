@@ -51,7 +51,15 @@ float pet_eye_lashes(vec2 q, float R, float upper, float amount) {
 // eyes[i*4+1] = (iris_ratio, pupil_ratio, pupil_slit, blink)
 // eyes[i*4+2] = (iris.rgb, socket_depth)
 // eyes[i*4+3] = (gaze.xy, lid_open, limbal_luminance)
-vec4 pet_shade_eye(vec4 e0, vec4 e1, vec4 e2, vec4 e3, vec2 p, float unit_px) {
+// `par` is this eye's offset from the centre of the pair, in units of its own
+// radius. Two eyes sit at different places on a curved face and therefore see
+// the same lamp from different angles, so the reflection of it cannot land in
+// the same spot on both. Without that the catchlights are identical on every
+// eye of every creature, which reads as two stickers rather than two wet
+// spheres — and it is the first thing a viewer notices, because it is the only
+// part of a face that is expected to be asymmetric.
+vec4 pet_shade_eye(vec4 e0, vec4 e1, vec4 e2, vec4 e3, vec2 p, float unit_px,
+		vec2 par) {
 	float R = e0.z;
 	if (R <= 1e-5) { return vec4(0.0); }
 
@@ -59,6 +67,7 @@ vec4 pet_shade_eye(vec4 e0, vec4 e1, vec4 e2, vec4 e3, vec2 p, float unit_px) {
 	float ct = cos(e0.w);
 	float st = sin(e0.w);
 	vec2 q = vec2(qr.x * ct - qr.y * st, qr.x * st + qr.y * ct);
+	par = vec2(par.x * ct - par.y * st, par.x * st + par.y * ct);
 
 	float r = length(q);
 	float aa = max(unit_px * 0.8, R * 0.006);
@@ -67,16 +76,29 @@ vec4 pet_shade_eye(vec4 e0, vec4 e1, vec4 e2, vec4 e3, vec2 p, float unit_px) {
 	// Lids first: the lash band reaches above the ball, so alpha has to be able
 	// to exist outside it.
 	float open = clamp(e3.z * (1.0 - e1.w), 0.0, 1.0);
-	// Rig space has +y down, so the upper lid lives at negative y. Fully open
-	// still crops the ball slightly — an eye with no lid overlap reads as a
-	// startled cartoon, not as a resting animal.
-	float upper = -R * mix(0.02, 0.82, open) + brow_raise * R * 0.13 - brow_furrow * R * 0.17;
+	// Rig space has +y down, so the upper lid lives at negative y.
+	//
+	// The lid is placed against the *iris*, not against the ball, and that is the
+	// whole fix for the stare. Every resting mammal carries its upper lid over the
+	// top of the iris; an iris that clears the lid completely is a full circle of
+	// colour, and a full circle of colour is the face of something that has just
+	// been startled. Held permanently, it is the difference between a cat and a
+	// cartoon. Roughly the top sixth of the iris disappears under the lid at rest,
+	// which is 30% of the iris radius measured from its top edge.
+	//
+	// Floored against the ball so a species with a small iris — a bird, a
+	// gecko — is not squinted shut by a rule written for a cat.
+	float iris_top = R * e1.x;
+	float upper = -mix(R * 0.02, max(iris_top * 0.70, R * 0.55), open)
+		+ brow_raise * R * 0.13 - brow_furrow * R * 0.17;
 	float lower = R * mix(-0.02, 0.90, open);
 	// Lids are arcs, not horizontal cuts. A straight lid line crossed with a
 	// circle gives the faceted, vaguely hexagonal eye that betrays every cheap
-	// procedural face; both lids have to sag toward the corners.
+	// procedural face; both lids have to sag toward the corners. The upper bow is
+	// gentler than it was because the lid now starts lower down the ball, and the
+	// two together would otherwise shut the eye at the corners.
 	float bow = (q.x / R) * (q.x / R);
-	upper += R * 0.62 * bow;
+	upper += R * 0.46 * bow;
 	lower -= R * 0.52 * bow;
 	float lash = eye_lash > 0.002 && open > 0.2
 		? pet_eye_lashes(q, R, upper, eye_lash * smoothstep(0.2, 0.6, open))
@@ -169,25 +191,52 @@ vec4 pet_shade_eye(vec4 e0, vec4 e1, vec4 e2, vec4 e3, vec2 p, float unit_px) {
 	float ndl = max(dot(n, L), 0.0);
 	col *= mix(0.58, 1.18, ndl);
 
-	// Catchlights. The primary sits where the sphere mirrors the key, which is
-	// the half-vector direction — so it tracks the rig instead of being pinned.
+	// Catchlight. The reflection of the key in a wet sphere: where it sits is set
+	// by the mirror direction, and what shape it is comes out of how the sphere
+	// curves underneath it.
+	//
+	// The shape is the part that was wrong. A rounded rectangle of constant size,
+	// stamped at the same offset on both eyes, is a decal on glass — it does not
+	// move with the ball, it does not foreshorten, and having it identical on the
+	// pair is the single loudest "this was drawn once and pasted twice" signal a
+	// face can send. What a sphere actually returns is an ellipse: the further the
+	// highlight lies from the centre, the more surface each pixel of it covers, so
+	// it squashes along the radius while keeping its width across it.
 	vec3 V = vec3(0.0, 0.0, 1.0);
-	vec2 keyp = normalize(L + V).xy * R * 0.86;
+	vec2 keyp = (normalize(L + V).xy + par * 0.26) * R * 0.72;
 	vec2 kd = (q - keyp) / R;
-	// A softly rounded rectangle reads as a window; a disc reads as a bead.
-	float win = 1.0 - clamp((pow(abs(kd.x) / 0.19, 3.0) + pow(abs(kd.y) / 0.14, 3.0)), 0.0, 1.0);
-	col += key_color.rgb * smoothstep(0.0, 0.55, win) * 1.15;
-	col += vec3(1.0) * smoothstep(0.35, 0.95, win) * 0.9;
+	float rr = clamp(length(keyp) / R, 0.0, 0.98);
+	vec2 rdir = rr > 1e-4 ? normalize(keyp) : vec2(0.0, -1.0);
+	float k_rad = dot(kd, rdir) / (0.150 * sqrt(max(1.0 - rr * rr, 0.06)));
+	float k_tan = dot(kd, vec2(-rdir.y, rdir.x)) / 0.185;
+	float ell = length(vec2(k_rad, k_tan));
+	// Two lobes, because a real catchlight has a core and a bloom around it, and
+	// the bloom is what stops the core reading as a cut-out hole.
+	col += key_color.rgb * smoothstep(1.7, 0.35, ell) * 0.80;
+	col += vec3(1.0) * smoothstep(0.95, 0.10, ell) * 0.95;
 	// A broad, dim reflection of the sky fills the upper dome.
 	float sky = smoothstep(0.9, 0.0, length((q - vec2(-R * 0.22, -R * 0.30)) / R) / 0.7);
 	col += ambient_tint.rgb * sky * 0.20;
 	// Total internal reflection piles a faint bright ring up at the limbus.
 	col += key_color.rgb * smoothstep(0.80, 1.0, r / R) * (1.0 - smoothstep(0.97, 1.0, r / R)) * 0.22;
 
-	// Upper lid contact shadow on the ball. A wet sphere set into a socket is
-	// always darkest right under the lid, and the gradient is what tells the eye
-	// it is looking at a sphere rather than a disc.
-	col *= mix(1.0, 0.30, smoothstep(R * 0.35, -R * 0.85, q.y));
+	// Upper lid contact shadow. A lid is a fold of skin lying *on* a wet sphere,
+	// not a hole cut in one, and there is always a band of shadow under it —
+	// deepest right at the margin, gone by the middle of the iris. Keyed to the
+	// lid's own arc rather than to a fixed height on the ball, so it follows the
+	// lid as it blinks and as the brow moves instead of sliding out from under it.
+	col *= mix(1.0, 0.30, smoothstep(R * 0.62, 0.0, q.y - upper));
+	// And the socket's own falloff on top, which is about the ball, not the lid.
+	col *= mix(1.0, 0.72, smoothstep(R * 0.35, -R * 0.95, q.y));
+
+	// The tear duct. A cat's inner canthus is a small bare pink notch where the
+	// two lid margins meet, and it is worth its cost for one reason: it is the
+	// only asymmetry on an eye. A perfectly symmetric eye is a stamped shape
+	// however good its interior is. The rig convention puts forward at +x, so the
+	// nasal corner is always the +x one and no species has to say so.
+	float nx = q.x / R;
+	float duct = smoothstep(0.40, 0.86, nx) * smoothstep(0.46, 0.08, abs(q.y / R - 0.12));
+	col = mix(col, mix(vec3(0.55, 0.30, 0.29), col, 0.30), duct * 0.80);
 
 	// --- lids and tear film -------------------------------------------------
 	float lid = smoothstep(-aa, aa, q.y - upper) * smoothstep(aa, -aa, q.y - lower);

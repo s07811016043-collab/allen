@@ -97,10 +97,15 @@ var frequency := 0.0
 var duty := 0.62
 var feet: Array[Foot] = []
 
-## Body outputs, read by the rig once per frame.
+## Body outputs, read by the rig once per frame. All three attitude channels are
+## in radians of picture-plane rotation, so the rig applies them directly.
 var bob := 0.0
 var pitch := 0.0
 var roll := 0.0
+## Counter-rotation between the pectoral and pelvic girdles: the *total* twist
+## across the trunk, which the rig splits half backwards into the croup and half
+## forwards into the withers. Positive lifts the withers.
+var girdle_twist := 0.0
 var surge := 0.0
 ## Lateral body wave for sprawling locomotion, sampled per spine bone.
 var undulation := 0.0
@@ -114,6 +119,34 @@ var exertion := 0.0
 ## that reserve the body has nowhere to bob up into, so the feet lift off the
 ## ground the moment the gait raises it. 5% of leg length is enough.
 const STANCE_COMPRESSION := 0.95
+
+## Trunk attitude gains, radians per unit of load asymmetry.
+##
+## Static geometry cannot produce these and it was a mistake to ask it to. A
+## cat's legs are long next to its stride, so the fore and hind support heights
+## differ by a couple of hundredths over a whole cycle; the trunk pitch that
+## fell out of them measured 0.005 rad peak-to-peak, which is a fifth of a pixel
+## at the size this pet actually ships at. An independent reviewer, shown the
+## build cold, called the body "furniture being carried along", and that number
+## is why.
+##
+## What pitches a trunk is the *load* handing over between the girdles, and load
+## is a phase quantity: already normalised to [0, 1], identical for a kitten and
+## an adult, and correct for every pattern in the table without a per-species
+## calibration. It also self-checks — at a trot the diagonal pairs make the two
+## girdles' loads identical, the imbalance is exactly zero, and a trotting animal
+## really does hold its trunk still. That is the gait a rider posts to precisely
+## because it does not pitch.
+const PITCH_GAIN := 0.72
+## Ceiling on trunk pitch. A gallop is often on a single leg and the raw
+## imbalance goes past 0.4; 0.13 rad is about 7°, which is a hard-running cat.
+const PITCH_MAX := 0.13
+## Radians of counter-rotation between the girdles at full asymmetry. Small in
+## absolute terms — it is the *opposition* that reads, not the amount.
+const TWIST_GAIN := 0.064
+## Whole-body lean from the near/far load split. A strict side view can barely
+## show a roll at all, so this stays a hint rather than a statement.
+const ROLL_GAIN := 0.022
 
 var _spec: CreatureSpec
 var _family: int = CreatureSpec.Locomotion.QUADRUPED
@@ -272,6 +305,7 @@ func settle() -> void:
 	bob = 0.0
 	pitch = 0.0
 	roll = 0.0
+	girdle_twist = 0.0
 	surge = 0.0
 	undulation = 0.0
 	for f in feet:
@@ -487,10 +521,16 @@ func _solve_body(dt: float) -> void:
 	var near_w := 0.0
 	var far_h := 0.0
 	var far_w := 0.0
+	## Vertical load per foot: 0 at touchdown and at lift-off, 1 at mid-stance.
+	## Deliberately normalised — the attitude channels are about *when* weight
+	## hands over, not about how tall the animal is.
+	var load := [0.0, 0.0, 0.0, 0.0]
 	for i in FOOT_COUNT:
 		var f: Foot = feet[i]
 		if not f.present:
 			continue
+		if f.stance:
+			load[i] = sin(PI * clampf(f.phase / maxf(duty, 1e-3), 0.0, 1.0))
 		var w: float = 1.0 if f.stance else 0.16
 		w_sum += w
 		if f.stance:
@@ -556,12 +596,57 @@ func _solve_body(dt: float) -> void:
 	# phase with the footfalls" looks like from the outside.
 	bob = lerpf(bob, target_bob, clampf(dt * maxf(26.0, frequency * 40.0), 0.0, 1.0))
 
+	# Phase-driven trunk attitude, gated on the animal actually walking. At rest
+	# the foot phases are frozen wherever the gait stopped, and reading them then
+	# would park the trunk at a permanent tilt; the idle layer owns the resting
+	# attitude instead, and these decay to zero through the followers below.
+	var pitch_to := 0.0
+	var roll_to := 0.0
+	var twist_to := 0.0
+	if frequency > 0.0:
+		var has_fore: bool = feet[FORE_NEAR].present and feet[FORE_FAR].present
+		var has_hind: bool = feet[HIND_NEAR].present and feet[HIND_FAR].present
+		var roll_fore: float = load[FORE_NEAR] - load[FORE_FAR] if has_fore else 0.0
+		var roll_hind: float = load[HIND_NEAR] - load[HIND_FAR] if has_hind else 0.0
+		if (feet[FORE_NEAR].present or feet[FORE_FAR].present) \
+				and (feet[HIND_NEAR].present or feet[HIND_FAR].present):
+			# The hind girdle carrying more than the fore means the croup is being
+			# driven up while the forehand falls away underneath it: nose down.
+			pitch_to = _soft_clip((_pair_load(load, HIND_NEAR, HIND_FAR)
+				- _pair_load(load, FORE_NEAR, FORE_FAR)) * PITCH_GAIN, PITCH_MAX)
+		# Each girdle's own near/far split, kept apart rather than averaged. The
+		# two are close to antiphase in every pattern we ship — at a trot they are
+		# exact negatives — and that opposition *is* the counter-rotation.
+		# Averaging the four feet together, which is what this used to do, cancels
+		# it to nothing, and cancelling it is most of why the trunk read as one
+		# rigid plank.
+		#
+		# Both girdles have to be complete for a twist between them to mean
+		# anything. A biped has no forehand at all, and reading the absent pair as
+		# a permanently unloaded one twisted its trunk against a girdle that does
+		# not exist — which, because the legs hang off the pelvis this rotates,
+		# walked the bird's feet a tenth of a unit off the spots they were pinned
+		# to. Measured: slip 0.1071 with the phantom girdle, 0.0000 without it.
+		if has_fore and has_hind:
+			twist_to = (roll_fore - roll_hind) * 0.5 * TWIST_GAIN
+		roll_to = (roll_fore + roll_hind) * 0.5 * ROLL_GAIN
+		# A sprawling animal's trunk motion is lateral, not sagittal — the spine
+		# writhes side to side and `undulation` already carries all of it. Pitching
+		# a lizard's long trunk on top of that only drives the far end of a metre
+		# of tail through the floor, which is exactly what it measured.
+		if _family == CreatureSpec.Locomotion.SPRAWLING:
+			pitch_to *= 0.35
+			twist_to *= 0.35
+	# The geometric differentials stay in the sum. They are a rounding error on a
+	# level floor, but they are the only term that hears a species whose hind legs
+	# are longer than its fore ones, or a foot that landed somewhere unexpected.
 	if fore_w > 0.0 and hind_w > 0.0:
-		var delta: float = (hind_h / hind_w) - (fore_h / fore_w)
-		pitch = lerpf(pitch, atan2(delta, _body_len) * 0.55, clampf(dt * 18.0, 0.0, 1.0))
+		pitch_to += atan2((hind_h / hind_w) - (fore_h / fore_w), _body_len) * 0.55
 	if near_w > 0.0 and far_w > 0.0:
-		var d2: float = (near_h / near_w) - (far_h / far_w)
-		roll = lerpf(roll, clampf(d2 * 1.4, -0.5, 0.5), clampf(dt * 16.0, 0.0, 1.0))
+		roll_to += clampf(((near_h / near_w) - (far_h / far_w)) * 1.4, -0.5, 0.5) * 0.22
+	pitch = lerpf(pitch, pitch_to, clampf(dt * 18.0, 0.0, 1.0))
+	roll = lerpf(roll, roll_to, clampf(dt * 16.0, 0.0, 1.0))
+	girdle_twist = lerpf(girdle_twist, twist_to, clampf(dt * 20.0, 0.0, 1.0))
 
 	# Fore-aft surge: the body decelerates against each braking forelimb and is
 	# pushed on by each hind. Small, but its absence is why naive walk cycles
@@ -583,6 +668,29 @@ func _solve_body(dt: float) -> void:
 		undulation = sin(TAU * cycle) * (0.10 + 0.16 * exertion)
 	else:
 		undulation = 0.0
+
+
+## Mean vertical load across one girdle's pair, ignoring limbs the species never
+## authored — a biped must not read a missing forehand as a permanently
+## unloaded one and walk around nose-up.
+func _pair_load(load: Array, near: int, far: int) -> float:
+	var sum := 0.0
+	var n := 0
+	if feet[near].present:
+		sum += float(load[near])
+		n += 1
+	if feet[far].present:
+		sum += float(load[far])
+		n += 1
+	return sum / float(maxi(n, 1))
+
+
+## Soft saturation: linear near zero, asymptotic at `cap`. A hard clamp on an
+## attitude channel flattens the top of every stride into a plateau, which reads
+## more mechanical than the overshoot it was fixing — the same lesson the bob
+## budget above already learned the expensive way.
+static func _soft_clip(v: float, cap: float) -> float:
+	return v / (1.0 + absf(v) / maxf(cap, 1e-4))
 
 
 ## The single strongest foot impact this frame, for squash and audio. Zero when

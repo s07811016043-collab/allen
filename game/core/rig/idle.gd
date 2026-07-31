@@ -28,6 +28,14 @@ const DOUBLE_BLINK_GAP := 0.09
 ## and then hold. Smooth eye interpolation is one of the great uncanny tells.
 const SACCADE_TIME := 0.045
 
+## How far the whole body sinks between a full inhale and a full exhale, rig
+## units. Small on purpose — see `_advance_weight`, which owns the budget.
+const BREATH_SINK := 0.016
+## Peak rotation of an idle ear flick, radians. A real ear twitch is 10–15° and
+## over inside a fifth of a second; the 3° this used to be was a pixel of travel
+## at the size the pet ships at, which is the same as no flick at all.
+const EAR_FLICK := 0.22
+
 
 ## Breathing.
 var breath := 0.0          ## −1 exhaled → +1 inhaled
@@ -51,6 +59,14 @@ var ear_far := 0.0
 ## Slow postural drift, rig units and radians.
 var weight_shift := Vector2.ZERO
 var weight_roll := 0.0
+## Fore-aft rock of a standing animal, radians, positive nose-down.
+##
+## A resting quadruped does not just slide sideways over its feet — it rocks its
+## weight between the girdles, and that rock is the one postural signal a strict
+## side view can show at full strength. Without it the only thing separating two
+## idle frames was a lateral drift of two pixels, which is how a twelve-second
+## sheet came back pose-identical.
+var weight_pitch := 0.0
 
 ## Self-motion of a resting tail, in radians of extra curl at the base.
 ##
@@ -78,8 +94,10 @@ var _ear_hold := 0.0
 var _shift_timer := 0.0
 var _shift := Vector2.ZERO
 var _shift_roll := 0.0
+var _shift_pitch := 0.0
 var _shift_target := Vector2.ZERO
 var _shift_roll_target := 0.0
+var _shift_pitch_target := 0.0
 
 
 func setup(spec: CreatureSpec, seed_value: int) -> void:
@@ -125,8 +143,13 @@ func _advance_breath(dt: float) -> void:
 ## no change in the silhouette. Breathing you cannot see is breathing that isn't
 ## there, and a still pet reads as a prop, so the amplitude is pushed to where
 ## the torso visibly rises and the shoulders carry the head with them.
+##
+## Measured against the ribcage's own silhouette rather than tuned by eye: the
+## top line of the trunk now travels 0.063 rig units over a breath, against
+## 0.020 with this term switched off. That is eight pixels at ship size, where
+## the previous 0.035 was inside the noise of the postural drift around it.
 func breath_swell() -> float:
-	return breath * (0.035 + 0.045 * exertion)
+	return breath * (0.062 + 0.050 * exertion)
 
 
 # --- blinking ---------------------------------------------------------------
@@ -232,11 +255,14 @@ func _advance_ears(dt: float) -> void:
 	else:
 		_ear_target_near = 0.0
 		_ear_target_far = 0.0
-	# Independent low-amplitude flicks. Ears twitch at rest even with nothing to
-	# hear, and the two sides are never in sync.
-	var idle_near := sin(_t * 0.73 + 1.1) * 0.020 + _tick(_t, 0.37) * 0.05
-	var idle_far := sin(_t * 0.61 + 2.7) * 0.016 + _tick(_t + 3.1, 0.29) * 0.04
-	var k: float = clampf(dt * 9.0, 0.0, 1.0)
+	# Independent flicks. Ears twitch at rest even with nothing to hear, and the
+	# two sides are never in sync. The follower below used to run at 9 Hz, which
+	# smeared a hundred-millisecond flick down to a third of its amplitude before
+	# the ear spring ever saw it — the impulse has to survive to the chain or it
+	# is not a flick, it is a drift.
+	var idle_near := sin(_t * 0.73 + 1.1) * 0.030 + _tick(_t, 0.37) * EAR_FLICK
+	var idle_far := sin(_t * 0.61 + 2.7) * 0.024 + _tick(_t + 3.1, 0.29) * EAR_FLICK * 0.8
+	var k: float = clampf(dt * 20.0, 0.0, 1.0)
 	ear_near = lerpf(ear_near, _ear_target_near + idle_near + alertness * 0.16, k)
 	ear_far = lerpf(ear_far, _ear_target_far + idle_far + alertness * 0.16, k)
 
@@ -265,17 +291,34 @@ func _advance_weight(dt: float) -> void:
 		# cannot: the only headroom the body has is the flexion reserve the gait
 		# holds back, so a rise larger than that runs the legs out of reach and the
 		# forepaws lift a couple of pixels clear of the floor.
-		_shift_target = Vector2(_rng.randf_range(-0.020, 0.020), _rng.randf_range(-0.005, 0.014))
+		_shift_target = Vector2(_rng.randf_range(-0.034, 0.034), _rng.randf_range(-0.005, 0.014))
 		_shift_roll_target = _rng.randf_range(-0.055, 0.055)
+		# Rocking fore-aft is the load actually moving between the girdles, so it
+		# is correlated with the lateral drift rather than independent of it: the
+		# animal leans back as it settles onto its hocks and forward as it comes
+		# up onto its toes. Correlated, not locked — the noise term keeps two
+		# consecutive shifts from looking like the same move replayed.
+		_shift_pitch_target = _shift_target.x * -0.62 + _rng.randf_range(-0.014, 0.014)
 	var k: float = clampf(dt * 1.3, 0.0, 1.0)
 	_shift = _shift.lerp(_shift_target, k)
 	_shift_roll = lerpf(_shift_roll, _shift_roll_target, k)
-	# A creep rides on top of the destination, at two frequencies that never line
-	# up. A discrete shift alone leaves the body perfectly still between moves; the
-	# creep means there is no instant at which the animal is not moving at all,
-	# which is the whole point of the idle layer.
-	weight_shift = _shift + Vector2(sin(_t * 0.41) * 0.006, sin(_t * 0.29 + 2.0) * 0.003)
+	_shift_pitch = lerpf(_shift_pitch, _shift_pitch_target, k)
+	# A creep rides on top of the destination, at three frequencies that never
+	# line up. A discrete shift alone leaves the body perfectly still between
+	# moves; the creep means there is no instant at which the animal is not
+	# moving at all, which is the whole point of the idle layer.
+	#
+	# Breathing is folded into the same vertical budget rather than added on top
+	# of it. The only headroom the body has is the flexion reserve the gait holds
+	# back, so the term is written to *sink* on the exhale instead of rising past
+	# what the legs can pay for — and the ribcage is what carries the visible half
+	# of the breath anyway, through `breath_swell`.
+	var breath_sink: float = (1.0 - breath) * 0.5 * BREATH_SINK
+	weight_shift = _shift + Vector2(sin(_t * 0.41) * 0.007,
+		sin(_t * 0.29 + 2.0) * 0.003 + breath_sink)
 	weight_roll = _shift_roll + sin(_t * 0.33 + 1.4) * 0.014
+	weight_pitch = _shift_pitch + sin(_t * 0.37 + 0.6) * 0.010 \
+		+ sin(_t * 0.23 + 2.4) * 0.006
 
 
 # --- resting tail -----------------------------------------------------------
@@ -284,8 +327,11 @@ func _advance_tail() -> void:
 	# Two slow swings well apart in frequency, so the tail wanders instead of
 	# metronoming, plus the same sparse impulse train the ears use — a resting
 	# cat's tail spends most of its time drifting and then flicks once.
-	var drift: float = sin(_t * 0.44) * 0.038 + sin(_t * 0.19 + 0.9) * 0.026
-	var flick: float = _tick(_t + 1.7, 0.21) * lerpf(0.06, 0.16, _spec.energy)
+	var drift: float = sin(_t * 0.44) * 0.055 + sin(_t * 0.19 + 0.9) * 0.038
+	# The flick is a *base* angle handed to a soft, under-damped chain that tapers
+	# it down the joints, so the tip travels several times this. Under-driven it
+	# read as the tail breathing rather than flicking.
+	var flick: float = _tick(_t + 1.7, 0.21) * lerpf(0.14, 0.30, _spec.energy)
 	# Exertion fades it out: a moving animal's tail is driven by its hips and does
 	# not need — or want — an idle wander fighting the spring.
 	tail_sway = (drift + flick) * (1.0 - clampf(exertion * 1.6, 0.0, 1.0))

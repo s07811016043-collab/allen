@@ -29,8 +29,11 @@ const RigBones := preload("res://core/rig/bone_map.gd")
 ## scaled, so a stall cannot make a spring explode or change the resulting pose.
 const STEP := 1.0 / 120.0
 const MAX_STEPS := 16
-## Fore-aft head lag per unit of the body's vertical speed, in rig units.
+## Fore-aft head lag per unit of the shoulder's vertical speed, in rig units.
 const HEAD_LEAD := 0.025
+## Fraction of the shoulder's stride ripple the neck absorbs. Not 1.0: a head
+## welded level is as dead a tell as a head welded to the spine.
+const HEAD_STEADY := 0.80
 
 var skeleton: RigSkeleton
 var gait := Gait.new()
@@ -61,10 +64,15 @@ var _head := -1
 var _chest := -1
 var _pelvis := -1
 var _root := -1
-var _head_level := 0.0
 var _head_aim := 0.0
-var _prev_bob := 0.0
-var _bob_vel := 0.0
+## Where the skull is riding, slow-followed, and the correction applied to it
+## last frame. The head is stabilised against its own measured travel rather
+## than against the gait's bob; see `_pose_head`.
+var _head_level := 0.0
+var _head_fix := 0.0
+## Vertical speed of the shoulder, which is what the muzzle leads against.
+var _prev_chest := 0.0
+var _chest_vel := 0.0
 var _prev_speed := 0.0
 var _carrier_accel := 0.0
 ## Mood tail carry, kept here rather than written straight into the chain: the
@@ -120,10 +128,22 @@ func _build_chains(spec: CreatureSpec) -> void:
 	_tail_chain = _add_chain("tail", RigBones.SIDE_NONE, RigBones.PELVIS,
 		SpringChain.Mode.ANGULAR, lerpf(15.0, 34.0, spec.energy), 0.52,
 		0.9, 2.6, 0.70)
+	if _tail_chain >= 0:
+		# ~120 ms of trail behind the hips. Now that the pelvis actually pitches
+		# and counter-rolls there is something to trail *behind*: without this the
+		# tail inherits every hip rotation on the same frame it happens and reads
+		# as a welded rod, however soft the spring under it is.
+		chains[_tail_chain].lag = 0.12
 	_ear_near_chain = _add_chain("ear", RigBones.SIDE_NEAR, RigBones.HEAD,
 		SpringChain.Mode.ANGULAR, 210.0, 0.90, 0.0, 0.55, 0.42)
 	_ear_far_chain = _add_chain("ear", RigBones.SIDE_FAR, RigBones.HEAD,
 		SpringChain.Mode.ANGULAR, 210.0, 0.90, 0.0, 0.55, 0.42)
+	# Ears are light and short, so they trail by about the length of one blink —
+	# enough to keep a swivel from snapping, not enough to look loose.
+	if _ear_near_chain >= 0:
+		chains[_ear_near_chain].lag = 0.045
+	if _ear_far_chain >= 0:
+		chains[_ear_far_chain].lag = 0.045
 	_add_chain("crest", RigBones.SIDE_NONE, RigBones.HEAD,
 		SpringChain.Mode.ANGULAR, 120.0, 0.72, 0.25, 0.9, 0.5)
 	_add_chain("wattle", RigBones.SIDE_NONE, RigBones.HEAD,
@@ -173,6 +193,13 @@ func settle() -> void:
 	skeleton.reset_pose()
 	skeleton.root_xform = Transform2D()
 	skeleton.update_pose()
+	# Prime the followers on the rest pose. Left at zero they start a whole
+	# body-height away from the bones they track, and the head arrives craned
+	# back for the first half-second of every spawn.
+	_head_level = skeleton.bones[_head].xform.origin.y if _head >= 0 else 0.0
+	_head_fix = 0.0
+	_prev_chest = skeleton.bones[_chest].xform.origin.y if _chest >= 0 else 0.0
+	_chest_vel = 0.0
 
 
 func time() -> float:
@@ -247,23 +274,34 @@ func _pose_body(dt: float) -> void:
 		gait.surge + idle.weight_shift.x,
 		gait.bob + idle.weight_shift.y))
 
+	# Girdle counter-rotation. A quadruped's shoulders and hips rotate in
+	# opposite senses about the long axis, and the only part of that a strict
+	# side view can show is the two ends of the trunk pitching against each
+	# other. So the twist is split: half of it backwards into the croup, all of
+	# it forwards along the lumbar run, which leaves the withers and the croup
+	# equal and opposite about the middle of the back. That is the difference
+	# between a supple spine and a plank with legs.
+	var twist: float = gait.girdle_twist
 	if _pelvis >= 0:
 		var p := skeleton.bones[_pelvis]
-		p.angle += gait.pitch
+		p.angle += gait.pitch + idle.weight_pitch - twist * 0.5
 		# Roll is invisible in a strict side view, so it is expressed the way a
 		# side view actually shows it: the near half of the body rides slightly
 		# higher or lower than the far half, plus a touch of whole-body lean.
-		p.angle += (gait.roll + idle.weight_roll + bank) * 0.22
+		p.angle += gait.roll + (idle.weight_roll + bank) * 0.22
 		p.bone_scale = squash.scale_vector()
 
-	# Spine: breathing swell, the lateral wave for sprawling gaits, and a bend
-	# into the turn distributed evenly so no single joint cranks.
+	# Spine: breathing swell, the lateral wave for sprawling gaits, the lumbar
+	# share of the girdle twist, and a bend into the turn — all distributed
+	# evenly so no single joint cranks.
 	var swell: float = idle.breath_swell()
+	var spine_n: float = maxf(float(_spine_bones.size()), 1.0)
 	for i in _spine_bones.size():
 		var b := skeleton.bones[_spine_bones[i]]
 		var t: float = float(i) / maxf(float(_spine_bones.size() - 1), 1.0)
 		b.angle += gait.undulation * sin(TAU * (t * 0.8 - gait.cycle))
 		b.angle += -bank * 0.20
+		b.angle += twist / spine_n
 		# Ribcage expands most in the middle of the trunk, tapering to the hips.
 		var swell_here: float = swell * (1.0 - absf(t - 0.55) * 1.2)
 		b.bone_scale *= Vector2(1.0, 1.0 + swell_here)
@@ -271,7 +309,7 @@ func _pose_body(dt: float) -> void:
 	if _chest >= 0:
 		skeleton.bones[_chest].bone_scale *= Vector2(1.0 + swell * 0.7, 1.0 + swell * 1.3)
 
-	_pose_head(dt)
+	_pose_head(dt, twist)
 
 
 ## Head stabilisation and aim.
@@ -281,33 +319,41 @@ func _pose_body(dt: float) -> void:
 ## skull stays remarkably level while its shoulders rise and fall underneath it;
 ## an animated character whose head rides the body bob rigidly looks like a toy
 ## on a stick.
-func _pose_head(dt: float) -> void:
+func _pose_head(dt: float, twist: float) -> void:
+	# Stabilise against where the body is actually putting the skull, not against
+	# `bob`. Bob is one of five things that move a head: trunk pitch swings it
+	# through the whole lever from the hips, the girdle twist adds the withers'
+	# share, an impact squash drops it, and breathing lifts it. A stabiliser
+	# watching only the bob is blind to four of them, which is how the skull ended
+	# up travelling nearly twice as far as the chest it was meant to be steadying.
+	#
+	# So measure the bone. `xform` is one frame stale — the pose is rebuilt after
+	# this runs — which is the right kind of wrong, because a real neck reacts
+	# late too. Backing last frame's correction out of the reading is what keeps
+	# this a feed-forward: cancel against the *corrected* head and the loop chases
+	# its own output, converging on a skull welded rigidly level.
+	var head_y := 0.0
+	if _head >= 0:
+		head_y = skeleton.bones[_head].xform.origin.y - _head_fix
+	var chest_y: float = skeleton.bones[_chest].xform.origin.y if _chest >= 0 else 0.0
 	# A *velocity*, not the per-step difference it used to be: a lead written as
 	# a raw delta silently scales with the step size, and at 120 Hz it came to a
-	# third of a pixel — a term that looked deliberate and did nothing.
-	# Filtered, not the raw per-step difference. Bob steps at every footfall, so its
-	# one-frame derivative spikes to several times the velocity of the motion it is
-	# meant to describe — and because the neck is tilted, a fore-aft head offset
-	# carries a third of itself into vertical. Unfiltered, the "lead" was throwing
-	# the skull up and down harder than the bob it exists to ride out, which is how
-	# a stabilised head ended up travelling further than the chest under it.
-	_bob_vel = lerpf(_bob_vel,
-		clampf((gait.bob - _prev_bob) / maxf(dt, 1e-5), -3.0, 3.0),
+	# third of a pixel — a term that looked deliberate and did nothing. Filtered,
+	# because the shoulder takes a step at every footfall and the one-frame
+	# derivative of a step is a spike several times the motion it describes.
+	_chest_vel = lerpf(_chest_vel,
+		clampf((chest_y - _prev_chest) / maxf(dt, 1e-5), -3.0, 3.0),
 		clampf(dt * 18.0, 0.0, 1.0))
-	_prev_bob = gait.bob
-	# Split the body's vertical motion into the part the head should follow and the
-	# part it should reject. `_head_level` is a slow follower, so it tracks postural
-	# changes — an animal crouches as it settles into a walk and the head has to go
-	# down with it — while sliding straight past the stride ripple. What is left is
-	# the ripple, and that is what gets cancelled.
-	#
-	# Cancelling the *lagged* signal instead, which is what this did, subtracts
-	# something already sixty degrees out of phase at walking cadence: over part of
-	# every stride it added to the head's motion rather than removing it, and the
-	# skull ended up travelling twice as far as the shoulders it was meant to be
-	# steadying.
-	_head_level = lerpf(_head_level, gait.bob, clampf(dt * 2.2, 0.0, 1.0))
-	var cancel: float = -(gait.bob - _head_level) * 0.85
+	_prev_chest = chest_y
+	# Split the head's vertical motion into the part it should follow and the part
+	# it should reject. `_head_level` is a slow follower, so it tracks postural
+	# change — an animal crouches as it settles into a walk, and a resting one
+	# raises and lowers its head on purpose, both of which must survive — while
+	# sliding straight past the stride ripple. What is left is the ripple, and
+	# that is what gets cancelled.
+	_head_level = lerpf(_head_level, head_y, clampf(dt * 2.2, 0.0, 1.0))
+	var cancel: float = -(head_y - _head_level) * HEAD_STEADY
+	_head_fix = cancel
 
 	var aim := 0.0
 	if look_target != Vector2.INF and _head >= 0:
@@ -321,21 +367,34 @@ func _pose_head(dt: float) -> void:
 		clampf(dt * 7.0, 0.0, 1.0))
 
 	# Distribute the aim down the neck so the join stays smooth, with the head
-	# itself taking the largest share.
+	# itself taking the largest share. The offsets are authored in rig space and
+	# converted into each bone's rest frame once, because that frame is the neck
+	# direction — a steep diagonal on every species we ship. Written in raw, a
+	# "vertical" stabiliser was being applied along the neck instead: it threw
+	# the skull forwards and carried a third of itself back into vertical with
+	# the wrong sign. The neck takes a third of the correction and the skull the
+	# rest, so the join bends instead of the head sliding off the end of it.
+	var neck_n: float = maxf(float(_neck_bones.size()), 1.0)
 	for i in _neck_bones.size():
 		var b := skeleton.bones[_neck_bones[i]]
 		b.angle += _head_aim * 0.22
-		b.offset += Vector2(0.0, cancel * 0.35 / maxf(float(_neck_bones.size()), 1.0))
+		b.offset += b.rest_xform.basis_xform_inv(Vector2(0.0, cancel * 0.34 / neck_n))
 	if _head >= 0:
 		var h := skeleton.bones[_head]
-		h.angle += _head_aim * 0.56 - gait.pitch * 0.7
+		# The skull rejects both trunk attitude channels, not just the pitch. The
+		# withers carry half the girdle twist, and a head that inherited it would
+		# nod once per forelimb — the exact tell of a character rigged as one
+		# rigid chain. Countering it here leaves the *neck* carrying the motion,
+		# which is what a walking cat actually looks like from the side.
+		h.angle += _head_aim * 0.56 - gait.pitch * 0.7 - twist * 0.45
 		# The muzzle noses forward as the shoulders drop out from under it and
 		# settles back as they rise. Small — a couple of pixels at walking pace —
 		# but it is the difference between a head that is carried and one bolted
-		# to the spine.
-		h.offset += Vector2(-_bob_vel * HEAD_LEAD, cancel)
-		# A braced animal carries its head higher and further forward.
-		h.offset += Vector2(0.012, -0.020) * tension
+		# to the spine. A braced animal also carries its head higher and further
+		# forward. All of it in rig space, converted once, for the reason above.
+		h.offset += h.rest_xform.basis_xform_inv(
+			Vector2(-_chest_vel * HEAD_LEAD + 0.012 * tension,
+				cancel * 0.66 - 0.020 * tension))
 
 
 # ---------------------------------------------------------------------------

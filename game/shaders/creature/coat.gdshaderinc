@@ -78,9 +78,15 @@ float pet_tier_crisp(float px_per_lane) {
 //
 // `soft` is 1 when the tier is at the sampling limit. It widens and flattens the
 // fibre profile so the feature is never narrower than a pixel; see
-// `pet_tier_crisp`.
+// `pet_tier_crisp`. It also *shortens* the fibre, and that second job is the one
+// that was missing. Aspect is a ratio, so a barely-resolved lane two pixels wide
+// still draws a dash six lanes long — twelve screen pixels, on an animal that is
+// only two hundred pixels from nose to rump. Six per cent of the body per stroke
+// is not hair, it is planking, and it is precisely what the ship-size read
+// collapsed into. A lane that cannot be resolved gets short dashes instead.
 float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 		float soft, out float dcross, out float rnd, out float lean) {
+	aspect = max(aspect * mix(1.0, 0.55, soft), 1.0);
 	// The warp has to *diverge* between neighbouring lanes, not shift them as a
 	// block: a warp that changes slowly along the hair slides whole bands of
 	// parallel lanes sideways in formation, and parallel lines with a slow wave
@@ -208,7 +214,40 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// shouting. Getting this backwards — full contrast on an unresolved rung — is
 	// the whole of the wood-grain failure.
 	float crisp = (w0 * k0 + w1 * k1 + w2 * k2 + w3 * k3) * inv;
-	float amp = mix(0.72, 1.0, crisp);
+	// The floor here is the single number that decides whether the ship-size pet
+	// wears hair or timber. A rung sampled at two and a bit pixels a lane cannot
+	// carry contrast: whatever value swing it is given lands on the pixel grid as
+	// a beat, and a beat between two near-equal frequencies is a long, slow,
+	// perfectly straight streak. Held at 0.72 the coat kept three quarters of its
+	// contrast at the one size where it can resolve none of its structure, which
+	// is why every review at 640 px passed a build that reads as carved wood at
+	// 260. The strokes stay — they are what stops it being clay — they just stop
+	// shouting until there are pixels to say it in.
+	float amp = mix(0.22, 1.0, crisp);
+	// How much of the fibre structure is allowed to *show*, which is a different
+	// question from how much of it is present, and the one that actually decides
+	// the ship-size read.
+	//
+	// A rung drawn at two and a bit pixels a lane sits right on the sampling
+	// limit. The structure is genuinely there — that is what `res` says — but
+	// every scrap of contrast put into it comes back as the *beat* between the
+	// lane pitch and the pixel grid, and the beat of a 2.4 px pattern on a 1 px
+	// grid is a band about twelve pixels wide. Long, straight, evenly spaced,
+	// running the length of the animal. That is the plank grain, and it arrives by
+	// a route that no amount of tuning inside the fibre tier can close, because
+	// the tier is not what is wrong: the sampling is.
+	//
+	// So the coat's *display* fades over the same window `pet_tier_crisp` uses.
+	// That is the only lever that fixes 260 px without emptying 720 px, where
+	// there are four pixels to a lane, nothing beats, and the coat has to be
+	// entirely present — which is the trade every previous attempt got backwards.
+	float show = res * mix(0.18, 1.0, smoothstep(0.06, 0.46, crisp));
+	// The normal perturbation gets a harder gate again, because it is the term
+	// that aliases worst. A tint of a few per cent at sub-pixel pitch averages
+	// away; a six-degree tilt of the normal under a directional key does not — it
+	// swings the whole width of the diffuse falloff. Relief is the last thing a
+	// coat should be drawn in when there is no room to draw it.
+	float relief = res * mix(0.10, 1.0, smoothstep(0.06, 0.46, crisp));
 
 	float strand = (w0 * h0 + w1 * h1 + w2 * h2 + w3 * h3) * inv;
 	float lean = (w0 * n0 + w1 * n1 + w2 * n2 + w3 * n3) * inv;
@@ -223,9 +262,19 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// no rung resolves at all — and an unguarded zero pitch is a division by zero
 	// inside the tier, i.e. a screenful of NaN on the one size a desktop pet
 	// spends most of its life at.
-	float pitch_c = (wsum > 1e-3
+	//
+	// The pitch tracks the carrying rung, but only downward. A lock is a physical
+	// object — a few millimetres of matted hair — so it has a size in rig space,
+	// and letting the carrying rung set it in *both* directions is what made the
+	// ship size fail. As the pet shrinks the carrying rung coarsens, the lock
+	// coarsens with it, and at the 130 px per unit a desktop pet actually lives at
+	// the "locks" came out a third of the animal long. Nothing that big is a lock;
+	// it is plank grain, drawn at exactly the frequency the eye reads as sawn
+	// timber. Floored against the finest authored rung, the lock keeps the same
+	// size on the animal from a taskbar icon to a head close-up.
+	float pitch_c = max((wsum > 1e-3
 		? (w0 * pitch0 + w1 * pitch1 + w2 * pitch2 + w3 * pitch3) * inv
-		: pitch0) * 0.13;
+		: pitch0) * 0.13, pitch0 * 0.26);
 	float fc = pet_tier_fade(px / pitch_c);
 	float dc = 0.0, rc = 0.5, nc = 0.0, lock = 0.0;
 	if (fc > 0.002) {
@@ -235,7 +284,14 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// The coat parts along the locks, so the strands thin out where a lock edge
 	// runs. Modulating *coverage* is what gives the coat its second scale of
 	// structure, and unlike a lock drawn in albedo it costs nothing in pigment.
-	float part = mix(0.66, 1.0, lock);
+	//
+	// A lock is a *grouping* of strands, so it can only say as much as the
+	// strands under it can. Once none of them resolve there is nothing left for
+	// the lock to be a grouping of, and a third of a stop of coverage swing at
+	// lock pitch is then just a set of broad stripes down the animal — which,
+	// with the grain running the same way, is the second half of the plank read.
+	float lock_amp = mix(0.14, 1.0, crisp);
+	float part = mix(1.0 - 0.34 * lock_amp, 1.0, lock);
 
 	Coat c;
 	c.tuft = lock;
@@ -247,23 +303,23 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// the whole animal by a fifth and every value in the lighting rig then has to
 	// be re-tuned around a coat.
 	c.occ = mix(1.0, mix(1.0 - 0.17 * amp, 1.0 + 0.24 * amp, strand * part),
-		fluffy * res);
+		fluffy * show);
 
 	// Slopes are divided by their own pitch so a fine rung does not tilt the
 	// normal harder than a coarse one just for being denser. The lock gets a
 	// quarter of the strands' amplitude: a lock is a parting in the coat, not a
 	// ridge in the flesh, and given real relief it becomes a row of sausages.
-	c.slope = across * fluffy * amp * inv
+	c.slope = across * fluffy * relief * inv
 		* (0.034 * w0 * d0 / pitch0 + 0.032 * w1 * d1 / pitch1
 			+ 0.030 * w2 * d2 / pitch2 + 0.028 * w3 * d3 / pitch3)
-		+ across * fluffy * 0.009 * fc * dc / max(pitch_c, 1e-3);
+		+ across * fluffy * 0.009 * fc * lock_amp * dc / max(pitch_c, 1e-3);
 
 	// Albedo carries almost none of the coat. Real hair is one pigment: what
 	// changes from fibre to fibre is which way it points, not what colour it is.
 	// Painting the variation into albedo is what produced the soft blotches that
 	// made the animal look wet, so the strand read lives in `spec` and `tilt`
 	// below and this is left as the faint pigment drift a lock has.
-	c.tint = (rnd - 0.5) * 0.42 * res;
+	c.tint = (rnd - 0.5) * 0.42 * show;
 
 	// The visible structure of a short coat is specular. Each fibre is a tiny
 	// cylinder: the highlight breaks across it, dies in the gap to the next one,
@@ -271,10 +327,10 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// neighbours catch the key at slightly different angles, and `glint` drives
 	// the tinted second lobe. The lock only shades it — a lock lying against the
 	// light is duller than one standing away from it — it never sets its scale.
-	c.glint = rnd * rnd;
-	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), res)
-		* mix(0.80, 1.16, lock) * part;
-	c.tilt = lean * 0.34 * res;
+	c.glint = mix(0.25, rnd * rnd, show);
+	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), show)
+		* mix(1.0 - 0.20 * lock_amp, 1.0 + 0.16 * lock_amp, lock) * part;
+	c.tilt = lean * 0.34 * show;
 	return c;
 }
 
@@ -296,8 +352,23 @@ float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
 	// the coat is groomed instead of standing up like a brush.
 	float arc = dot(p, across) + dot(p, grad) * dot(groom, across) * 1.4;
 
-	float pitch_a = 92.0 * density;
-	float pitch_b = 230.0 * density;
+	// The outline is the one place on the animal where the field is not smoothed
+	// by anything, so it is also the one place a missing tier is unmissable: with
+	// no spikes the silhouette is an exact analytic curve, and an exact analytic
+	// curve around a limb is what a lathe makes. Authored at a fixed rig pitch the
+	// coarse tier stops resolving below about 240 px per unit — which is every
+	// size the pet actually ships at — so the desktop cat has been wearing a
+	// machined outline and nobody caught it at review zoom, where the tier is
+	// present.
+	//
+	// So the coarse pitch is capped by what the frame can hold: spikes land about
+	// every two and a half pixels however small the pet is drawn. That is not a
+	// cheat about hair size, it is what a pelt does — shrink an animal far enough
+	// and what breaks its outline is no longer single hairs but the clumps they
+	// lie in, and clumps are exactly what a coarser tier draws. The cap only ever
+	// bites downward, so a head close-up still gets the authored frequency.
+	float pitch_a = min(92.0 * density, px / 2.55);
+	float pitch_b = min(230.0 * density, px / 1.15);
 	float fa = pet_tier_fade(px / pitch_a) * sharp;
 	float fb = pet_tier_fade(px / pitch_b) * sharp;
 
@@ -334,6 +405,76 @@ float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
 	// guard hairs, and without it the silhouette reads as a saw blade. It stays
 	// thin, though — every unit of skirt is a unit of blur on the outline.
 	return total + 0.045;
+}
+
+
+// ---------------------------------------------------------------------------
+// Whiskers
+// ---------------------------------------------------------------------------
+
+// A cat without whiskers is not a cat, and there is no part budget left to make
+// them geometry — the species is at 28 capsules of 28. So they are drawn here,
+// off the muzzle, and they are the only feature in the renderer allowed to leave
+// the body's silhouette entirely.
+//
+// What actually reaches the eye from a real whisker is not a drawn line. It is
+// the specular streak off a cylinder a tenth of a millimetre across: thin,
+// bright, and mostly transparent, fading against a bright background rather than
+// drawing over it. Rendered as opaque dark strokes — the obvious first attempt —
+// a fan of them looks like cut wire glued to the face, which is worse than
+// having none at all.
+//
+// `pad` is (x, y, length, amount) in rig space. `CreatureRenderer` finds it from
+// the frontmost part rather than making a species declare its own muzzle twice.
+float pet_whiskers(vec2 p, vec4 pad, float unit_px) {
+	if (pad.w <= 0.002) { return 0.0; }
+	float len = pad.z;
+	vec2 q = p - pad.xy;
+	// Cheap reject first: the fan occupies a small box in front of the muzzle and
+	// this function is otherwise evaluated over the whole quad.
+	if (q.x < -len * 0.30 || q.x > len * 1.15 || abs(q.y) > len * 0.85) {
+		return 0.0;
+	}
+	// One pixel is the floor on width. Drawn thinner, the line breaks into a
+	// dashed row of aliased dots that crawls whenever the head turns, which is
+	// far more distracting than a whisker slightly too fat. Hold the width and
+	// take the contrast out instead — which is what a sub-pixel highlight does in
+	// a real camera anyway.
+	float w0 = max(unit_px * 1.15, len * 0.006);
+	float faint = clamp(len * 0.006 / w0, 0.26, 1.0);
+
+	float cov = 0.0;
+	for (int i = 0; i < 10; i++) {
+		float fi = float(i);
+		float r = pet_hash1(vec2(fi, 17.0));
+		// Two rows about the muzzle line. A real pad is arranged in rows, the
+		// upper row carries the long ones, and the fan opens further above the
+		// line than below it.
+		float row = mod(fi, 2.0) * 2.0 - 1.0;
+		float k = floor(fi * 0.5) * 0.25;
+		// Roots are spread across the pad, not stacked on one point. A whisker pad
+		// is a patch of skin with rows of follicles in it; collapse them all onto
+		// one origin and what comes out is a starburst, which is the shape of a
+		// broom, not of a face. The upper rows also sit further back, which is
+		// what opens the fan out instead of letting it radiate.
+		vec2 root = vec2(-len * (0.04 + 0.26 * k),
+			row * len * (0.045 + 0.075 * k) - len * 0.015);
+		vec2 qq = q - root;
+		float ang = row * (0.14 + 0.60 * k) - 0.06;
+		float span = len * (0.60 + 0.40 * r) * (1.0 - 0.22 * k);
+		vec2 d = vec2(cos(ang), sin(ang));
+		float s = dot(qq, d);
+		if (s < 0.0 || s > span) { continue; }
+		float t = dot(qq, vec2(-d.y, d.x));
+		// Every whisker bows: it leaves the pad stiff and sags along its length,
+		// and ten perfectly straight rays read as a compass rose.
+		t -= (0.18 + 0.30 * r) * row * s * s / span;
+		float u = s / span;
+		float w = w0 * (1.0 - 0.72 * u);
+		cov = max(cov, smoothstep(w, w * 0.35, abs(t))
+			* smoothstep(1.0, 0.70, u) * (0.55 + 0.45 * r));
+	}
+	return cov * pad.w * faint;
 }
 
 

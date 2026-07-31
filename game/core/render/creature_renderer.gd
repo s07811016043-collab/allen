@@ -40,6 +40,8 @@ var _packed := PackedVector4Array()
 var _packed_eyes := PackedVector4Array()
 var _packed_landmarks := PackedVector4Array()
 var _landmark_count := 0
+## Whisker pad, packed (x, y, length, amount) in rig space. See `_pack_whiskers`.
+var _whisker_pad := Vector4.ZERO
 var _palette := PackedColorArray()
 var _bounds_min := Vector2.ZERO
 var _bounds_max := Vector2.ONE
@@ -153,6 +155,7 @@ func _process(_delta: float) -> void:
 	_pack_parts()
 	_pack_eyes()
 	_pack_landmarks()
+	_pack_whiskers()
 	_upload_dynamic()
 
 
@@ -304,10 +307,55 @@ func _pack_landmarks() -> void:
 		# normal reads as a hard edge catching the key.
 		at.y = core.y - core_r * 0.52
 		at.x += signf(core.x - at.x) * core_r * 0.28
-		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.58, 1.35)
+		# The slope is set by the ship size, not by the close-up. A landmark is a
+		# broad shape, so unlike the coat it survives the downsample intact — and
+		# at 260 px a tilt tuned to read as a scapula at review zoom is a pair of
+		# soft round lumps on the flank, which is the silhouette of a bruise. It
+		# has to be the amount that still says "bone" when it is fifteen pixels
+		# across, and that is less than it looks like at four times the size.
+		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.58, 1.02)
 	_landmark_count = sum_x.size()
 	for i in range(_landmark_count, MAX_LANDMARKS):
 		_packed_landmarks[i] = Vector4(1e6, 1e6, 1.0, 0.0)
+
+
+## Whisker pad for the body shader, packed (x, y, length, amount) in rig space.
+##
+## Whiskers cannot be parts — a cat is 28 of 28 — so the shader draws them, and
+## it needs an anchor. Found geometrically for the same two reasons the landmarks
+## are: a species should not have to describe its own face twice, and the pad has
+## to track the rig, because a whisker fan that stayed put while the head turned
+## would be worse than none.
+##
+## The one thing the rig convention guarantees is that +x is forward, so the
+## frontmost point on the animal is the tip of its snout whatever species it is.
+## The pad sits behind and just below that, on the muzzle, which is where a real
+## one is. Only mammals get them: a bird with whiskers reads as a mistake, the
+## same way a gecko with eyelashes does.
+func _pack_whiskers() -> void:
+	_whisker_pad = Vector4.ZERO
+	if spec.coat_surface != SDFPart.Surface.FUR:
+		return
+	var snout := Vector2(-INF, 0.0)
+	var core_r := 0.0
+	for p in live_parts:
+		# The far-side layer is behind the body, so its parts are never the snout
+		# even when the head is turned away.
+		if p.layer != SDFPart.Layer.BEHIND:
+			if p.a.x + p.radius_a > snout.x:
+				snout = Vector2(p.a.x + p.radius_a, p.a.y)
+			if p.b.x + p.radius_b > snout.x:
+				snout = Vector2(p.b.x + p.radius_b, p.b.y)
+		var r: float = maxf(p.radius_a, p.radius_b)
+		if p.layer == SDFPart.Layer.BODY and r > core_r:
+			core_r = r
+	if not is_finite(snout.x) or core_r <= 0.0:
+		return
+	# Both offsets are fractions of the body's own thickness rather than of the
+	# snout's, because a nose is a tiny part and scaling off it makes the fan
+	# collapse onto the nose leather on any species whose nose is small.
+	_whisker_pad = Vector4(snout.x - core_r * 0.42, snout.y + core_r * 0.17,
+		core_r * 1.60, 1.0)
 
 
 func _upload_dynamic() -> void:
@@ -317,6 +365,7 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("part_count", live_parts.size())
 	_mat.set_shader_parameter("landmarks", _packed_landmarks)
 	_mat.set_shader_parameter("landmark_count", _landmark_count)
+	_mat.set_shader_parameter("whisker_pad", _whisker_pad)
 	_mat.set_shader_parameter("bounds_min", _bounds_min)
 	_mat.set_shader_parameter("bounds_max", _bounds_max)
 	_mat.set_shader_parameter("growth", growth)

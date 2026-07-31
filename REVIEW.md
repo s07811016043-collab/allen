@@ -24,54 +24,34 @@ tools/capture.sh --species=cat --growth=3 --out=_captures/adult.png --size=720x7
 tools/capture.sh --species=cat --growth=3 --out=_captures/head.png  --size=720x720 --zoom=3.4 --focus=head
 ```
 
-## Blocking — ranked by an independent reviewer, most damaging first
+## Blocking — round 5 blind review at 260 px, most damaging first
 
-1. **The read collapses at ship size.** Coat detail is scale-locked: hair
-   strokes vanish, tabby bars turn into plank grain, legs become uniform-width
-   noodles with no paw shape. Drive stroke frequency and marking edge softness
-   off on-screen pixels-per-unit rather than rig units, and add a broad
-   low-frequency value break — a dark saddle over the shoulders, a pale chest
-   bib — that carries the read at 200 px when no fine detail survives.
-2. **The cat reads as a dachshund.** The torso is far too long for its shoulder
-   height and the foreleg attaches near mid-torso, leaving a long unsupported
-   neck-and-chest cantilever. This is an over-correction of the earlier
-   too-short body. Shorten the lumbar run, move the scapula forward to about
-   22% of body length, and give the shoulder an actual mass so the front leg
-   stops being a stick pinned to a barrel.
-3. **Far-side limbs are flat dark shapes.** They have no coat strokes, no rim
-   and no fringe, so they read as painted shadow rather than as limbs. Run the
-   same fur shading on the BEHIND layer at reduced contrast instead of replacing
-   it with a flat tint; add a thin cool rim and slight desaturation so it
-   recedes atmospherically.
-4. **Everything above the legs is a rigid plank.** The probe reports body pitch
-   of exactly +0.00 on every frame of a walk cycle, head travel of 0.015 units
-   and tail travel of 0.03. The idle is functionally frozen: two frames two
-   seconds apart are pose-identical. Drive pitch and shoulder/hip counter-roll
-   off gait phase, let the tail lag the hips by ~120 ms so it sways and
-   overshoots, and give idle a real loop.
-5. **Tabby bands are hard-edged rectangles.** Constant width and value over the
-   spine and down the flank, with square clipped ends, so the body reads as a
-   painted barrel. Taper each band and fade it toward both ends, and modulate by
-   surface normal so bands narrow as they wrap away from the light.
-6. **The coat is uniformly matte.** No anisotropic sheen anywhere, so a
-   3D-shaded form is lit like felt. Add a fur sheen lobe biased along the stroke
-   direction, strongest across the back and the top of the tail.
-7. **Eyes: the iris is the best asset in the build, and the rest of the eye
-   undoes it.** The specular is a hard-edged white rounded rectangle pasted at
-   an identical position on both eyes; no eyelid ever overlaps the top of the
-   iris, so both eyes are perfect circles and the cat looks permanently
-   startled. Make the highlight an elliptical soft reflection positioned from
-   the light vector and the eyeball normal, cut the top ~15% of each iris with a
-   lid arc and a contact shadow, add a tear-duct wedge — and add whiskers, which
-   do not exist at all.
-8. **Grounding is mathematically perfect and visually absent.** The probe reports
-   slip and sink of exactly 0.0000 on every stance foot, but the shadow is a
-   single body-wide ellipse, so a correctly planted paw still reads as
-   levitating. Composite one tight, high-opacity contact patch per stance paw on
-   top of the broad ambient ellipse.
-9. **A cross-hatched etch artifact over the brow** where the SDF blend gradient
-   is steep. Clamp the stroke displacement by the blend-field gradient
-   magnitude.
+The reviewer identified the build as *"a small four-legged mammal — probably a
+cat, possibly a whippet or a young deer."* The head is now convincingly feline;
+the body is not. Everything below is body.
+
+1. **The legs are collinear, so the silhouette has two columns, not four.** In
+   the standing pose the near and far leg of each pair sit on the same x, so
+   there is no negative space inside a pair — and negative space is what tells
+   the eye it is looking at a quadruped. Stagger the stance in the spec.
+2. **There is no chest.** Below the neck the front of the body drops as a flat
+   vertical wall to the foreleg, because no capsule fills the brisket between
+   the forelimbs. A cat's chest is the deepest part of its body.
+3. **The hind limb is an L with no hock zigzag.** The double-bend of a feline
+   hind leg is the single most recognisable cue in the animal and it is absent.
+4. **Groom runs lengthwise along the whole torso regardless of surface flow**, so
+   the strokes cross the form instead of wrapping it — and at 260 px that is
+   *precisely* what aliases into wood grain. This is the root cause the previous
+   two coat passes were treating symptomatically.
+5. **The belly is a blown-out pale slab** with a hard straight bottom edge, at
+   essentially the same value as the lit back. No occlusion where the limbs
+   enter the body, no ground-bounce gradient on the underside.
+6. **No per-paw contact shadow in the standing shot.** `contact_shadow.gd` grew
+   the capability but the standing capture still shows one body-wide ellipse, so
+   nothing disambiguates the fused leg pair.
+7. **Animation regressed to 3/10.** Body pitch, tail lag and a live idle were
+   the brief last round and the reviewer still reads the torso as carried
+   furniture. Re-measure with `--probe` rather than assuming the fix landed.
 
 ## Core bugs found while authoring the bird
 

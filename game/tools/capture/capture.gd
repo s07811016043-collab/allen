@@ -221,7 +221,7 @@ func _build_creature() -> void:
 				clip.add_child(c)
 				add_child(clip)
 		elif draw_contact:
-			var shadow := _make_contact_shadow()
+			var shadow := _make_contact_shadow(c)
 			add_child(shadow)
 			# Behind every creature by depth rather than by sibling index: with
 			# `--bg=alpha` there is no backdrop node to sit in front of, and an
@@ -492,44 +492,13 @@ func _probe_cell(index: int, c: Creature, t: float) -> void:
 	print(line)
 
 
-## Soft elliptical contact shadow with a penumbra that tightens near the paws.
-## Grounding is the single cheapest way to stop a 2D character looking pasted on.
-func _make_contact_shadow() -> Node2D:
-	var holder := Node2D.new()
-	var rect := ColorRect.new()
-	# Sized to the animal actually in frame, not to a guess: a long cat casts a
-	# long shadow, and a kitten a small one.
-	var w: float = _body_span() * _spec.pixels_per_unit * 1.05
-	rect.size = Vector2(w, w * 0.34)
-	# The ellipse inside the shader is centred at UV y = 0.62, so the rect has to
-	# be offset by exactly that fraction of its own height for the shadow to land
-	# on the ground line rather than below it. Getting this wrong is what made
-	# the pet look like it was hovering over its own shadow.
-	rect.position = Vector2(-w * 0.5, -rect.size.y * 0.62)
-	rect.mouse_filter = Control.MOUSE_FILTER_IGNORE
-	var sh := Shader.new()
-	sh.code = """
-shader_type canvas_item;
-render_mode blend_mix, unshaded;
-uniform float softness : hint_range(0.05, 1.0) = 0.55;
-uniform float strength : hint_range(0.0, 1.0) = 0.55;
-void fragment() {
-	vec2 q = (UV - vec2(0.5, 0.62)) * vec2(2.0, 3.1);
-	float d = length(q);
-	// Two stacked falloffs: a tight dark core where the body meets the ground,
-	// and a wide soft ambient occlusion halo around it.
-	float core = smoothstep(0.55, 0.05, d);
-	float halo = smoothstep(1.15, 0.15, d);
-	float a = (core * 0.72 + halo * 0.35) * strength;
-	COLOR = vec4(vec3(0.03, 0.03, 0.05), clamp(a, 0.0, 1.0));
-}
-"""
-	var m := ShaderMaterial.new()
-	m.shader = sh
-	rect.material = m
-	rect.color = Color.WHITE
-	holder.add_child(rect)
-	return holder
+## Ground contact for one cell. `ContactShadow` owns the whole thing now — a
+## broad ambient ellipse plus a tight patch under every planted paw — because
+## the old single body-wide ellipse could not tell a review whether a foot was
+## touching the floor, which is the one thing a contact shadow exists to say.
+## It follows the creature's transform itself, so nothing is placed here.
+func _make_contact_shadow(c: Node2D) -> Node2D:
+	return ContactShadow.make_for(c)
 
 
 func _process(_delta: float) -> void:
