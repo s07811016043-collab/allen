@@ -320,17 +320,7 @@ func _refresh_click_through() -> void:
 
 	var region := Rect2()
 	if not wants_all:
-		var any := false
-		for host in hosts:
-			var r: Rect2 = host.hit_rect()
-			region = r if not any else region.merge(r)
-			any = true
-		if not any:
-			# No pets on screen. A degenerate box off the top-left corner is how
-			# you say "intercept nothing" — an empty polygon would say the
-			# opposite and swallow the player's entire desktop.
-			region = Rect2(_window_origin() - Vector2(4, 4), Vector2(1, 1))
-		region = region.grow(1.0).abs()
+		region = _interaction_rect(Vector2(DisplayServer.mouse_get_position()))
 
 	# Pushing an unchanged region is a wasted round trip to the window manager,
 	# and this runs ten times a second for as long as the app is open.
@@ -345,6 +335,49 @@ func _refresh_click_through() -> void:
 	var hi := region.end - _window_origin()
 	DisplayServer.window_set_mouse_passthrough(PackedVector2Array([
 		lo, Vector2(hi.x, lo.y), hi, Vector2(lo.x, hi.y)]))
+
+
+## The one rectangle the window should accept the mouse inside.
+##
+## `window_set_mouse_passthrough` takes a single polygon, so with more than one
+## pet there is a choice to make, and unioning them is the wrong one: two cats in
+## opposite corners union into a band across the whole desktop, and the overlay
+## then eats every click inside it — the exact failure this mechanism exists to
+## prevent.
+##
+## A click can only ever land where the cursor already is, so the rectangle worth
+## arming is the one belonging to the pet nearest the cursor. Distance is
+## measured to the hit rectangle rather than to its centre, so a large pet the
+## cursor is standing inside always beats a small one whose middle happens to be
+## nearer. With a single pet this is that pet, always, which is what it was
+## before this had to think about crowds.
+##
+## The 10 Hz refresh cannot make this stale in a way that matters: which pet is
+## nearest only changes around the midpoint between two of them, hundreds of
+## pixels from either body, so the right rectangle is armed long before the
+## cursor reaches the animal it belongs to.
+func _interaction_rect(cursor: Vector2) -> Rect2:
+	var best := Rect2()
+	var best_d := INF
+	for host in hosts:
+		var r: Rect2 = host.hit_rect().abs()
+		var d := _distance_to_rect(r, cursor)
+		if d < best_d:
+			best_d = d
+			best = r
+	if best_d == INF:
+		# No pets on screen. A degenerate box off the top-left corner is how you
+		# say "intercept nothing" — an empty polygon would say the opposite and
+		# swallow the player's entire desktop.
+		return Rect2(_window_origin() - Vector2(4, 4), Vector2(1, 1))
+	return best.grow(1.0)
+
+
+## Zero when the point is inside the rectangle, otherwise the distance to it.
+static func _distance_to_rect(r: Rect2, p: Vector2) -> float:
+	var dx := maxf(maxf(r.position.x - p.x, p.x - r.end.x), 0.0)
+	var dy := maxf(maxf(r.position.y - p.y, p.y - r.end.y), 0.0)
+	return sqrt(dx * dx + dy * dy)
 
 
 ## Does this display server implement a passthrough *region* rather than just an

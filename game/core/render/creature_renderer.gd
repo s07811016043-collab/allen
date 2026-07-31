@@ -293,11 +293,19 @@ func _pack_landmarks() -> void:
 		# above and behind the shoulder, the point of the hip above and in front
 		# of the femur head. Both are toward the body's centre, so nudging the
 		# landmark that way covers both without needing to know which is which.
-		at.y -= core_r * 0.42
+		#
+		# Height is measured from the body's own spine line rather than from the
+		# limb root, and that is the whole difference between a skeleton and a
+		# lump. A landmark parked at the limb root lands halfway up the barrel,
+		# where the surface already faces the viewer square-on — the relief there
+		# is a bulge in the middle of the flank, which is the shape of a hernia,
+		# not of a shoulder blade. Both of these bones ride high, just under the
+		# top line, where the surface is turning away and a small tilt of the
+		# normal reads as a hard edge catching the key.
+		at.y = core.y - core_r * 0.52
 		at.x += signf(core.x - at.x) * core_r * 0.28
-		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.80, 0.45)
+		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.58, 1.35)
 	_landmark_count = sum_x.size()
-	Log.info("LMDEBUG", "core_r=%f roots=%d clusters=%d" % [core_r, roots.size(), sum_x.size()])
 	for i in range(_landmark_count, MAX_LANDMARKS):
 		_packed_landmarks[i] = Vector4(1e6, 1e6, 1.0, 0.0)
 

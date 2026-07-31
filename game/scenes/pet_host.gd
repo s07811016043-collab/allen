@@ -102,6 +102,9 @@ var _can_stop := false
 var _can_gait := false
 var _can_react := false
 var _can_speed := false
+## Last ledge the audio layer was told about, so the surface is only pushed on a
+## real change rather than every frame.
+var _reported_ledge := -2
 
 
 # ---------------------------------------------------------------------------
@@ -157,6 +160,11 @@ func _build_creature() -> bool:
 	_can_speed = creature.get("speed") != null
 	if creature.has_signal("footfall"):
 		creature.connect("footfall", _on_footfall)
+	# The audio layer needs the same signal, and it wants to know what the paw
+	# landed on: an icon, the taskbar and a window edge are three materials, and
+	# hearing the difference is most of what makes the pet feel like it is *on*
+	# the desktop rather than floating in front of it.
+	AudioDirector.bind_creature(record.id, creature)
 	return true
 
 
@@ -326,6 +334,7 @@ func step(delta: float) -> void:
 	var before := position_of()
 	if navigator != null and navigator.has_method("step"):
 		navigator.call("step", delta * _pace_scale())
+		_report_surface()
 
 	# 5. Body. Speed and heading in, then the rig, then the authoritative
 	#    position back out over whatever the creature integrated for itself.
@@ -397,6 +406,17 @@ func _pace_scale() -> float:
 
 ## Feed the body what it needs to look like it is doing the move: heading, ground
 ## speed, gait family, and the one-shot reactions at the beats that need them.
+## Tell the audio layer which ledge the pet is standing on. Cheap, and only
+## when it changes — the navigator is the only thing that knows.
+func _report_surface() -> void:
+	var id: int = int(navigator.get("current_ledge"))
+	if id == _reported_ledge:
+		return
+	_reported_ledge = id
+	var ledge: Variant = DesktopBridge.ledge_by_id(id)
+	AudioDirector.set_surface(record.id, ledge.kind if ledge != null else &"")
+
+
 func _drive_body(velocity: Vector2) -> void:
 	var travelling := _travelling()
 	var traversal: Object = navigator.get("traversal") if navigator != null else null
@@ -446,7 +466,7 @@ func _on_phase_changed(phase: StringName, traversal: Object) -> void:
 			var impact: float = clampf(absf(_air_velocity.y) / maxf(_run_px(), 1.0), 0.15, 1.2)
 			_react(&"land", 0.6 + impact)
 			_vfx_call("landed", [record.id, creature.global_position, _air_velocity])
-			AudioDirector.foley(&"land", clampf(0.25 + impact, 0.0, 1.0))
+			_foley(&"land", clampf(0.25 + impact, 0.0, 1.0))
 		&"grab":
 			# Catching an edge is a whole-body effort; perking the ears reads as
 			# the animal committing to the haul rather than sliding up the wall.
@@ -459,7 +479,7 @@ func _on_footfall(_slot: int, force: float) -> void:
 	var speed_norm: float = clampf(_num(creature, "speed", 0.0) / _run_rig(), 0.0, 1.6)
 	_vfx_call("footfall", [record.id, creature.global_position, speed_norm,
 		_num(creature, "facing", 1.0)])
-	AudioDirector.foley(&"step", clampf(0.15 + 0.5 * force, 0.0, 1.0))
+	_foley(&"step", clampf(0.15 + 0.5 * force, 0.0, 1.0))
 
 
 # ---------------------------------------------------------------------------
@@ -501,6 +521,16 @@ func _publish_to_vfx() -> void:
 func _vfx_call(method: String, args: Array) -> void:
 	if _vfx != null and _vfx.has_method(method):
 		_vfx.callv(method, args)
+
+
+## Foley, probed the same way as everything else this file reaches for. The
+## audio layer is an autoload rather than a script loaded by path, but it is
+## being rewritten in parallel just like `core/`, and a footfall must never be
+## the thing that takes a frame down.
+func _foley(foley_id: StringName, intensity: float) -> void:
+	var audio := get_node_or_null(^"/root/AudioDirector")
+	if audio != null and audio.has_method("foley"):
+		audio.call("foley", foley_id, intensity)
 
 
 # ---------------------------------------------------------------------------

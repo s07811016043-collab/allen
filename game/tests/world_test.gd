@@ -111,6 +111,7 @@ func _ready() -> void:
 	_assert_run(host, run)
 	_assert_directed_journey(world, host)
 	_assert_pick_up_and_drop(world, host)
+	_assert_click_through_region(world, host)
 	_assert_save_round_trip(world, host)
 	_finish()
 
@@ -432,6 +433,59 @@ func _assert_pick_up_and_drop(world: PetaliaWorld, host: PetHost) -> void:
 
 	EventBus.pet_grabbed.disconnect(on_grab)
 	EventBus.pet_landed.disconnect(on_land)
+
+
+## The overlay's one non-negotiable promise: it hands the cursor back everywhere
+## the pet is not. The window manager takes a single passthrough polygon, so with
+## two pets the world has to pick one rectangle, and picking the union would
+## quietly turn the span between them into dead desktop.
+##
+## Asserted on the geometry rather than through `DisplayServer`, because the
+## headless driver has no passthrough to inspect and the choice — not the syscall
+## — is the part that can be wrong.
+func _assert_click_through_region(world: PetaliaWorld, host: PetHost) -> void:
+	# Same species as the starter: this is a test about window regions, and it
+	# should not fail because some other species' spec is mid-rewrite.
+	var second = GameState.adopt(host.record.species, "Bracken")
+	var other: PetHost = world.spawn(second)
+	if not _check(other != null, "a second pet can be adopted into a running world"):
+		GameState.pets.erase(second)
+		return
+
+	var area := _allowed_rect()
+	var mid := area.get_center().y
+	host.place_at(Vector2(area.position.x + 90.0, mid))
+	other.place_at(Vector2(area.end.x - 90.0, mid))
+	var here := host.position_of()
+	var there := other.position_of()
+	_check(here.distance_to(there) > 600.0, "the two pets are genuinely far apart",
+		"%.0f px" % here.distance_to(there))
+
+	var armed_here: Rect2 = world._interaction_rect(here)
+	var armed_there: Rect2 = world._interaction_rect(there)
+	_check(armed_here.has_point(here), "the cursor on one pet arms that pet")
+	_check(not armed_here.has_point(there),
+		"and leaves the far pet's ground click-through", str(armed_here))
+	_check(armed_there.has_point(there), "the cursor on the other arms the other")
+	_check(not armed_there.has_point(here), "and not the first", str(armed_there))
+
+	var union: Rect2 = host.hit_rect().abs().merge(other.hit_rect().abs())
+	_check(armed_here.get_area() < union.get_area() * 0.5,
+		"the armed region is one animal, not the span between them",
+		"%.0f px2 vs union %.0f px2" % [armed_here.get_area(), union.get_area()])
+
+	# A point far from both pets must fall through even though a rectangle is
+	# always armed somewhere — this is the click the player aimed at their work.
+	var empty := Vector2(area.get_center().x, area.position.y + 12.0)
+	_check(not world._interaction_rect(empty).has_point(empty),
+		"a click nowhere near a pet reaches the desktop", str(empty))
+
+	# Hand the world back the way the remaining assertions expect to find it.
+	world.hosts.erase(other)
+	other.detach_vfx()
+	other.get_parent().remove_child(other)
+	other.free()
+	GameState.pets.erase(second)
 
 
 ## The one thing that must survive a crash: the pet. Exercised through the

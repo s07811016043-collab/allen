@@ -194,11 +194,11 @@ class SVF:
 	var _k: float = 1.0
 
 	func set_params(cutoff_hz: float, q: float, sr: float) -> void:
-		var g: float = tan(PI * clampf(cutoff_hz, 12.0, sr * 0.47) / sr)
+		var c: Vector3 = AudioDSP.tpt_coeffs(cutoff_hz, q, sr)
 		_k = 1.0 / maxf(q, 0.05)
-		_a1 = 1.0 / (1.0 + g * (g + _k))
-		_a2 = g * _a1
-		_a3 = g * _a2
+		_a1 = c.x
+		_a2 = c.y
+		_a3 = c.z
 
 	func reset() -> void:
 		_ic1 = 0.0
@@ -419,11 +419,10 @@ class EarlyReflections:
 	const TAPS_R := [0.0091, 0.0134, 0.0193, 0.0251, 0.0344, 0.0467]
 	const GAINS := [0.50, -0.42, 0.33, -0.25, 0.19, -0.13]
 
-	var wet_l: float = 0.0
-	var wet_r: float = 0.0
-	## Tap gains as floats rather than the `GAINS` constant: a `const Array` is
-	## an array of Variants, and unboxing six of them per sample costs more than
-	## the six delay reads they multiply.
+	## Tap offsets and gains, unpacked from the `const Array`s above at
+	## configuration time. A `const Array` is an array of Variants, and unboxing
+	## twelve of them per sample costs more than the twelve delay reads they
+	## exist to address.
 	var _gains := PackedFloat32Array()
 	var _buf := PackedFloat32Array()
 	var _size: int = 0
@@ -454,52 +453,107 @@ class EarlyReflections:
 		_damp_l = 0.0
 		_damp_r = 0.0
 
-	func process(x: float) -> void:
-		if _size == 0:
-			wet_l = 0.0
-			wet_r = 0.0
+	## Add the room onto a block of dry mix, in place.
+	##
+	## A block method rather than a per-sample one, and unrolled rather than
+	## looped, because this is the most-run code in the engine: every sample of
+	## every sound the game makes passes through it. Hoisting the taps, the gains
+	## and the damping state into locals for the duration of the block is worth
+	## roughly half the cost on its own — there are twenty state lookups per
+	## sample here, and in GDScript a lookup through `self` is not free.
+	##
+	## `_buf` is the one thing that stays a member. Packed arrays are
+	## copy-on-write, so aliasing it into a local and writing through the alias
+	## would silently fork the delay line and drop the room every block.
+	func mix_block(left: PackedFloat32Array, right: PackedFloat32Array, count: int,
+			send: float) -> void:
+		if _size == 0 or send <= 0.0:
 			return
-		_buf[_write] = x
-		var l: float = 0.0
-		var r: float = 0.0
-		for i in _idx_l.size():
-			var g: float = _gains[i]
-			var a: int = _write - _idx_l[i]
-			if a < 0:
-				a += _size
-			var b: int = _write - _idx_r[i]
-			if b < 0:
-				b += _size
-			l += _buf[a] * g
-			r += _buf[b] * g
-		_damp_l += (l - _damp_l) * (1.0 - damping)
-		_damp_r += (r - _damp_r) * (1.0 - damping)
-		wet_l = _damp_l
-		wet_r = _damp_r
-		_write += 1
-		if _write >= _size:
-			_write = 0
+		var n: int = _size
+		var w: int = _write
+		var la: int = _idx_l[0]
+		var lb: int = _idx_l[1]
+		var lc: int = _idx_l[2]
+		var ld: int = _idx_l[3]
+		var le: int = _idx_l[4]
+		var lf: int = _idx_l[5]
+		var ra: int = _idx_r[0]
+		var rb: int = _idx_r[1]
+		var rc: int = _idx_r[2]
+		var rd: int = _idx_r[3]
+		var re: int = _idx_r[4]
+		var rf: int = _idx_r[5]
+		var ga: float = _gains[0]
+		var gb: float = _gains[1]
+		var gc: float = _gains[2]
+		var gd: float = _gains[3]
+		var ge: float = _gains[4]
+		var gf: float = _gains[5]
+		var dl: float = _damp_l
+		var dr: float = _damp_r
+		var keep: float = 1.0 - damping
+		for i in count:
+			_buf[w] = (left[i] + right[i]) * 0.5
+			var t: int = w - la
+			if t < 0:
+				t += n
+			var l: float = _buf[t] * ga
+			t = w - lb
+			if t < 0:
+				t += n
+			l += _buf[t] * gb
+			t = w - lc
+			if t < 0:
+				t += n
+			l += _buf[t] * gc
+			t = w - ld
+			if t < 0:
+				t += n
+			l += _buf[t] * gd
+			t = w - le
+			if t < 0:
+				t += n
+			l += _buf[t] * ge
+			t = w - lf
+			if t < 0:
+				t += n
+			l += _buf[t] * gf
 
+			t = w - ra
+			if t < 0:
+				t += n
+			var r: float = _buf[t] * ga
+			t = w - rb
+			if t < 0:
+				t += n
+			r += _buf[t] * gb
+			t = w - rc
+			if t < 0:
+				t += n
+			r += _buf[t] * gc
+			t = w - rd
+			if t < 0:
+				t += n
+			r += _buf[t] * gd
+			t = w - re
+			if t < 0:
+				t += n
+			r += _buf[t] * ge
+			t = w - rf
+			if t < 0:
+				t += n
+			r += _buf[t] * gf
 
-## First-order DC blocker.
-##
-## Every source here can leave a bias — an asymmetric pulse train, a one-sided
-## noise burst, a formant bank asked for a 90 Hz F1. DC costs headroom, makes the
-## limiter behave strangely, and on some hardware makes a speaker cone sit off
-## centre. One pole on the master removes it for two multiplies.
-class DCBlock:
-	var _x1: float = 0.0
-	var _y1: float = 0.0
-
-	func reset() -> void:
-		_x1 = 0.0
-		_y1 = 0.0
-
-	func process(x: float) -> float:
-		var y: float = x - _x1 + 0.9975 * _y1
-		_x1 = x
-		_y1 = y
-		return y
+			dl += (l - dl) * keep
+			dr += (r - dr) * keep
+			left[i] += dl * send
+			right[i] += dr * send
+			w += 1
+			if w >= n:
+				w = 0
+		_write = w
+		_damp_l = dl
+		_damp_r = dr
 
 
 ## Rational tanh approximation, accurate to ~0.3 % over [-3, 3] and roughly six
@@ -512,6 +566,21 @@ static func soft_clip(x: float) -> float:
 		return 1.0
 	var x2: float = x * x
 	return x * (27.0 + x2) / (27.0 + 9.0 * x2)
+
+
+## The three TPT coefficients for a cutoff and a Q, as a `Vector3`.
+##
+## `SVF` computes these for itself; this hands them out instead, for the hot
+## loops that keep their filter state in local variables and so cannot use the
+## class. Everything in this file is a method call, and a method call per sample
+## is the one cost the engine cannot absorb — see `AmbienceBed.render_add` and
+## `VoiceModel.render_add`, which are the two places that pay it.
+static func tpt_coeffs(cutoff_hz: float, q: float, sr: float) -> Vector3:
+	var g: float = tan(PI * clampf(cutoff_hz, 12.0, sr * 0.47) / sr)
+	var k: float = 1.0 / maxf(q, 0.05)
+	var a1: float = 1.0 / (1.0 + g * (g + k))
+	var a2: float = g * a1
+	return Vector3(a1, a2, g * a2)
 
 
 static func db_to_linear(db: float) -> float:

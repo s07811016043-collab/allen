@@ -35,9 +35,15 @@ extends Node2D
 ##                       events worth inspecting are not all stride-length: a
 ##                       blink is 180 ms and is invisible on a sheet that steps
 ##                       half a second at a time.
+##   --probe=<0|1>       also print the numbers behind the picture. A sheet shows
+##                       *that* a foot slides or a paw hovers; at review zoom two
+##                       pixels and twenty look the same, and a fix has to move a
+##                       number rather than a vibe.
 ##
 ## Motion is advanced at a fixed step from a settled rig, never from wall time,
 ## so two runs of the same command are pixel-identical.
+
+const RigBones := preload("res://core/rig/bone_map.gd")
 
 ## Rig step used to advance to `--t`. Matches `CreatureRig.STEP`, so each call
 ## consumes exactly one simulation step and nothing is ever interpolated.
@@ -74,6 +80,7 @@ var anim := &""
 var start_t := -1.0
 var strip := 0
 var window := -1.0
+var probe := false
 
 var _frames := 0
 var _done := false
@@ -109,6 +116,7 @@ func _parse_args() -> void:
 			"t": start_t = float(kv[1])
 			"strip": strip = int(kv[1])
 			"window": window = float(kv[1])
+			"probe": probe = kv[1] != "0"
 
 
 func _build_backdrop() -> void:
@@ -178,6 +186,8 @@ func _build_creature() -> void:
 		c.set_process(false)
 		c.setup_preview(_spec, growth, 0x5EED)
 		_drive(c, times[i])
+		if probe:
+			_probe_cell(i, c, times[i])
 		_cells.append(c)
 
 	var vp := get_viewport_rect().size
@@ -361,7 +371,13 @@ func _frame_times() -> PackedFloat32Array:
 		out.append(maxf(start_t, 0.0) if start_t >= 0.0 else (0.0 if anim == &"" else 1.0))
 		return out
 	var cycle := _cycle_seconds()
-	var begin: float = start_t if start_t >= 0.0 else cycle * WARMUP_CYCLES
+	var begin: float = start_t
+	if begin < 0.0:
+		# Warming up only means anything for motion that repeats. A reaction is a
+		# one-shot, and two "cycles" of settling put the sheet two and a half
+		# seconds past the startle it exists to show — six identical frames of a
+		# cat standing still, which is exactly what it produced.
+		begin = 0.0 if anim == &"startle" else cycle * WARMUP_CYCLES
 	for i in count:
 		out.append(begin + cycle * float(i) / float(count))
 	return out
@@ -406,6 +422,56 @@ func _drive(c: Creature, t: float) -> void:
 	var steps: int = clampi(int(round(maxf(t, 0.0) / TICK)), 0, 6000)
 	for _i in steps:
 		c.tick(TICK)
+
+
+## Print one cell's measurements, in rig units so readings are comparable across
+## species and growth stages.
+##
+## Three numbers carry most of the weight. `floor` is the bottom of the
+## silhouette: 0 means the animal is standing on the ground plane, negative means
+## it hovers. `sink` is the same question asked of one paw's contact patch. `slip`
+## is the distance that patch has drifted, in *ground* space, from the spot the
+## gait pinned it to — the definition of a skate, and the one thing a reviewer
+## cannot measure by eye.
+func _probe_cell(index: int, c: Creature, t: float) -> void:
+	var floor_y := -INF
+	for p in c.renderer.live_parts:
+		floor_y = maxf(floor_y, maxf(p.a.y + p.radius_a, p.b.y + p.radius_b))
+	var sk: RigSkeleton = c.rig.skeleton
+	var g: Gait = c.rig.gait
+	var tail: Vector2 = sk.bone_position(RigBones.chain_tip("tail", RigBones.SIDE_NONE))
+	var idle: IdleRig = c.rig.idle
+	# Head *and* chest, because "does the head ride the bob" is a question about the
+	# gap between them. The head alone cannot answer it: breathing lifts the whole
+	# front of the animal, and a head faithfully riding a breath looks identical in
+	# one number to a head welded to the stride.
+	var line := ("PROBE %d t=%.3f cyc=%.3f bob=%+.4f floor=%+.4f head=%+.4f chest=%+.4f"
+		+ " tail=%+.3f,%+.3f"
+		+ " breath=%+.3f blink=%.2f gaze=%+.2f,%+.2f ear=%+.3f shift=%+.4f,%+.4f") \
+		% [index, t, g.cycle, g.bob, floor_y,
+			sk.bone_position(RigBones.HEAD).y, sk.bone_position(RigBones.CHEST).y,
+			tail.x, tail.y,
+			idle.breath_swell(), idle.blink, idle.gaze.x, idle.gaze.y, idle.ear_near,
+			idle.weight_shift.x, idle.weight_shift.y]
+	for s in mini(g.feet.size(), c.rig.legs.size()):
+		var f: Gait.Foot = g.feet[s]
+		var ch: LegIK.Chain = c.rig.legs[s]
+		if not f.present or not ch.valid:
+			continue
+		# The contact patch is rigidly attached to the toe bone, so ask that bone
+		# where it ended up rather than re-deriving it from the target the gait
+		# asked for. The gap between the two is precisely what a slide is.
+		var ti := sk.index_of(RigBones.limb_bone(ch.fore, ch.far, false, -1))
+		var contact := Vector2.INF
+		if ti >= 0:
+			var tb: RigSkeleton.Bone = sk.bones[ti]
+			contact = tb.xform * (tb.rest_inv * Vector2(ch.contact_bind.x, 0.0))
+		var ik: float = sk.bones[ch.ankle_bone].xform.origin.distance_to(f.target)
+		line += "  %s%s ik=%.4f sink=%+.4f" % [
+			["FN", "FF", "HN", "HF"][s], "*" if f.stance else ".", ik, contact.y]
+		if f.stance:
+			line += " slip=%+.4f" % (contact.x + g.travel - f.plant_ground)
+	print(line)
 
 
 ## Soft elliptical contact shadow with a penumbra that tightens near the paws.

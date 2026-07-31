@@ -30,7 +30,7 @@ const RigBones := preload("res://core/rig/bone_map.gd")
 const STEP := 1.0 / 120.0
 const MAX_STEPS := 16
 ## Fore-aft head lag per unit of the body's vertical speed, in rig units.
-const HEAD_LEAD := 0.06
+const HEAD_LEAD := 0.025
 
 var skeleton: RigSkeleton
 var gait := Gait.new()
@@ -64,6 +64,11 @@ var _root := -1
 var _head_level := 0.0
 var _head_aim := 0.0
 var _prev_bob := 0.0
+var _bob_vel := 0.0
+## Mood tail carry, kept here rather than written straight into the chain: the
+## idle layer wants to add its own wander to the same rest angle, and whichever
+## of the two wrote last would otherwise erase the other.
+var _tail_carry := 0.0
 
 
 func setup(spec: CreatureSpec, bind_parts: Array[SDFPart], bind_eyes: Array,
@@ -208,6 +213,7 @@ func _step(dt: float) -> void:
 	for c in chains:
 		c.advance(skeleton, dt)
 	_pose_ears()
+	_pose_tail()
 	skeleton.update_pose()
 
 
@@ -262,11 +268,29 @@ func _pose_head(dt: float) -> void:
 	# A *velocity*, not the per-step difference it used to be: a lead written as
 	# a raw delta silently scales with the step size, and at 120 Hz it came to a
 	# third of a pixel — a term that looked deliberate and did nothing.
-	var bob_vel: float = clampf((gait.bob - _prev_bob) / maxf(dt, 1e-5), -2.0, 2.0)
+	# Filtered, not the raw per-step difference. Bob steps at every footfall, so its
+	# one-frame derivative spikes to several times the velocity of the motion it is
+	# meant to describe — and because the neck is tilted, a fore-aft head offset
+	# carries a third of itself into vertical. Unfiltered, the "lead" was throwing
+	# the skull up and down harder than the bob it exists to ride out, which is how
+	# a stabilised head ended up travelling further than the chest under it.
+	_bob_vel = lerpf(_bob_vel,
+		clampf((gait.bob - _prev_bob) / maxf(dt, 1e-5), -3.0, 3.0),
+		clampf(dt * 18.0, 0.0, 1.0))
 	_prev_bob = gait.bob
-	# Track the body's vertical motion with a lag, then cancel most of it.
-	_head_level = lerpf(_head_level, gait.bob, clampf(dt * 11.0, 0.0, 1.0))
-	var cancel: float = -(_head_level * 0.62)
+	# Split the body's vertical motion into the part the head should follow and the
+	# part it should reject. `_head_level` is a slow follower, so it tracks postural
+	# changes — an animal crouches as it settles into a walk and the head has to go
+	# down with it — while sliding straight past the stride ripple. What is left is
+	# the ripple, and that is what gets cancelled.
+	#
+	# Cancelling the *lagged* signal instead, which is what this did, subtracts
+	# something already sixty degrees out of phase at walking cadence: over part of
+	# every stride it added to the head's motion rather than removing it, and the
+	# skull ended up travelling twice as far as the shoulders it was meant to be
+	# steadying.
+	_head_level = lerpf(_head_level, gait.bob, clampf(dt * 2.2, 0.0, 1.0))
+	var cancel: float = -(gait.bob - _head_level) * 0.85
 
 	var aim := 0.0
 	if look_target != Vector2.INF and _head >= 0:
@@ -292,7 +316,7 @@ func _pose_head(dt: float) -> void:
 		# settles back as they rise. Small — a couple of pixels at walking pace —
 		# but it is the difference between a head that is carried and one bolted
 		# to the spine.
-		h.offset += Vector2(-bob_vel * HEAD_LEAD, cancel)
+		h.offset += Vector2(-_bob_vel * HEAD_LEAD, cancel)
 		# A braced animal carries its head higher and further forward.
 		h.offset += Vector2(0.012, -0.020) * tension
 
@@ -324,6 +348,17 @@ func _pose_ears() -> void:
 
 
 # ---------------------------------------------------------------------------
+# Tail
+# ---------------------------------------------------------------------------
+
+## Mood carry plus the idle layer's wander, written together every step. The
+## spring still does the settling — this only moves the angle it settles toward.
+func _pose_tail() -> void:
+	if _tail_chain >= 0:
+		chains[_tail_chain].set_bias(_tail_carry * -0.30 + idle.tail_sway, 0.86)
+
+
+# ---------------------------------------------------------------------------
 # Output
 # ---------------------------------------------------------------------------
 
@@ -337,8 +372,7 @@ func write(bind_parts: Array[SDFPart], live_parts: Array[SDFPart],
 
 ## Tail carry: raised when happy, tucked when frightened, in [-1, 1].
 func set_tail_carry(amount: float) -> void:
-	if _tail_chain >= 0:
-		chains[_tail_chain].set_bias(clampf(amount, -1.0, 1.0) * -0.30, 0.86)
+	_tail_carry = clampf(amount, -1.0, 1.0)
 
 
 func hear(direction: Vector2, strength: float = 1.0) -> void:

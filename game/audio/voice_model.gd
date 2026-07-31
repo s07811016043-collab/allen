@@ -109,16 +109,43 @@ var syllables: Array[Syl] = []
 ## Tail after the last syllable's release, so the room has something to ring on.
 var tail: float = 0.12
 
-var _osc := AudioDSP.Osc.new()
-var _sub := AudioDSP.Osc.new()
-var _noise := AudioDSP.NoiseGen.new()
+## The vocal tract stays an object: it is already unrolled internally, it is the
+## one part of the voice with a name a reader would recognise, and it is set up
+## once per block like everything else here.
 var _tract := AudioDSP.FormantBank.new()
-var _filter := AudioDSP.SVF.new()
 var _env := AudioDSP.ADSR.new()
 var _vib := AudioDSP.LFO.new()
 var _trem := AudioDSP.LFO.new()
 var _cyc := AudioDSP.LFO.new()
 var _drift := AudioDSP.LFO.new()
+
+## The glottal pulse, its sub-oscillator, the breath generator and the output
+## filter, held as bare state rather than as `AudioDSP` objects.
+##
+## Those four run once per sample per voice, four voices deep, on the main
+## thread, in GDScript — and a method call there measured as costing about as
+## much as the arithmetic inside it. So the render loop inlines all four and
+## keeps their state in locals for the length of a block. The arithmetic is
+## `Osc.pulse`, `Osc.saw`, `NoiseGen.tilted` and `SVF.process` verbatim; if you
+## change one, change both. The tract is the exception above, and the envelopes
+## and LFOs are updated per block, so they stay objects too.
+var _osc_phase: float = 0.0
+var _osc_inc: float = 0.0
+var _osc_width: float = 0.28
+var _sub_phase: float = 0.5
+var _sub_inc: float = 0.0
+var _nz_state: int = 0x9E3779B9
+var _nz_b0: float = 0.0
+var _nz_b1: float = 0.0
+var _nz_b2: float = 0.0
+var _nz_p: float = 0.0
+var _nz_hp: float = 0.0
+var _flt_s1: float = 0.0
+var _flt_s2: float = 0.0
+var _flt_a1: float = 0.0
+var _flt_a2: float = 0.0
+var _flt_a3: float = 0.0
+var _flt_k: float = 1.0
 
 var _t: float = 0.0
 var _end: float = 0.6
@@ -148,14 +175,21 @@ func setup(sample_rate: float) -> void:
 	if fidelity < 0.75:
 		sub_amount = 0.0
 	_tract.reset()
-	_filter.reset()
+	_flt_s1 = 0.0
+	_flt_s2 = 0.0
 	# Every oscillator starts at a different point in its cycle, otherwise two
 	# calls that overlap phase-cancel each other's fundamental.
 	var s: int = int(f0 * 977.0) ^ int(_end * 7919.0)
-	_noise.seed_with(s * 2654435761)
-	_osc.reset(fposmod(float(s) * 0.618034, 1.0))
-	_sub.reset(0.5)
-	_osc.width = pulse_width
+	# Zero is a fixed point of xorshift; force a live state, as `NoiseGen` does.
+	_nz_state = ((s * 2654435761) & 0xFFFFFFFF) | 1
+	_nz_b0 = 0.0
+	_nz_b1 = 0.0
+	_nz_b2 = 0.0
+	_nz_p = 0.0
+	_nz_hp = 0.0
+	_osc_phase = fposmod(float(s) * 0.618034, 1.0)
+	_sub_phase = 0.5
+	_osc_width = pulse_width
 	_vib.shape = AudioDSP.LFO.Shape.SINE
 	_vib.hz = vibrato_hz
 	_vib.reset(0.0, s | 1)
@@ -189,31 +223,124 @@ func render_add(left: PackedFloat32Array, right: PackedFloat32Array, count: int)
 		var n: int = mini(AudioDSP.BLOCK, count - i)
 		_update_block(float(n) / _sr)
 		var step: float = (_amp_target - _amp) / float(n)
-		var vsub: float = sub_amount
+		var vsub: float = sub_amount * _voiced_amp
 		var vmix: float = _voiced_amp
 		var bmix: float = _breath
 		var tilt: float = breath_tilt
 		var tmix: float = tract_mix
 		var hmix: float = hp_mix
+		# State into locals for the length of the block; back out at the end.
+		var ph: float = _osc_phase
+		var inc: float = _osc_inc
+		var pw: float = _osc_width
+		var sph: float = _sub_phase
+		var sinc: float = _sub_inc
+		var ns: int = _nz_state
+		var nb0: float = _nz_b0
+		var nb1: float = _nz_b1
+		var nb2: float = _nz_b2
+		var np: float = _nz_p
+		var nhp: float = _nz_hp
+		var fs1: float = _flt_s1
+		var fs2: float = _flt_s2
+		var fa1: float = _flt_a1
+		var fa2: float = _flt_a2
+		var fa3: float = _flt_a3
+		var fk: float = _flt_k
+		var amp: float = _amp
+		var gl: float = _gl
+		var gr: float = _gr
 		for k in n:
 			var src: float = 0.0
 			if vmix > 0.0:
-				src = _osc.pulse() * vmix
+				# The glottal pulse, band-limited on both edges, with the duty
+				# cycle's DC removed. `AudioDSP.Osc.pulse`, inlined.
+				var pv: float = 1.0 if ph < pw else -1.0
+				if ph < inc:
+					var a: float = ph / inc
+					pv += a + a - a * a - 1.0
+				elif ph > 1.0 - inc:
+					var a2: float = (ph - 1.0) / inc
+					pv += a2 * a2 + a2 + a2 + 1.0
+				var e: float = ph - pw
+				if e < 0.0:
+					e += 1.0
+				if e < inc:
+					var b: float = e / inc
+					pv -= b + b - b * b - 1.0
+				elif e > 1.0 - inc:
+					var b2: float = (e - 1.0) / inc
+					pv -= b2 * b2 + b2 + b2 + 1.0
+				ph += inc
+				if ph >= 1.0:
+					ph -= 1.0
+				src = (pv - (2.0 * pw - 1.0)) * vmix
 				if vsub > 0.0:
-					src += _sub.saw() * vsub * vmix
+					# Half-rate saw: the period doubling that is a growl.
+					var sv: float = 2.0 * sph - 1.0
+					if sph < sinc:
+						var c: float = sph / sinc
+						sv -= c + c - c * c - 1.0
+					elif sph > 1.0 - sinc:
+						var c2: float = (sph - 1.0) / sinc
+						sv -= c2 * c2 + c2 + c2 + 1.0
+					sph += sinc
+					if sph >= 1.0:
+						sph -= 1.0
+					src += sv * vsub
 			if bmix > 0.0:
 				# One generator, two colours: pink for anything that came out of
 				# a chest, white for turbulence at the teeth.
-				src += _noise.tilted(tilt) * bmix
-			var shaped: float = _tract.process(src)
-			var v: float = lerpf(src, shaped, tmix)
-			_filter.process(v)
-			v = _filter.lp if hmix <= 0.0 else lerpf(_filter.lp, _filter.hp, hmix)
-			v = AudioDSP.soft_clip(v * _amp)
+				ns ^= (ns << 13) & 0xFFFFFFFF
+				ns ^= ns >> 17
+				ns ^= (ns << 5) & 0xFFFFFFFF
+				ns &= 0xFFFFFFFF
+				var wn: float = float(ns) * (2.0 / 4294967295.0) - 1.0
+				nb0 = 0.99765 * nb0 + wn * 0.0990460
+				nb1 = 0.96300 * nb1 + wn * 0.2965164
+				nb2 = 0.57000 * nb2 + wn * 1.0526913
+				var pk: float = (nb0 + nb1 + nb2 + wn * 0.1848) * 0.32
+				nhp = pk - np + 0.99 * nhp
+				np = pk
+				src += (nhp + (wn - nhp) * tilt) * bmix
+			var v: float = src + (_tract.process(src) - src) * tmix
+			# The output filter, `AudioDSP.SVF.process` inlined. Both responses
+			# come out of the same two state words, which is why a thin airy call
+			# can blend toward the highpass without a second filter.
+			var d: float = v - fs2
+			var v1: float = fa1 * fs1 + fa2 * d
+			var v2: float = fs2 + fa2 * fs1 + fa3 * d
+			fs1 = 2.0 * v1 - fs1
+			fs2 = 2.0 * v2 - fs2
+			if hmix > 0.0:
+				var hp: float = v - fk * v1 - v2
+				v = (v2 + (hp - v2) * hmix) * amp
+			else:
+				v = v2 * amp
+			# `AudioDSP.soft_clip`, inlined. In range is the case that happens.
+			if v >= -3.0 and v <= 3.0:
+				var q: float = v * v
+				v = v * (27.0 + q) / (27.0 + 9.0 * q)
+			elif v > 3.0:
+				v = 1.0
+			elif v < -3.0:
+				v = -1.0
+			else:
+				v = 0.0
 			var idx: int = i + k
-			left[idx] += v * _gl
-			right[idx] += v * _gr
-			_amp += step
+			left[idx] += v * gl
+			right[idx] += v * gr
+			amp += step
+		_osc_phase = ph
+		_sub_phase = sph
+		_nz_state = ns
+		_nz_b0 = nb0
+		_nz_b1 = nb1
+		_nz_b2 = nb2
+		_nz_p = np
+		_nz_hp = nhp
+		_flt_s1 = fs1
+		_flt_s2 = fs2
 		_amp = _amp_target
 		i += n
 	elapsed += float(count) / _sr
@@ -259,10 +386,11 @@ func _update_block(dt: float) -> void:
 	var vib: float = _vib.process(dt)
 	var jit: float = _drift.process(dt)
 	_pitch = f0 * mult * (1.0 + vib * vibrato_depth + jit * jitter)
-	_osc.set_hz(_pitch, _sr)
-	_osc.width = clampf(pulse_width + jit * 0.05, 0.05, 0.9)
+	# `Osc.set_hz`: cycles per sample, held below Nyquist.
+	_osc_inc = clampf(_pitch / _sr, 0.0, 0.45)
+	_osc_width = clampf(pulse_width + jit * 0.05, 0.05, 0.9)
 	if sub_amount > 0.0:
-		_sub.set_hz(_pitch * 0.5, _sr)
+		_sub_inc = clampf(_pitch * 0.5 / _sr, 0.0, 0.45)
 
 	# --- Tract ---
 	var oab: float = lerpf(cur.open_a, cur.open_b, u)
@@ -276,7 +404,11 @@ func _update_block(dt: float) -> void:
 		formant_q, _sr)
 
 	var env: float = _env.process(dt)
-	_filter.set_params(lp_hz * lerpf(1.0, lp_open, env), lp_q, _sr)
+	var c: Vector3 = AudioDSP.tpt_coeffs(lp_hz * lerpf(1.0, lp_open, env), lp_q, _sr)
+	_flt_a1 = c.x
+	_flt_a2 = c.y
+	_flt_a3 = c.z
+	_flt_k = 1.0 / maxf(lp_q, 0.05)
 
 	# --- Level ---
 	var amp: float = env * cur.amp

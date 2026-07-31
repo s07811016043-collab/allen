@@ -65,8 +65,12 @@ class Foot:
 	## Rig-space IK target for the ankle.
 	var target := Vector2.ZERO
 	var pitch := 0.0
-	## Height the hip above this foot is geometrically allowed to sit at.
+	## Height above the ground this leg permits its own limb root to ride at.
 	var support := 0.0
+	## The same height in the bind pose. Pitch and roll are differentials against
+	## it, because a cat's hind legs are simply longer than its forelegs and the
+	## raw difference would tilt the animal permanently nose-down.
+	var support_ref := 0.0
 	## Where in *ground* space the **contact patch** is pinned. Ground space is rig
 	## space plus distance travelled, so a pinned foot is exactly stationary.
 	var plant_ground := 0.0
@@ -118,8 +122,16 @@ var _bob_gain := 1.0
 var _body_len := 0.5
 ## Mean support height over the reference cycle; bob oscillates around it.
 var _support_ref := 0.5
-## Mean leg reach, i.e. the highest the body could ever ride. Stands in for the
-## support mean during a suspension, when no foot is carrying anything.
+## The highest that mean ever gets over the reference cycle. Stands in for it
+## during a suspension, when no foot is carrying anything: the trunk is ballistic
+## and the honest statement is "as high as this animal's legs ever put it", scaled
+## by the pattern's `lift`. Leg reach used to stand in here, which is a length
+## rather than a height above the floor — the two agreed closely enough by
+## accident to look right, until the support height started counting the ankle,
+## and then a galloping cat buried a quarter of a unit of itself in the floor
+## every suspension.
+var _support_hi := 0.5
+## Mean leg reach. Sets the flexion reserve the body bobs into.
 var _reach_ref := 0.5
 ## Constant downward offset that buys the legs their flexion reserve.
 var _crouch := 0.0
@@ -143,6 +155,9 @@ func setup(spec: CreatureSpec, chains: Array) -> void:
 			f.root_bind = c.root_bind
 			f.reach = maxf(c.reach, 1e-3)
 		f.target = f.bind
+		var bind_dx: float = f.bind.x - f.root_bind.x
+		f.support_ref = -f.bind.y \
+			+ sqrt(maxf(f.reach * f.reach - bind_dx * bind_dx, 0.0))
 		feet.append(f)
 
 	# A biped has only the hind pair; a quadruped that authored no forelimbs is
@@ -204,16 +219,21 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 			var ph: float = fposmod(c + float(pat["phase"][i]), 1.0)
 			var stance: bool = ph < d
 			# Must mirror `_solve_body` exactly, or the gain ends up calibrated
-			# against a curve the runtime never produces: stance feet only, and
-			# the gathered height whenever the reference cycle has none down.
+			# against a curve the runtime never produces: stance feet only, the
+			# same rolled ankle, and the gathered height whenever the reference
+			# cycle has none down.
 			if not stance:
 				continue
 			w_sum += 1.0
-			# Stance sweeps the contact back linearly under the body.
-			var dx: float = f.contact_bind.x + sweep * (0.5 - ph / d) - f.root_bind.x
-			var support: float = sqrt(maxf(f.reach * f.reach - dx * dx, 0.0))
+			# Stance sweeps the contact back linearly under the body; the ankle is
+			# then read off it through the roll, exactly as `_ankle_for` does.
+			var st: float = ph / d
+			var contact := Vector2(f.contact_bind.x + sweep * (0.5 - st), 0.0)
+			var ankle: Vector2 = contact - f.contact_arm.rotated(_stance_pitch(st))
+			var dx: float = ankle.x - f.root_bind.x
+			var support: float = -ankle.y + sqrt(maxf(f.reach * f.reach - dx * dx, 0.0))
 			h_sum += support
-			ceil_max = maxf(ceil_max, (f.bind.y - f.root_bind.y) - support)
+			ceil_max = maxf(ceil_max, -f.root_bind.y - support)
 		var mean: float = (h_sum / w_sum) if w_sum > 0.0 else _reach_ref
 		lo = minf(lo, mean)
 		hi = maxf(hi, mean)
@@ -221,6 +241,7 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 	if not is_finite(span) or span < 1e-5:
 		return 1.0
 	_support_ref = (lo + hi) * 0.5
+	_support_hi = hi
 	# A foot planted ahead of the hip needs more leg than one straight under it.
 	# If the body does not lower to pay for that, the reach constraint in
 	# `_solve_body` shears the top off every bob and the authored amplitude never
@@ -245,7 +266,7 @@ func settle() -> void:
 		f.stance = true
 		f.target = f.bind
 		f.pitch = 0.0
-		f.support = absf(f.root_bind.y - f.bind.y)
+		f.support = -f.root_bind.y
 		f.plant_ground = f.contact_bind.x
 		f.lift_ground = f.contact_bind.x
 		f.just_landed = false
@@ -328,10 +349,7 @@ func advance(dt: float) -> void:
 				f.plant_ground = travel + f.contact_bind.x + sweep * 0.5
 				f.just_landed = true
 				f.landing_force = clampf(0.35 + exertion, 0.0, 1.6)
-			# Roll from heel to toe across stance: flat early, up onto the toe as
-			# the leg trails behind. This is what stops the paw looking welded on.
-			var st: float = f.phase / maxf(duty, 1e-3)
-			f.pitch = -0.10 * smoothstep(0.0, 0.22, st) + 0.42 * smoothstep(0.62, 1.0, st)
+			f.pitch = _stance_pitch(f.phase / maxf(duty, 1e-3))
 			f.target = _ankle_for(f, Vector2(f.plant_ground - travel, 0.0))
 			f.lift_ground = f.plant_ground
 		else:
@@ -367,6 +385,16 @@ func _idle_step(dt: float) -> void:
 	_solve_body(dt)
 
 
+## Foot roll through stance, `st` running 0 → 1 from touchdown to lift-off: flat
+## early, up onto the toe as the leg trails behind. This is what stops the paw
+## looking welded on — and it is a named function rather than three inline lines
+## because `_calibrate_bob` has to reproduce the same pose, and a roll that the
+## calibration cannot see is a roll the bob gain is wrong about.
+static func _stance_pitch(st: float) -> float:
+	var a: float = clampf(st, 0.0, 1.0)
+	return -0.10 * smoothstep(0.0, 0.22, a) + 0.42 * smoothstep(0.62, 1.0, a)
+
+
 ## Swing timing. Recovery is quick, placement is slow — the classic asymmetric
 ## step. A symmetric curve here is the single most common cause of "floaty".
 static func _swing_ease(u: float) -> float:
@@ -394,20 +422,30 @@ func _ankle_for(f: Foot, contact: Vector2) -> Vector2:
 	return contact - f.contact_arm.rotated(f.pitch)
 
 
-## How high this leg permits the body to ride, measured from the ground.
+## How high this leg permits the limb root to ride **above the ground**.
 ##
-## For a foot on the ground that is the inverted pendulum: the hip can be at most
-## sqrt(reach² − dx²) above a contact dx away. A foot in the *air* constrains
+## For a foot on the ground that is the inverted pendulum: the ankle can be at
+## most sqrt(reach² − dx²) below the hip, so the hip clears the floor by that
+## much plus however high the ankle itself is. A foot in the *air* constrains
 ## nothing at all — it can be folded and set down anywhere — so the height it
 ## permits is its whole reach. Running the swing foot through the stance formula
 ## instead is what made the body sink through a gallop's suspension: mid-swing
 ## the target is projected almost a full stride ahead of the hip, which the
 ## pendulum reads as a leg with no height left in it.
+##
+## The ankle term is not a detail. The foot rolls onto the toe through the back
+## half of stance, which lifts the ankle and carries it forward over the contact
+## patch — that rise *is* the push-off, and dropping it (measuring the hip from
+## the ankle alone) both loses the lift and makes the pendulum think the leg has
+## height in reserve exactly when the body should be sinking. Between them those
+## two errors sheared more than half of the authored bob away.
 func _support_height(f: Foot) -> float:
 	if not f.stance:
-		return f.reach
+		# Gathered under the body: dx is zero because a folded leg can be set down
+		# anywhere, so the whole reach is available from wherever the ankle is.
+		return -f.target.y + f.reach
 	var dx: float = f.target.x - f.root_bind.x
-	return sqrt(maxf(f.reach * f.reach - dx * dx, 0.0))
+	return -f.target.y + sqrt(maxf(f.reach * f.reach - dx * dx, 0.0))
 
 
 ## Turn the per-foot support heights into body bob, pitch and roll.
@@ -445,23 +483,30 @@ func _solve_body(dt: float) -> void:
 		if f.stance:
 			stance_w += 1.0
 			stance_h += f.support
-			ceiling = maxf(ceiling, (f.target.y - f.root_bind.y) - f.support)
+			# The hip rides −root_bind.y − bob above the floor and may not out-climb
+			# what this leg permits, so bob has a hard lower bound.
+			ceiling = maxf(ceiling, -f.root_bind.y - f.support)
+		# Attitude is a differential: how much higher than its *resting* height this
+		# leg is currently letting its girdle sit. Feeding in the raw heights makes
+		# an animal with unequal fore and hind legs — which is every quadruped we
+		# ship — walk permanently nose-down.
+		var lift_h: float = f.support - f.support_ref
 		if i == FORE_NEAR or i == FORE_FAR:
-			fore_h += f.support * w
+			fore_h += lift_h * w
 			fore_w += w
 		else:
-			hind_h += f.support * w
+			hind_h += lift_h * w
 			hind_w += w
 		if i == FORE_NEAR or i == HIND_NEAR:
-			near_h += f.support * w
+			near_h += lift_h * w
 			near_w += w
 		else:
-			far_h += f.support * w
+			far_h += lift_h * w
 			far_w += w
 	if w_sum <= 0.0:
 		return
 
-	var mean: float = (stance_h / stance_w) if stance_w > 0.0 else _reach_ref
+	var mean: float = (stance_h / stance_w) if stance_w > 0.0 else _support_hi
 	# `lift` finally does what the pattern table says it does. The pendulum's
 	# geometry is nearly the same at every speed — a cat's legs are long next to
 	# its stride, so the support height only ever varies by a couple of
@@ -471,13 +516,32 @@ func _solve_body(dt: float) -> void:
 	# how much further the body goes.
 	var ride: float = _crouch + _move_crouch \
 		* clampf(speed / maxf(_spec.walk_speed, 1e-3), 0.0, 1.0)
-	var target_bob: float = ride \
-		+ (_support_ref - mean) * _bob_gain * float(_pattern()["lift"])
+	var lift: float = float(_pattern()["lift"])
+	var target_bob: float = ride + (_support_ref - mean) * _bob_gain * lift
+	# `lift` is a budget as well as a gain. At a gallop the animal is often on a
+	# single leg, and one pendulum swings far wider than the average of four does,
+	# so the raw geometry overshot the declared amplitude by well over double — a
+	# quarter of the cat's own height of vertical travel per stride.
+	#
+	# Compressed rather than clipped, and only above budget. A hard clip engaged
+	# for two thirds of a gallop cycle and turned the curve into two flat plateaux,
+	# which reads more mechanical than the overshoot it was fixing; this leaves an
+	# ordinary stride untouched and only reins in the single-leg outliers.
+	var budget: float = _spec.bob * _spec.adult_height * lift
+	var excess: float = target_bob - ride
+	var over: float = absf(excess) / maxf(budget, 1e-5)
+	if over > 1.0:
+		target_bob = ride + signf(excess) * budget * (2.0 - 1.0 / over)
 	if is_finite(ceiling):
 		target_bob = maxf(target_bob, ceiling)
-	# One pole of smoothing: the body has mass and cannot follow a discontinuity
-	# in support the instant a foot lands.
-	bob = lerpf(bob, target_bob, clampf(dt * 26.0, 0.0, 1.0))
+	# One pole of smoothing: the body has mass and cannot follow a discontinuity in
+	# support the instant a foot lands. The rate scales with cadence, because the
+	# discontinuity *is* a footfall and footfalls arrive faster as the animal speeds
+	# up. Held fixed, the corner sits below the stride at anything past a stroll,
+	# which quietly halves the bob and drags what is left a sixth of a stride behind
+	# the feet that are meant to be causing it — which is what "the bob is out of
+	# phase with the footfalls" looks like from the outside.
+	bob = lerpf(bob, target_bob, clampf(dt * maxf(26.0, frequency * 40.0), 0.0, 1.0))
 
 	if fore_w > 0.0 and hind_w > 0.0:
 		var delta: float = (hind_h / hind_w) - (fore_h / fore_w)

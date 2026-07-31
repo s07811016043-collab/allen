@@ -374,11 +374,37 @@ func _test_intro_is_quiet() -> void:
 	old.queue_free()
 
 
+## A fixed lump of the same work the mixer does — float multiply-add in a tight
+## GDScript loop — used as the unit the cost budget is expressed in.
+##
+## An absolute millisecond bound measures the container as much as the code: this
+## build shares a machine, and the same synthesis timed a minute apart swings by
+## a quarter. Dividing by a yardstick timed in the same process takes the
+## machine's raw speed out of the number, which is what makes the budget mean
+## something on hardware nobody has run it on yet. It does not take the *noise*
+## out — the two workloads do not stall in step — so the bounds it feeds are
+## still generous.
+##
+## Best of three, and deliberately asymmetric: the yardstick gets its fastest
+## run while the synthesis it divides gets a single one, so a loaded machine
+## pushes the ratio up rather than down. A cost test that grows more permissive
+## exactly when the machine is busy is worse than no cost test.
+func _reference_ms() -> float:
+	var best := INF
+	for attempt in 3:
+		var acc := 0.37
+		var t0 := Time.get_ticks_usec()
+		for i in 400000:
+			acc = acc * 0.9999 + 0.0001
+		best = minf(best, float(Time.get_ticks_usec() - t0) / 1000.0)
+		# Reading the accumulator keeps the loop from being provably dead.
+		if not is_finite(acc):
+			_check(false, "the cost yardstick is sane")
+	return maxf(best, 0.001)
+
+
 ## The whole design rests on synthesis being cheap enough to do on the main
-## thread, in GDScript, inside a frame. The bound is deliberately loose — this
-## runs on a shared software-rendered container — because what it is there to
-## catch is a structural regression: a raised mix rate, a formant bank moved to
-## per-sample coefficients, a voice cap quietly lifted.
+## thread, in GDScript, inside a frame.
 func _test_cost() -> void:
 	var synth := VoiceSynth.new()
 	add_child(synth)
@@ -413,17 +439,22 @@ func _test_cost() -> void:
 		idle.render_offline(512)
 	var quiet := float(Time.get_ticks_usec() - t0) / 1000.0 / seconds
 
+	var unit := _reference_ms()
 	print("      cost per second of audio: %.1f ms saturated, %.1f ms typical, %.1f ms idle"
 		% [saturated, typical, quiet])
-	# Bounds sit about 50 % above what this container measures, because the
-	# machine is shared and the point is to catch a structural regression — a
-	# raised mix rate, per-sample filter coefficients, a lifted voice cap — not
-	# to police a few milliseconds.
-	_check(saturated < 480.0, "the synthesiser fits in a frame budget at the cap",
-		"%.1f ms per audio second" % saturated)
-	_check(typical < 200.0, "one talkative pet plus the room bed stays cheap",
-		"%.1f ms" % typical)
-	_check(quiet < 20.0, "and an idle pet costs nothing at all", "%.1f ms" % quiet)
+	print("      in yardstick units (%.2f ms each): %.1f / %.1f / %.2f"
+		% [unit, saturated / unit, typical / unit, quiet / unit])
+	# Bounds sit about half again above the worst this container has produced
+	# across repeated runs (22 / 9 / 0.01). Loose enough to absorb a machine
+	# whose method dispatch is priced differently from its float loops, tight
+	# enough that undoing any one of the inlined hot loops — the bed, the voice,
+	# the master chain — lands a number outside it.
+	_check(saturated / unit < 34.0, "the synthesiser fits in a frame budget at the cap",
+		"%.1f units (%.1f ms) per audio second" % [saturated / unit, saturated])
+	_check(typical / unit < 14.0, "one talkative pet plus the room bed stays cheap",
+		"%.1f units (%.1f ms)" % [typical / unit, typical])
+	_check(quiet / unit < 0.5, "and an idle pet costs nothing at all",
+		"%.2f units (%.1f ms)" % [quiet / unit, quiet])
 	synth.queue_free()
 	one.queue_free()
 	idle.queue_free()

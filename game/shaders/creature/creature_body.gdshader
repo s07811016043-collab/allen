@@ -415,15 +415,29 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		for (int i = 0; i < MAX_LANDMARKS; i++) {
 			if (i >= landmark_count) { break; }
 			vec4 lm = landmarks[i];
-			vec2 dp = p - lm.xy;
+			// Neither of these bones is round, and a round one is the failure: a
+			// radially symmetric dome halfway up a flank is the shape of a boil,
+			// not of a skeleton. Both are crests hanging off the top line — the
+			// blade of the scapula, the point of the hip — so the relief is
+			// stretched *upward*, toward the spine, and cut off short below, where
+			// on a live animal the muscle simply fills in behind the bone. The
+			// horizontal squeeze keeps them from reading as a barrel band.
+			vec2 raw = p - lm.xy;
+			vec2 dp = raw * vec2(1.30, 1.0);
+			dp.y *= mix(0.58, 1.70, step(0.0, dp.y));
 			float q = length(dp);
 			float dsl;
 			float dome = pet_ridge(q / max(lm.z, 1e-4), dsl);
 			// The dome's own analytic slope *is* the normal tilt, exactly as for
-			// the capsule height field: bone catches the key on its upper face
-			// and the surface falls away under it.
-			nxy -= (dp / max(q, 1e-5)) * dsl * lm.w * bulk;
-			skel = max(skel, dome * bulk);
+			// the capsule height field. Only the crest is allowed to move, though:
+			// a bone shows because the light catches its upper face, not because
+			// the flesh beneath it goes dark, and a symmetric dome tilts its lower
+			// half away from the key and leaves a grey thumbprint on the flank —
+			// which is worse than having no landmark at all. Losing integrability
+			// here is fine; this is a shading model, not a displacement map.
+			float crest = smoothstep(0.55, -0.30, raw.y / max(lm.z, 1e-4));
+			nxy -= (dp / max(q, 1e-5)) * dsl * lm.w * bulk * crest;
+			skel = max(skel, dome * bulk * crest);
 		}
 		// The loin: two long muscles running either side of the spine. Seen from
 		// the side the groove between them is edge-on, so what actually reads is
@@ -492,6 +506,13 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		piping = s.extra;
 	}
 
+	// Hair lies flatter, tighter and glossier where it is stretched over bone.
+	// That is the other half of why a scapula reads on a live animal: the light
+	// finds it by shape *and* by gloss. Kept small — it is a tendency in the
+	// coat, not a bald patch.
+	spec_mul *= 1.0 + skel * 0.28;
+	micro_occ *= 1.0 - skel * 0.05;
+
 	vec3 n = normalize(vec3(nxy, 1.0));
 
 	// --- albedo -------------------------------------------------------------
@@ -532,8 +553,12 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 			float broken = pet_fbm(p * 2.1 + 19.0, 2);
 			// A bar is about a third of the period wide, not a tenth: narrow the
 			// dark core any further and the stripes stop being stripes and turn
-			// into a pinstripe nobody reads as a cat.
-			float bar = smoothstep(0.02, 0.50, bars)
+			// into a pinstripe nobody reads as a cat. The *edge* is the part that
+			// has to stay tight, though. Ramped over half the sine's range the
+			// bar has no edge at all, only a gradient, and a set of soft gradients
+			// at stripe spacing is not a tabby — it is the blotchy smear the coat
+			// pass just spent its whole budget getting rid of.
+			float bar = smoothstep(0.06, 0.34, bars)
 				* mix(0.40, 1.0, smoothstep(-0.50, -0.05, broken));
 			// The dorsal line is solid, and the pigment fades out under the
 			// animal: a tabby's belly is always the palest part of it.
@@ -542,12 +567,15 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 			float mark = clamp(max(bar * flank, dorsal * 0.92), 0.0, 1.0);
 			albedo = mix(albedo, palette[marking_index].rgb, mark * takes * 0.88);
 
-			// Agouti ticking over the top of it, at hair-band frequency rather
-			// than stripe frequency, so the ground colour between the bars is not
-			// flat either. It only ever darkens — pigment adds, it does not
-			// bleach.
-			float tick = smoothstep(0.15, 0.95, sin(arc * 96.0 + wob * 7.0));
-			albedo *= 1.0 - tick * 0.09 * takes;
+			// Agouti ticking over the top of it, so the ground colour between the
+			// bars is not flat either. It rides the coat's own per-strand random
+			// rather than a sine of its own, which is the only way to get it at
+			// the right frequency: a band on a hair is a hair-sized thing, and an
+			// independent sine has to guess a rig-space wavelength that is wrong
+			// at every zoom but one — guessing low is what put a second field of
+			// soft blotches on top of the stripes. It only ever darkens; pigment
+			// adds, it does not bleach.
+			albedo *= 1.0 - smoothstep(0.30, 0.95, glint) * 0.15 * takes;
 		}
 	}
 	albedo *= 1.0 + micro_tint;
@@ -671,18 +699,27 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	// shadow rather than as another limb. That is the failure this replaces.
 	if (ctx.atmos > 0.002) {
 		float lum = dot(lit, vec3(0.2126, 0.7152, 0.0722));
-		lit = mix(lit, vec3(lum), ctx.atmos * 0.34);
+		lit = mix(lit, vec3(lum), ctx.atmos * 0.44);
 		// The value the range collapses toward is what *this material* looks like
-		// under ambient alone, because that is physically what the far side of an
-		// animal is: five centimetres of air does nothing, the key is simply
-		// blocked and only the sky still reaches it. Pivoting on an absolute haze
-		// colour is the obvious formulation and it is wrong twice over — it is
-		// brighter than the limb, so compression pushes the limb *up* past the
-		// background, and it is blue, so a brown limb arrives grey. A pale blue
-		// smear behind a cat reads as fog. This reads as the same cat, in shadow.
+		// under a room's worth of fill, because that is physically what the far
+		// side of an animal is: five centimetres of air does nothing, the key is
+		// simply blocked and the sky and the floor still reach it. Pivoting on an
+		// absolute haze colour is the obvious formulation and it is wrong twice
+		// over — it is brighter than the limb, so compression pushes the limb *up*
+		// past the background, and it is blue, so a brown limb arrives grey. A
+		// pale blue smear behind a cat reads as fog. This reads as the same cat,
+		// in shade.
+		//
+		// The multiplier is the load-bearing number in the whole depth pass: it is
+		// the floor the far limb cannot fall below however many occlusion terms
+		// have multiplied into it, and set too low it is the difference between a
+		// leg and a smudge. It sits high deliberately, because a species has
+		// usually *already* paid for the depth once by giving its far-side parts
+		// the shadow pigment — the cat's are 0.62 of the near coat before the
+		// shader touches them — and paying twice is how the far side went black.
 		vec3 pivot = albedo * mix(ambient_tint.rgb, vec3(1.0), 0.45)
-			* ambient_energy * 3.0;
-		lit = mix(lit, pivot + (lit - pivot) * 0.52, ctx.atmos);
+			* ambient_energy * 5.2;
+		lit = mix(lit, pivot + (lit - pivot) * 0.58, ctx.atmos);
 	}
 	// After the haze, not before it: the crack where a near limb crosses the one
 	// behind it is dark all the way to the viewer, so compressing it toward the
@@ -722,15 +759,29 @@ void fragment() {
 	// melted into the torso. So the torso's occlusion is broad (it really does
 	// shade everything under the belly) and the near limb's is tight: a crevice
 	// line, then daylight.
+	// The budget below is set by arithmetic rather than by feel, because every one
+	// of these terms multiplies and it is very easy to stack four reasonable-
+	// looking numbers into a black cut-out. A far limb that reads is roughly half
+	// the value of the near one — dark enough to be behind it, light enough to
+	// still be a limb — so the shadow, the two occlusion terms and the crevice
+	// together may not take more than about a third of the light away, and the
+	// haze pivot then puts a floor under whatever is left. What buys the depth is
+	// the *desaturation* and the loss of contrast, which cost no value at all.
 	LayerCtx c0;
-	c0.shadow = min(layer_shadow(f1, lxy, reach * 1.8, 0.46),
-		layer_shadow(f2, lxy, reach * 1.2, 0.40));
-	c0.ao = layer_occlude(f1, body_h * 0.22, 0.30)
-		* layer_occlude(f2, body_h * 0.055, 0.26);
-	c0.contact = layer_contact(f2, body_h * 0.020, 0.46)
-		* layer_contact(f1, body_h * 0.018, 0.34);
+	c0.shadow = min(layer_shadow(f1, lxy, reach * 1.8, 0.30),
+		layer_shadow(f2, lxy, reach * 1.2, 0.24));
+	c0.ao = layer_occlude(f1, body_h * 0.22, 0.22)
+		* layer_occlude(f2, body_h * 0.055, 0.16);
+	// The crevice is the one term allowed to go properly dark, and it is kept
+	// narrow on purpose: a hard line where the two limbs cross is what separates
+	// them, and a wide one just paints the far limb out.
+	c0.contact = layer_contact(f2, body_h * 0.015, 0.44)
+		* layer_contact(f1, body_h * 0.014, 0.26);
 	c0.atmos = 0.85;
-	c0.soften = 2.6;
+	// The far limb is only a sliver a dozen pixels wide beside the near one, so
+	// the defocus has to stay narrow enough to leave that sliver a shape. Past
+	// about two pixels of feather there is no silhouette left to soften.
+	c0.soften = 2.0;
 	c0.detail = 0.30;
 	c0.body_h = body_h;
 

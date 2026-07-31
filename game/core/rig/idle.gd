@@ -52,6 +52,15 @@ var ear_far := 0.0
 var weight_shift := Vector2.ZERO
 var weight_roll := 0.0
 
+## Self-motion of a resting tail, in radians of extra curl at the base.
+##
+## Nothing else drives it when the animal is standing: the tail chain is a spring
+## hanging off the pelvis, and a pelvis that is not moving exerts no force at all.
+## A twelve-second idle sheet caught the tail frozen to the pixel in all six
+## frames while the head and eyes were plainly alive — which reads worse than no
+## animation, because the contrast points straight at the seam.
+var tail_sway := 0.0
+
 var _rng := RandomNumberGenerator.new()
 var _spec: CreatureSpec
 var _t := 0.0
@@ -67,6 +76,8 @@ var _ear_target_near := 0.0
 var _ear_target_far := 0.0
 var _ear_hold := 0.0
 var _shift_timer := 0.0
+var _shift := Vector2.ZERO
+var _shift_roll := 0.0
 var _shift_target := Vector2.ZERO
 var _shift_roll_target := 0.0
 
@@ -91,6 +102,7 @@ func advance(dt: float) -> void:
 	_advance_gaze(dt)
 	_advance_ears(dt)
 	_advance_weight(dt)
+	_advance_tail()
 
 
 # --- breathing --------------------------------------------------------------
@@ -241,12 +253,42 @@ static func _tick(t: float, rate: float) -> float:
 func _advance_weight(dt: float) -> void:
 	_shift_timer -= dt
 	if _shift_timer <= 0.0:
-		_shift_timer = _rng.randf_range(3.0, 8.0) * lerpf(1.4, 0.6, _spec.energy)
-		_shift_target = Vector2(_rng.randf_range(-0.012, 0.012), _rng.randf_range(-0.006, 0.004))
-		_shift_roll_target = _rng.randf_range(-0.035, 0.035)
+		# Shorter gaps than a literal reading of "every few seconds" would suggest.
+		# The follower below has a three-quarter-second time constant, so a gap of
+		# five seconds means four of them are spent parked on the target, and a
+		# review frame is far more likely to land in the parked stretch than in the
+		# move — which is exactly how a twelve-second sheet came back with six
+		# identical bodies.
+		_shift_timer = _rng.randf_range(1.8, 4.5) * lerpf(1.4, 0.6, _spec.energy)
+		# The vertical drift is biased downward on purpose. A standing animal settles
+		# onto its legs; it does not push itself up off them. And mechanically it
+		# cannot: the only headroom the body has is the flexion reserve the gait
+		# holds back, so a rise larger than that runs the legs out of reach and the
+		# forepaws lift a couple of pixels clear of the floor.
+		_shift_target = Vector2(_rng.randf_range(-0.020, 0.020), _rng.randf_range(-0.005, 0.014))
+		_shift_roll_target = _rng.randf_range(-0.055, 0.055)
 	var k: float = clampf(dt * 1.3, 0.0, 1.0)
-	weight_shift = weight_shift.lerp(_shift_target, k)
-	weight_roll = lerpf(weight_roll, _shift_roll_target, k)
+	_shift = _shift.lerp(_shift_target, k)
+	_shift_roll = lerpf(_shift_roll, _shift_roll_target, k)
+	# A creep rides on top of the destination, at two frequencies that never line
+	# up. A discrete shift alone leaves the body perfectly still between moves; the
+	# creep means there is no instant at which the animal is not moving at all,
+	# which is the whole point of the idle layer.
+	weight_shift = _shift + Vector2(sin(_t * 0.41) * 0.006, sin(_t * 0.29 + 2.0) * 0.003)
+	weight_roll = _shift_roll + sin(_t * 0.33 + 1.4) * 0.014
+
+
+# --- resting tail -----------------------------------------------------------
+
+func _advance_tail() -> void:
+	# Two slow swings well apart in frequency, so the tail wanders instead of
+	# metronoming, plus the same sparse impulse train the ears use — a resting
+	# cat's tail spends most of its time drifting and then flicks once.
+	var drift: float = sin(_t * 0.44) * 0.038 + sin(_t * 0.19 + 0.9) * 0.026
+	var flick: float = _tick(_t + 1.7, 0.21) * lerpf(0.06, 0.16, _spec.energy)
+	# Exertion fades it out: a moving animal's tail is driven by its hips and does
+	# not need — or want — an idle wander fighting the spring.
+	tail_sway = (drift + flick) * (1.0 - clampf(exertion * 1.6, 0.0, 1.0))
 
 
 ## Write the live eye state the renderer reads. Kept here rather than in the rig

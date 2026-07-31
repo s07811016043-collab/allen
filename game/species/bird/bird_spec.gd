@@ -21,7 +21,9 @@ const E := preload("res://core/creature/eye_spec.gd")
 # songbird's whole charm is that it is *patterned*, and every stripe here costs
 # a slot rather than a texture.
 const COL_MANTLE := 0
-const COL_MANTLE_DARK := 1
+## Not referenced by any part: the body shader reads slot 1 directly through its
+## `marking_index` uniform. See the palette note in `build`.
+const COL_MANTLE_BAND := 1
 const COL_FLIGHT := 2
 const COL_FLIGHT_DARK := 3
 const COL_BREAST := 4
@@ -55,30 +57,71 @@ static func build() -> S:
 	s.display_name = "Songbird"
 	s.blurb = "Never stops moving. Investigates the cursor, decides it is a threat, decides it is food, and sings about the whole ordeal from the top of your window frame."
 
-	# Two constraints shape this palette beyond taste.
+	# Slot 1 is not a free colour, and that constrains the whole scheme.
 	#
-	# Slot 1 is not free. The body shader paints its dorsal markings — bars plus a
-	# spine line — in `palette[marking_index]`, and that index defaults to 1, so
-	# whatever sits in slot 1 is what gets drawn down the back of every furred or
-	# feathered animal. A cat wants that: slot 1 is its tabby. A songbird does not,
-	# and the only lever a species has today is how far slot 1 sits from slot 0. It
-	# is therefore a *deeper mantle* rather than a contrasting colour, which turns
-	# the bars into the soft tonal banding real feather tracts have while still
-	# serving as the far side's shade. See the note in the hand-off: this wants a
-	# per-species `marking_strength` before it is properly solved.
+	# The body shader paints its dorsal markings — mackerel bars plus a solid spine
+	# line — in `palette[marking_index]`, and both that index and the
+	# `marking_strength` beside it are left at their shader defaults, because
+	# `CreatureRenderer._upload_static` never sets either. So every species takes
+	# full-strength tabby out of slot 1 whether it wants it or not. A cat wants
+	# exactly that. A songbird does not: bars that bend and break along the flank
+	# are a mammal's agouti banding, and on a bird they read as watered silk.
 	#
-	# Second, the markings and the agouti ticking over them are both gated on
-	# luminance and fade out above about 0.85, so a mid-dark coat takes them at
-	# full strength. Pitching the blue and the rust high keeps both to a whisper —
-	# and a pale sky-blue passerine is a perfectly real animal.
+	# The one lever a species actually owns is *how far slot 1 sits from slot 0*,
+	# since the marking is a `mix` between them. Pulling it to within about half the
+	# old distance turns the bars into the soft tonal variation real feather tracts
+	# have, and leaves the barbs from `pet_feather` — the structure this species
+	# exists to show — as the loudest thing on the mantle rather than the second
+	# loudest. It is a workaround, not a fix; the fix is a per-species
+	# `marking_strength`, flagged in the hand-off because `CreatureSpec` is not this
+	# file's to change.
+	#
+	# The second constraint is the one that actually chose these colours, and it is
+	# worth stating as a rule because it is invisible until it has already ruined a
+	# palette: `takes = smoothstep(0.88, 0.60, luminance)`. Markings apply at *full*
+	# strength to anything below luminance 0.60, taper to nothing by 0.88, and the
+	# mix runs at 0.88 toward slot 1. So any saturated mid-tone on a feathered part
+	# is not "a colour with faint bars over it" — it is a colour that gets replaced
+	# by slot 1 across most of its area.
+	#
+	# The first pass of this species was a saturated rust breast at luminance 0.50
+	# and near-black navy wings at 0.10. Both sat squarely in the full-strength
+	# band, so the mackerel code mixed the rust 88% toward blue and *lightened* the
+	# wing in four hard-edged bands — the wing arrived on screen as a row of dark
+	# rectangles, which is what sent this pass looking for a bug in the wing
+	# geometry. The wing was fine. The colours were in the wrong luminance window.
+	#
+	# There are only two ways out, and the species has to pick one per colour:
+	# climb above the gate, or sit close enough to slot 1 that the mix has nowhere
+	# to move you. The useful measure is not the colour distance to slot 1 but
+	# `0.88 * takes * distance` — how far a bar *actually* shifts the pixel. Under
+	# about 0.06 it is invisible, around 0.10 it reads as tonal banding, and past
+	# 0.20 it reads as a stripe painted on a toy.
+	#
+	#   mantle       lum 0.28  takes 1.00  bar shift 0.09   soft tract banding
+	#   flight       lum 0.17  takes 1.00  bar shift 0.10   covert edging
+	#   flight dark  lum 0.12  takes 1.00  bar shift 0.18   feather tips
+	#   breast       lum 0.83  takes 0.09  bar shift 0.09   immune by luminance
+	#   cheek        lum 0.86  takes 0.02  bar shift 0.02   immune by luminance
+	#   belly        lum 0.95  takes 0.00  bar shift 0.00   immune by luminance
+	#
+	# That is what drove the bird dark above and pale below rather than the mid
+	# sky-blue and rust it started as: a *saturated mid-tone is the one thing this
+	# palette cannot contain*, because it is far from slot 1 and far below the gate
+	# at the same time. Dark-above/pale-below is also the honest resolution
+	# aesthetically — deep blue-black upperparts with pale underparts is a swallow
+	# or a martin, and those are precisely the birds that are iridescent, which is
+	# the surface effect this species exists to show. The thin-film term in
+	# `creature_body` is additive and reads against a dark ground; on the pale
+	# sky-blue it was invisible.
 	s.palette = PackedColorArray([
-		Color(0.335, 0.505, 0.795),   # mantle: crown, back, rump, uppertail
-		Color(0.235, 0.365, 0.620),   # dorsal feather-tract banding, far-side shade
-		Color(0.150, 0.240, 0.470),   # wing coverts and rectrices
-		Color(0.062, 0.098, 0.200),   # secondaries, primaries, outer rectrix
-		Color(0.825, 0.430, 0.175),   # breast and flank, rust
-		Color(0.930, 0.900, 0.840),   # belly and throat
-		Color(0.740, 0.660, 0.545),   # ear-covert cheek patch, warm buff
+		Color(0.205, 0.280, 0.470),   # mantle: crown, back, rump, uppertail
+		Color(0.163, 0.228, 0.390),   # dorsal feather-tract banding (shader slot 1)
+		Color(0.120, 0.165, 0.300),   # wing coverts and central rectrices
+		Color(0.105, 0.145, 0.268),   # secondaries, primaries, outer rectrix
+		Color(0.975, 0.800, 0.655),   # breast and flank, warm apricot
+		Color(0.965, 0.945, 0.905),   # belly and throat
+		Color(0.900, 0.855, 0.760),   # ear-covert cheek patch, warm buff
 		Color(0.105, 0.098, 0.112),   # upper mandible, near black horn
 		Color(0.330, 0.310, 0.300),   # lower mandible, pale horn
 		Color(0.360, 0.295, 0.260),   # tarsus and toes
@@ -93,12 +136,44 @@ static func build() -> S:
 
 	s.coat_surface = P.Surface.FEATHER
 	s.coat_length = 0.010
-	# Barb pitch is `150 * coat_density` per rig unit and a tier only fades in
-	# once its pitch clears about 2.5 screen pixels. At 158 px/unit that puts the
-	# usable ceiling near 0.4 — above it the vanes go sub-Nyquist and the bird
-	# reads as a smooth painted egg, which is the one thing a feathered species
-	# must not do.
-	s.coat_density = 0.70
+	# This number is the whole feather read, and it runs backwards from the
+	# intuition that "denser = more detail".
+	#
+	# `pet_feather` lays barbs at a pitch of `150 * coat_density` lanes per rig
+	# unit and then multiplies the entire result — relief, occlusion, spec break-up
+	# and the iridescence weight — by `smoothstep(1.8, 4.2, px_per_unit / pitch)`,
+	# i.e. by how many screen pixels one barb gets. Raising density shrinks the
+	# barb, so it *closes* that gate. At 158 px/unit the arithmetic is:
+	#
+	#   density 0.70 → 105 lanes/unit → 1.5 px per barb → gate 0.00
+	#   density 0.38 →  57 lanes/unit → 2.8 px per barb → gate 0.36
+	#   density 0.30 →  45 lanes/unit → 3.5 px per barb → gate 0.80
+	#
+	# The species shipped at 0.70, which is not "fine plumage" — it is the vanes
+	# switched off entirely, leaving the mammal marking code as the only structure
+	# on the bird, and the thin-film term dead with it (`irid` is barb coverage, and
+	# coverage was zero).
+	#
+	# The other end is just as wrong, and less obvious. `pet_feather` builds its
+	# lane from `arc + abs(v) * 1.6`, where `arc` is the world position projected on
+	# the groom direction but `v` is distance *through the blended field*. On a long
+	# flat part — a primary, a rectrix — the `v` term bends the lanes into barbs
+	# raking back off a rachis, which is exactly right. On a three-capsule egg it
+	# bends them into iso-distance contours of the whole body, so at gate 0.80 the
+	# torso came back as a topographic map: concentric fingerprint whorls with a
+	# 28% occlusion swing between lane and gap.
+	#
+	# 0.38 is where the two failures are both avoided. The vanes are real — fine
+	# enough to read as barbs, and carrying enough coverage to light the
+	# iridescence — while the contouring on the body stays a sheen rather than a
+	# relief map. Wings and tail get the good end of the same number for free,
+	# because there the contours *are* the barbs.
+	#
+	# The cost is that `coat_density` is one global and the scaled tarsi read it too
+	# (`pet_scale` sizes a plate at `0.030 / density`), so this trades finer scutes
+	# for a bird that actually has feathers. It puts about four plates on a 0.26-unit
+	# tarsus, which is close to what a real passerine shows anyway.
+	s.coat_density = 0.38
 	s.translucency = 0.50
 	s.roughness = 0.46
 
@@ -158,7 +233,15 @@ static func build() -> S:
 	# Only the lower two segments of the far leg exist. The femur of a bird is
 	# horizontal and completely buried in the flank; authoring it would spend two
 	# uniform slots on something that can never be seen.
-	var fl_far := _part(&"leg_hind_far_lower", Vector2(0.168, -0.556), Vector2(-0.036, -0.278), 0.072, 0.042, COL_MANTLE_DARK, 0)
+	#
+	# The far tibiotarsus takes the *same* rust as the near one rather than a
+	# darkened stand-in. It is still feathered flank at this height — the trousers,
+	# not the bare leg — so painting it a separate dark colour put a brown blob
+	# under the belly that read as a shadow rather than as a limb. The BEHIND layer
+	# already has `layer_occlude` and the atmospheric term to push it back, and
+	# those desaturate rather than just darken, which is the whole reason they
+	# exist.
+	var fl_far := _part(&"leg_hind_far_lower", Vector2(0.168, -0.556), Vector2(-0.036, -0.278), 0.072, 0.042, COL_BREAST, 0)
 	var fc_far := _part(&"leg_hind_far_cannon", Vector2(-0.036, -0.278), Vector2(0.102, -0.052), 0.031, 0.024, COL_TARSUS_DARK, 0)
 	fc_far.surface = P.Surface.SCALE
 	fc_far.blend = 0.022
@@ -187,13 +270,31 @@ static func build() -> S:
 	var chest := _part(&"chest", Vector2(0.060, -0.735), Vector2(0.200, -0.762), 0.258, 0.212, COL_MANTLE)
 	chest.blend = 0.13
 	chest.height_scale = 1.12
-	# The rust/blue boundary on a real bird runs along the flank, not around the
-	# body's circumference, so the breast has to be its own volume slung under
-	# the egg rather than a differently coloured section of it.
-	var belly := _part(&"belly", Vector2(-0.235, -0.515), Vector2(-0.085, -0.530), 0.120, 0.150, COL_CREAM)
-	belly.blend = 0.115
-	var breast := _part(&"belly_breast", Vector2(-0.035, -0.588), Vector2(0.215, -0.718), 0.215, 0.152, COL_BREAST)
-	breast.blend = 0.125
+	# The pale/dark boundary on a real bird runs along the flank, not around the
+	# body's circumference, so the underparts have to be their own volumes slung
+	# under the egg rather than a differently coloured section of it.
+	#
+	# Both run further back and sit higher than they first did, and that is doing
+	# work for the *wing* rather than for the belly. The folded wing is painted
+	# after these, so wherever the two overlap the wing wins and the visible edge is
+	# the wing's own lower outline. That makes the pale underparts the only thing
+	# this species has that can draw that outline with real contrast: tonal
+	# separation between wing and mantle is capped by the marking gate above, but
+	# pale against dark is not capped by anything. Where the pale stopped short of
+	# the wing tip the wing's rear half was dark-on-dark and simply disappeared,
+	# which is most of why the folded wing stayed invisible at desktop size even
+	# after it was being drawn at all.
+	# `blend` on an engulfed part is not a joint softness, it is the width of the
+	# *colour* edge: paint fades over `smoothstep(blend, -blend, d)`. At the 0.12
+	# these carried, the pale faded out over a quarter of a rig unit and the
+	# underparts arrived as a soft oval stain floating on the flank rather than as a
+	# bird's pale belly with a flank line. Dropping it to 0.035 is what turns them
+	# into a region with an edge. The union these capsules contribute is unaffected,
+	# because a capsule wholly inside the body barely moves the field at all.
+	var belly := _part(&"belly", Vector2(-0.360, -0.560), Vector2(-0.130, -0.585), 0.130, 0.155, COL_CREAM)
+	belly.blend = 0.035
+	var breast := _part(&"belly_breast", Vector2(-0.130, -0.585), Vector2(0.190, -0.660), 0.155, 0.175, COL_BREAST)
+	breast.blend = 0.040
 	# "Nape", not "neck". A perching songbird at rest has no visible neck: the
 	# vertebrae are folded into an S inside the feathers and the head simply
 	# continues the shoulder. This capsule exists to fill that junction solid, so
@@ -284,16 +385,40 @@ static func build() -> S:
 	# difference between a stiff vane and the down it lies on. The tip clears the
 	# rump and reaches about a third of the way down the tail — a folded wing that
 	# stops at the rump reads as clipped.
-	var w_cov := _part(&"wing_near_covert", Vector2(0.158, -0.826), Vector2(-0.060, -0.786), 0.084, 0.102, COL_FLIGHT)
+	var w_cov := _part(&"wing_near_covert", Vector2(0.168, -0.834), Vector2(-0.050, -0.790), 0.078, 0.096, COL_FLIGHT)
 	w_cov.height_scale = 0.86
 	w_cov.blend = 0.016
-	var w_sec := _part(&"wing_near_secondary", Vector2(-0.060, -0.786), Vector2(-0.280, -0.748), 0.102, 0.066, COL_FLIGHT_DARK)
+	var w_sec := _part(&"wing_near_secondary", Vector2(-0.050, -0.790), Vector2(-0.278, -0.752), 0.096, 0.062, COL_FLIGHT_DARK)
 	w_sec.height_scale = 0.44
 	w_sec.blend = 0.014
-	var w_pri := _part(&"wing_near_primary", Vector2(-0.278, -0.750), Vector2(-0.566, -0.714), 0.066, 0.021, COL_FLIGHT_DARK)
+	var w_pri := _part(&"wing_near_primary", Vector2(-0.276, -0.754), Vector2(-0.600, -0.710), 0.062, 0.016, COL_FLIGHT_DARK)
 	w_pri.height_scale = 0.30
 	w_pri.blend = 0.014
-	pass # DIAGNOSTIC: wing omitted
+	# The wing bar — the pale tips of the greater coverts — and the last part in the
+	# budget. It is the piece that finally made the folded wing legible, so it is
+	# worth recording why the two obvious alternatives are both dead ends.
+	#
+	# Darkening the wing away from the mantle cannot work: every dark colour here
+	# has to stay within about 0.23 of slot 1 or the mackerel bars rewrite it in
+	# blocks, and slot 1 has to stay near the mantle or the mantle itself gets
+	# striped. Between them those cap how far the wing may sit from the back it lies
+	# on, and under that cap it is a faint tonal patch however well it is shaped.
+	# Moving the whole wing to the FRONT layer escapes the cap and overshoots badly:
+	# FRONT takes no occlusion at all and casts a 42% shadow on the body, so the
+	# wing arrives fully lit with a hard rim and reads as a plank leaning against
+	# the bird. Making the *coverts* pale escapes it too, but a pale panel sits
+	# directly above the pale breast and the two merge into one blob.
+	#
+	# A thin pale line does none of that. High luminance is precisely what switches
+	# the markings off — buff at luminance 0.86 takes 2% of them — so it keeps full
+	# contrast against the dark wing while being far too narrow to merge with
+	# anything. It runs down and back across the covert/secondary joint, which is
+	# how a wing bar actually lies on a folded wing, and it is the one mark that
+	# says "the dark shape on this flank has feather rows in it".
+	var w_bar := _part(&"wing_near_covert_bar", Vector2(0.020, -0.872), Vector2(-0.076, -0.712), 0.014, 0.010, COL_CHEEK)
+	w_bar.height_scale = 0.50
+	w_bar.blend = 0.010
+	parts.append_array([w_cov, w_sec, w_pri, w_bar])
 
 	# --- beak ---------------------------------------------------------------
 	# Hard keratin, so CLAW rather than SKIN: the claw model pipes light along the

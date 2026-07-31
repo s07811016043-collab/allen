@@ -46,37 +46,57 @@ struct Surf {
 
 // A lane tier is honest down to roughly two pixels per lane; below that it can
 // only alias. Being timid about this threshold is what emptied the coat at body
-// scale: at ~330 px per rig unit the guard tier is under three pixels a lane, so
-// a cutoff at four or five removes every tier the body has and leaves nothing
-// but the clump field — which is exactly the smooth-clay read.
+// scale: at ~320 px per rig unit the coarsest strand rung is already close to
+// two pixels a lane, so a cutoff at four or five removes every rung the body has
+// and leaves nothing but the clump field — which is exactly the smooth-clay read.
 float pet_tier_fade(float px_per_lane) {
 	return smoothstep(1.25, 2.55, px_per_lane);
+}
+
+// How much of a tier the sampler can actually *resolve*, which is not the same
+// question as how much of it belongs on screen — and conflating the two is what
+// produced the wood grain. A lane two pixels wide has to stay: take it away and
+// the coat is smooth clay. But its bright core is a third of a lane, so it is a
+// third of a pixel, and point-sampling a sub-pixel ridge is moire by
+// construction — long wavy filaments that are the beat between the lane pitch
+// and the pixel grid, not hair. So a barely-resolved rung is drawn with a wider,
+// flatter profile and less contrast, which is what a mip level would have done
+// for it if this coat came out of a texture.
+float pet_tier_crisp(float px_per_lane) {
+	return smoothstep(2.0, 5.4, px_per_lane);
 }
 
 
 // One tier of fibres in the groom frame (`t.x` along the hair, `t.y` across).
 //
 // `pitch` is fibres per rig unit and `aspect` is how long each one is in units
-// of its own width — a guard hair is roughly fifteen times as long as it is
-// wide, a lock only four or five. The across-hair coordinate is warped *before*
-// it is quantised, which makes neighbouring lanes converge, and that convergence
-// is clumping. `clump` is measured in lane widths so a tier clumps by the same
-// visible amount whatever its pitch.
+// of its own width. That second number decides whether the coat reads as hair or
+// as timber: a pelt is seen tip-on, so what reaches the eye is a dense field of
+// short dashes, never the full length of any one hair. Much past six and each
+// lane is a ribbon, and a field of wavy ribbons is wood grain whatever colour it
+// is painted.
+//
+// `soft` is 1 when the tier is at the sampling limit. It widens and flattens the
+// fibre profile so the feature is never narrower than a pixel; see
+// `pet_tier_crisp`.
 float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
-		out float dcross, out float rnd, out float lean) {
+		float soft, out float dcross, out float rnd, out float lean) {
 	// The warp has to *diverge* between neighbouring lanes, not shift them as a
-	// block: a low-frequency warp with a large amplitude slides whole bands of
-	// parallel lanes together, and smoothly wavy parallel lines are wood grain.
-	// Two octaves, the finer one only a few lanes across, is what makes lanes
-	// merge into each other instead of travelling in formation.
-	float w = pet_noise(vec2(t.x * pitch * 0.055 + seed * 3.7, t.y * pitch * 0.11))
-		+ 0.45 * pet_noise(vec2(t.x * pitch * 0.20 + seed, t.y * pitch * 0.34));
+	// block: a warp that changes slowly along the hair slides whole bands of
+	// parallel lanes sideways in formation, and parallel lines with a slow wave
+	// in them are the definition of wood grain. So both octaves run far faster
+	// across the lanes than along them, and the along-hair amplitude is kept to a
+	// fraction of a lane. What is left is lanes merging into their neighbours,
+	// which is clumping, and almost no lateral travel, which is what a coat
+	// combed in one direction actually looks like.
+	float w = 0.58 * pet_noise(vec2(t.x * pitch * 0.028 + seed * 3.7, t.y * pitch * 0.30))
+		+ 0.42 * pet_noise(vec2(t.x * pitch * 0.105 + seed, t.y * pitch * 0.66));
 	float y = t.y * pitch + w * clump;
 	float lane = floor(y);
 	float f = fract(y) - 0.5;
 	rnd = pet_hash1(vec2(lane, seed));
 
-	float width = mix(0.20, 0.42, rnd);
+	float width = mix(mix(0.15, 0.33, rnd), 0.46, soft);
 	float dprofile;
 	float core = pet_ridge(abs(f) / width, dprofile);
 
@@ -85,13 +105,14 @@ float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 	// the chop is offset per lane so neighbours start and end at different
 	// places instead of forming a seam across the coat. Each cell draws its own
 	// length from the hash: some fibres lie flat against the next one, some end
-	// in a clear gap.
+	// in a clear gap. The floor under `seg` has to stay near zero — any real
+	// floor is a lane that never stops, and a lane that never stops is a wire.
 	float span = t.x * pitch / max(aspect, 1.0) + rnd * 11.0;
 	float cell = floor(span);
 	float rc = pet_hash1(vec2(cell, lane * 0.61 + seed));
 	float dseg;
-	float seg = 0.22 + 0.78
-		* pet_ridge(abs(fract(span) - 0.5) / mix(0.30, 0.58, rc), dseg);
+	float seg = 0.05 + 0.95
+		* pet_ridge(abs(fract(span) - 0.5) / mix(0.32, 0.60, rc), dseg);
 
 	// No two hairs point exactly the same way, and that scatter is the whole
 	// reason a coat glitters instead of gleaming: it splits one broad sheen into
@@ -107,102 +128,120 @@ float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 
 // The layered coat.
 //
-// Four scales, because a pelt has four, and the ladder is anchored at the top by
-// physics rather than by taste. A cat's guard hair is about a tenth of a
-// millimetre across on an animal a quarter of a metre tall, so an individual
-// hair is sub-pixel at every size a desktop pet is ever drawn at: at body scale
-// it is not the hair the eye resolves, it is the *lock* — a few dozen hairs
-// travelling together, roughly ten hairs wide. That fixes the coarsest tier at a
-// tenth of the guard pitch, and everything finer arrives only as the player
-// zooms in.
+// Three strand rungs plus a clump field. The rungs sit a shade over two to one
+// apart rather than the two-and-a-half of a conventional mip chain, and each one
+// only hands its weight down once the rung below it is *comfortably* resolved
+// rather than merely present. Both choices exist to keep the coat off a lane
+// that is two pixels wide: handing over the instant a finer rung appears is what
+// put the entire body-scale coat on the sampling limit, and the beat between
+// that lane pitch and the pixel grid is the wavy filament pattern that made the
+// animal look like varnished timber.
 //
-// The lock tier is what makes or breaks the body-scale read, and it is a fibre
-// tier rather than a blob of fractal noise for one reason: fractal noise has no
-// strands in it, so it can only ever be soft blotches, and soft blotches on a
-// brown animal look like wet clay. But it is a *short* fibre — four or five
-// times as long as it is wide, not fifteen — because a lock is a stubby thing,
-// and long ones would just be corduroy at a bigger scale.
+// The clump is not a fixed rig-space frequency. A lock is "about ten hairs
+// across", and which rung is currently standing in for a hair changes with the
+// zoom, so the clump pitch is derived from the rungs that are actually carrying
+// the coat. That holds the lock-to-strand ratio — the relationship the eye reads
+// as a coat rather than as a texture — constant from a taskbar icon to a head
+// close-up. The cost is that the clump field is not rigidly nailed to rig space
+// while the pet is being resized; its amplitude is small enough that this is the
+// cheaper of the two errors, and the alternative is locks the size of the whole
+// animal as soon as anyone zooms in.
 Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	vec2 across = vec2(-groom.y, groom.x);
 	vec2 t = vec2(dot(p, groom), dot(p, across));
 
-	Coat c;
+	// The coarsest rung is pitched so that at desktop body scale — roughly 320
+	// screen pixels to the rig unit — a lane lands near three pixels rather than
+	// near two. Two is where the profile goes sub-pixel and the coat turns to
+	// moire; three is the finest the eye can still be told a direction at.
+	float pitch0 = 104.0 * density;
+	float pitch1 = pitch0 * 2.15;
+	float pitch2 = pitch0 * 4.62;
 
-	float pitch_g = 135.0 * density;
-	float pitch_c = pitch_g * 0.10;
-	float pitch_m = 340.0 * density;
-	float pitch_u = 810.0 * density;
+	float f0 = pet_tier_fade(px / pitch0);
+	float f1 = pet_tier_fade(px / pitch1);
+	float f2 = pet_tier_fade(px / pitch2);
+	float k0 = pet_tier_crisp(px / pitch0);
+	float k1 = pet_tier_crisp(px / pitch1);
+	float k2 = pet_tier_crisp(px / pitch2);
 
-	float fc = pet_tier_fade(px / pitch_c);
-	float fg = pet_tier_fade(px / pitch_g);
-	float fm = pet_tier_fade(px / pitch_m);
-	float fu = pet_tier_fade(px / pitch_u);
+	float d0 = 0.0, d1 = 0.0, d2 = 0.0;
+	float r0 = 0.5, r1 = 0.5, r2 = 0.5;
+	float n0 = 0.0, n1 = 0.0, n2 = 0.0;
+	float h0 = 0.0, h1 = 0.0, h2 = 0.0;
+	if (f0 > 0.002) { h0 = pet_fibre_tier(t, pitch0, 0.90, 6.0, 1.0, 1.0 - k0, d0, r0, n0); }
+	if (f1 > 0.002) { h1 = pet_fibre_tier(t, pitch1, 0.90, 6.5, 7.0, 1.0 - k1, d1, r1, n1); }
+	if (f2 > 0.002) { h2 = pet_fibre_tier(t, pitch2, 0.90, 7.0, 19.0, 1.0 - k2, d2, r2, n2); }
 
-	float dc = 0.0, dg = 0.0, dm = 0.0, du = 0.0;
-	float rc = 0.5, rg = 0.5, rm = 0.5, ru = 0.5;
-	float lc = 0.0, lg = 0.0, lm = 0.0, lu = 0.0;
-	float hc = 0.0, hg = 0.0, hm = 0.0, hu = 0.0;
-	if (fc > 0.002) { hc = pet_fibre_tier(t, pitch_c, 1.6, 4.5, 31.0, dc, rc, lc); }
-	if (fg > 0.002) { hg = pet_fibre_tier(t, pitch_g, 2.6, 15.0, 1.0, dg, rg, lg); }
-	if (fm > 0.002) { hm = pet_fibre_tier(t, pitch_m, 2.2, 17.0, 7.0, dm, rm, lm); }
-	if (fu > 0.002) { hu = pet_fibre_tier(t, pitch_u, 1.8, 19.0, 19.0, du, ru, lu); }
-
-	// The coat parts along the locks, so the finer tiers thin out where a lock
-	// edge runs. Modulating *coverage* like this is what gives the coat a second
-	// scale of structure, and it costs nothing in albedo.
-	float lockmask = 0.35 + 0.65 * hc;
-	c.tuft = hc;
-
-	// Whichever tier is currently the finest resolvable is the one the eye
-	// should be reading, so each tier hands most of its weight to the next one
-	// down as that one arrives. Holding every tier at a fixed share is what
-	// leaves coarse brush-strokes sitting on top of a close-up.
-	float wc = fc * (1.0 - 0.70 * fg);
-	float wg = fg * (1.0 - 0.70 * fm) * mix(0.55, 1.0, lockmask);
-	float wm = fm * (1.0 - 0.70 * fu) * mix(0.55, 1.0, lockmask);
-	float wu = fu * mix(0.55, 1.0, lockmask);
-	float wsum = wc + wg + wm + wu;
+	float w0 = f0 * (1.0 - 0.72 * k1);
+	float w1 = f1 * (1.0 - 0.72 * k2);
+	float w2 = f2;
+	float wsum = w0 + w1 + w2;
 	float inv = 1.0 / max(wsum, 1e-4);
 	// How much resolvable fibre structure there is at all. Every fibre-derived
 	// term fades toward its neutral value with this, so a pet shrunk to a taskbar
 	// icon loses its coat cleanly instead of dissolving into low-frequency mush.
 	float res = min(wsum, 1.0);
+	// How sharply the coat is being sampled, which is what every contrast term
+	// below is scaled by. The strands stay on screen at body scale; they stop
+	// shouting. Getting this backwards — full contrast on an unresolved rung — is
+	// the whole of the wood-grain failure.
+	float crisp = (w0 * k0 + w1 * k1 + w2 * k2) * inv;
+	float amp = mix(0.72, 1.0, crisp);
 
-	float cover = (wc * hc + wg * hg + wm * hm + wu * hu) * inv;
+	float strand = (w0 * h0 + w1 * h1 + w2 * h2) * inv;
+	float lean = (w0 * n0 + w1 * n1 + w2 * n2) * inv;
+	float rnd = (w0 * r0 + w1 * r1 + w2 * r2) * inv;
 
-	// The hair tiers are kept apart from the lock tier for everything specular.
-	// Blending them into one coverage figure lets the lock — which outweighs them
-	// whenever the pet is small — set the frequency of the highlight break-up
-	// too, and a highlight breaking at lock scale is a set of broad soft bands,
-	// which is the smooth-clay read wearing a different hat. The diffuse can have
-	// the blend; the gloss has to be at fibre frequency or it says nothing.
-	float wf = wg + wm + wu;
-	float finv = 1.0 / max(wf, 1e-4);
-	float fine = (wg * hg + wm * hm + wu * hu) * finv;
-	float lean = (wg * lg + wm * lm + wu * lu) * finv;
-	float rnd = (wg * rg + wm * rm + wu * ru) * finv;
-	float fres = min(wf, 1.0);
+	// The lock: ten strand widths across and stubby, four times as long as it is
+	// wide, because a lock is a stubby thing and a long one is only corduroy at a
+	// bigger scale. It is a fibre tier rather than a blob of fractal noise for
+	// one reason — fractal noise has no strands in it, so it can only ever be
+	// soft blotches, and soft blotches on a brown animal look like wet clay.
+	// Guarded, because the weighted mean is 0/0 once the pet is small enough that
+	// no rung resolves at all — and an unguarded zero pitch is a division by zero
+	// inside the tier, i.e. a screenful of NaN on the one size a desktop pet
+	// spends most of its life at.
+	float pitch_c = (wsum > 1e-3
+		? (w0 * pitch0 + w1 * pitch1 + w2 * pitch2) * inv : pitch0) * 0.10;
+	float fc = pet_tier_fade(px / pitch_c);
+	float dc = 0.0, rc = 0.5, nc = 0.0, lock = 0.0;
+	if (fc > 0.002) {
+		lock = pet_fibre_tier(t, pitch_c, 0.75, 4.0, 31.0,
+			1.0 - pet_tier_crisp(px / pitch_c), dc, rc, nc);
+	}
+	// The coat parts along the locks, so the strands thin out where a lock edge
+	// runs. Modulating *coverage* is what gives the coat its second scale of
+	// structure, and unlike a lock drawn in albedo it costs nothing in pigment.
+	float part = mix(0.66, 1.0, lock);
+
+	Coat c;
+	c.tuft = lock;
 
 	// Between the fibres you are looking down at shadowed skin; on one you are
-	// looking at a lit fibre. The mean of `cover` sits near a fifth, not a half —
+	// looking at a lit fibre. The mean of `strand` sits near a fifth, not a half —
 	// narrow fibres with gaps between them — so the endpoints are chosen to
 	// average out near unity. Getting that wrong is not a subtle bug: it darkens
 	// the whole animal by a fifth and every value in the lighting rig then has to
 	// be re-tuned around a coat.
-	c.occ = mix(1.0, mix(0.86, 1.30, cover), fluffy * res);
+	c.occ = mix(1.0, mix(1.0 - 0.17 * amp, 1.0 + 0.24 * amp, strand * part),
+		fluffy * res);
 
-	// Slopes are divided by their own pitch so a fine tier does not tilt the
-	// normal harder than a coarse one just for being denser.
-	c.slope = across * fluffy * inv * (0.045 * wc * dc / pitch_c
-		+ 0.055 * wg * dg / pitch_g + 0.050 * wm * dm / pitch_m
-		+ 0.040 * wu * du / pitch_u);
+	// Slopes are divided by their own pitch so a fine rung does not tilt the
+	// normal harder than a coarse one just for being denser. The lock gets a
+	// tenth of the strands' amplitude: a lock is a parting in the coat, not a
+	// ridge in the flesh, and given real relief it becomes a row of sausages.
+	c.slope = across * fluffy * amp * inv
+		* (0.034 * w0 * d0 / pitch0 + 0.032 * w1 * d1 / pitch1
+			+ 0.030 * w2 * d2 / pitch2)
+		+ across * fluffy * 0.009 * fc * dc / max(pitch_c, 1e-3);
 
-	// Albedo now carries almost none of the coat. Real hair is one pigment: what
+	// Albedo carries almost none of the coat. Real hair is one pigment: what
 	// changes from fibre to fibre is which way it points, not what colour it is.
 	// Painting the variation into albedo is what produced the soft blotches that
 	// made the animal look wet, so the strand read lives in `spec` and `tilt`
 	// below and this is left as the faint pigment drift a lock has.
-	c.tint = (rnd - 0.5) * 0.50 * mix(0.35, 1.0, fres);
+	c.tint = (rnd - 0.5) * 0.42 * res;
 
 	// The visible structure of a short coat is specular. Each fibre is a tiny
 	// cylinder: the highlight breaks across it, dies in the gap to the next one,
@@ -211,8 +250,9 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// the tinted second lobe. The lock only shades it — a lock lying against the
 	// light is duller than one standing away from it — it never sets its scale.
 	c.glint = rnd * rnd;
-	c.spec = mix(1.0, mix(0.26, 2.90, fine), fres) * mix(0.82, 1.16, hc);
-	c.tilt = lean * 0.30 * fres;
+	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), res)
+		* mix(0.76, 1.20, lock) * part;
+	c.tilt = lean * 0.34 * res;
 	return c;
 }
 
