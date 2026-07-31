@@ -326,6 +326,94 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	int mat = int(f.mat + 0.5);
 	float unit_px = 1.0 / max(px_per_unit, 1.0);
 	bool furry = mat == MAT_FUR || mat == MAT_FEATHER;
+	float R = max(f.radius, 1e-4);
+
+	// --- surface frame ------------------------------------------------------
+	// Local frame across the part's spine. Every marking, every non-fur family
+	// and — from this pass — the groom itself is written in it, so their detail
+	// wraps the body instead of being stamped in screen space. Built on the
+	// spine, not on the groom; see `Field.axis`.
+	vec2 across = vec2(-f.axis.y, f.axis.x);
+	float arc = dot(p, f.axis);
+	float side = dot(f.grad, across) >= 0.0 ? 1.0 : -1.0;
+	float v = (f.d + R) * side;
+	// Dorsal-to-ventral coordinate: +1 at the top line of the part, 0 across the
+	// middle of the flank where the surface faces the viewer, -1 at the belly
+	// line. It falls out of the capsule frame for free and it is what lets a
+	// marking or a landmark be told to keep to the back and off the underside.
+	//
+	// The sign is not obvious from the algebra and it is worth not re-deriving.
+	// Rendering `dv` straight to the framebuffer settles it in one capture; do
+	// that rather than reasoning about it, because reasoning about it puts the
+	// tabby's spine stripe down the animal's underside. Measured again this round
+	// on the standing cat at ship size: +1 is the back. The same capture also says
+	// `|dv|` and `u` are the same number to every digit it can print, which is the
+	// identity the groom frame below is built on.
+	float dv = clamp(v / R, -1.0, 1.0);
+	// `bulk` separates a body mass from a limb — the only thing on an animal
+	// thinner than a body section is a limb — and a good half of this file keys
+	// off it. The gate is a ratio against body height, so it means the same thing
+	// for a kitten and for an adult.
+	float bulk = smoothstep(0.055, 0.100, R / ctx.body_h);
+
+	// --- groom frame --------------------------------------------------------
+	// Where the hair points, derived from the surface instead of authored.
+	//
+	// A species hands each part one `groom_angle`, and most of them barely set it:
+	// measured at ship size, 58% of this cat's body pixels carry the identical
+	// direction — dead level, from the base of the neck to the root of the tail.
+	// Fur grown on that frame runs as one unbroken set of parallel lanes across
+	// the whole animal, and parallel lanes sampled at two pixels a lane are sawn
+	// timber whatever pigment they are drawn in. That is the wood grain at its
+	// root, and it is why the two previous passes, which both worked on the lanes
+	// themselves, could only move it around.
+	//
+	// Real fur flows over the form, and the form here has an exact unfolding: the
+	// part is a capsule seen from the side, `arc` runs along its spine, and the
+	// angle round the barrel is `theta` with `sin(theta) = dv` by construction.
+	// (That is the same identity as `u = |dv|`, which the height field below
+	// already depends on, so the whole frame costs one `asin`.) Arc length round
+	// the barrel is `R * theta`, and hair is spaced evenly in *that* — which is
+	// what crowds the lanes toward the silhouette the way a real pelt does instead
+	// of holding one screen pitch from spine to outline.
+	//
+	// Unfolding is also what makes this safe. The groom is a constant rotation in
+	// that plane, so the across-hair coordinate stays a genuine scalar field: its
+	// level sets bend but can never close. Rotating the frame per pixel — the
+	// obvious way to make fur curve — gives up exactly that property, and what
+	// comes back is concentric loops, which is the fingerprint artefact the bird's
+	// vanes are wearing further down this file.
+	//
+	// What lands on screen is a family of sine curves: level along the top line,
+	// tilting steeply as they come round the middle of the ribcage, level again
+	// under the belly. That is the reference photograph, and it is the thing a
+	// single authored angle cannot say.
+	//
+	// `dv` rather than `u` on purpose — it is signed, and it is taken from the
+	// field before the fringe displaces it, so the frame is continuous across the
+	// outline where the fringe is at its noisiest.
+	float sfore = max(sqrt(max(1.0 - dv * dv, 0.0)), 0.16);
+	// How far the flow leans off the spine. A pelt on a body mass runs down and
+	// back across the ribs; on a limb, an ear or a tail it runs along the bone and
+	// barely wraps at all, and `bulk` is already precisely that distinction.
+	float tilt = mix(0.10, 0.62, bulk);
+	float ctil = cos(tilt);
+	float stil = sin(tilt);
+	// The two axes in screen space. A step along the spine moves a whole unit; a
+	// step round the barrel is foreshortened by `sfore`, because the screen offset
+	// from the spine line is `R*sin(theta)` and its derivative with respect to arc
+	// length `R*theta` is `cos(theta)`. Caudal is +arc and ventral is -theta, so
+	// the flow is (cos, -sin) in the unfolded plane and the across-hair axis is
+	// (sin, cos).
+	vec2 groom_s = normalize(ctil * f.axis - stil * sfore * across + 1e-6);
+	vec2 across_s = normalize(stil * f.axis + ctil * sfore * across + 1e-6);
+	// Screen pixels per rig unit measured *across* the hair, which is the pitch
+	// that decides whether a lane can be resolved at all. Where the lanes crowd
+	// into the silhouette this falls, and every level-of-detail term in `pet_fur`
+	// backs the coat off with it — which is exactly where it would otherwise alias
+	// hardest. One number for the whole animal is what let the rim shimmer.
+	float px_groom = px_per_unit
+		* max(sqrt(stil * stil + ctil * ctil * sfore * sfore), 0.20);
 
 	// --- coat silhouette ----------------------------------------------------
 	// Real strands, indexed along the outline, displacing the distance field.
@@ -339,7 +427,7 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		// A receded layer gets its individual hairs taken away, not just blurred:
 		// you cannot resolve a strand on the far side of an animal, and leaving
 		// the fringe crisp back there is a depth cue pointing the wrong way.
-		float spikes = pet_fur_fringe(p, f.grad, f.groom, coat_density,
+		float spikes = pet_fur_fringe(p, f.grad, groom_s, coat_density,
 			px_per_unit, ctx.detail, cover);
 		// How far in from the outline the fringe is allowed to disturb the field.
 		// Budgeted against the part's own radius as well as the coat length,
@@ -372,7 +460,6 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	// faster than one pixel can resolve. A fixed bound instead would flatten a
 	// 15 px leg into pure silhouette while leaving a torso untouched — which is
 	// exactly how thin limbs end up as pale featureless tubes.
-	float R = max(f.radius, 1e-4);
 	float u = clamp(1.0 + d / R, 0.0, 1.0);
 	float u_res = 1.0 - 1.0 / max(R * px_per_unit, 2.0);
 	float su_min = sqrt(max(1.0 - u_res * u_res, 1e-4));
@@ -396,53 +483,6 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		nxy += f.decal_grad * (0.36 * ud / max(sud, 0.46)) * f.decal_w * small;
 	}
 
-	// --- groom field --------------------------------------------------------
-	// Fur has to curve, and there are two ways to get that wrong. Leaving it
-	// dead parallel reads as brushed metal. Rotating the strand frame per pixel
-	// looks like the obvious fix and is worse: the lane coordinate stops being
-	// integrable, so lanes close into concentric loops and the coat turns into
-	// wood grain. Displacing the *sample point* through a smooth vector field
-	// with the frame held fixed bends the lanes and can never form a loop.
-	//
-	// The frequencies matter as much as the trick. A large displacement at a low
-	// frequency bends every lane the same way at once, and smoothly wavy parallel
-	// lines are the definition of wood grain. Three small octaves, the finest at
-	// strand scale, make lanes wander apart from their neighbours instead.
-	vec2 pw = p;
-	if (furry) {
-		pw += vec2(pet_noise(p * 3.6 + 11.0), pet_noise(p * 3.6 + 43.0)) * 0.024
-			+ vec2(pet_noise(p * 11.0 + 3.0), pet_noise(p * 11.0 + 71.0)) * 0.009
-			+ vec2(pet_noise(p * 34.0 + 5.0), pet_noise(p * 34.0 + 17.0)) * 0.0026;
-	}
-	// The shading tangent does follow the surface, though: a strand lies on the
-	// body, so it sweeps around the barrel as the surface turns away from us.
-	// That sweep is what turns a flat sheen into a band running along the back.
-	vec2 groom = f.groom;
-	vec2 tang = vec2(-f.grad.y, f.grad.x);
-	if (dot(tang, groom) < 0.0) { tang = -tang; }
-	vec2 groom_s = normalize(mix(groom, tang, u * u * 0.45) + 1e-6);
-
-	// Local frame across the part's spine, used by every marking and by every
-	// non-fur family so their detail wraps the body instead of being stamped in
-	// screen space. Built on the spine, not on the groom — see `Field.axis`.
-	vec2 across = vec2(-f.axis.y, f.axis.x);
-	float arc = dot(p, f.axis);
-	float side = dot(f.grad, across) >= 0.0 ? 1.0 : -1.0;
-	float v = (f.d + R) * side;
-	// Dorsal-to-ventral coordinate: +1 at the top line of the part, 0 across the
-	// middle of the flank where the surface faces the viewer, -1 at the belly
-	// line. It falls out of the capsule frame for free and it is what lets a
-	// marking or a landmark be told to keep to the back and off the underside.
-	//
-	// The sign is not obvious from the algebra and it is worth not re-deriving:
-	// `across` is a quarter turn from the groom, which in a y-down rig looks like
-	// it should point at the belly, and it does not — the rig hands the trunk a
-	// groom that already runs tail-to-nose, and the two flips cancel. Rendering
-	// `dv` straight to the framebuffer settles it in one capture. Do that rather
-	// than reasoning about it; reasoning about it puts the tabby's spine stripe
-	// down the animal's underside, which is a whole review cycle wasted.
-	float dv = clamp(v / R, -1.0, 1.0);
-
 	// --- skeleton -----------------------------------------------------------
 	// A cat's back is not a tube. The blade of the scapula stands proud where the
 	// foreleg swings under it, the point of the hip sits above the femur head,
@@ -452,11 +492,13 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	// is at 28 parts of 28. So they are relief, added to the same height-field
 	// slope everything else in this shader uses.
 	//
-	// `bulk` keeps them on the body masses. The identical field stamped onto a
-	// leg or an ear is a dent in a tube, and the gate is a ratio against body
-	// height so it means the same thing for a kitten and an adult.
-	float bulk = smoothstep(0.055, 0.100, R / ctx.body_h);
+	// `bulk` (computed with the surface frame above) keeps them on the body
+	// masses. The identical field stamped onto a leg or an ear is a dent in a
+	// tube.
 	float skel = 0.0;
+	// Lane displacement the coat picks up from the same bones, in rig-space
+	// surface arc length. See where it is used, below.
+	float whorl = 0.0;
 	if (bulk > 0.002) {
 		for (int i = 0; i < MAX_LANDMARKS; i++) {
 			if (i >= landmark_count) { break; }
@@ -484,6 +526,15 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 			float crest = smoothstep(0.55, -0.30, raw.y / max(lm.z, 1e-4));
 			nxy -= (dp / max(q, 1e-5)) * dsl * lm.w * bulk * crest;
 			skel = max(skel, dome * bulk * crest);
+			// The coat sweeps *around* a shoulder rather than straight over it,
+			// which is why a real cat has a visible whorl there and why the review
+			// asks for one. It is added to the lane coordinate, not to the frame
+			// direction: any smooth scalar added to a lane index bends the lanes
+			// and cannot fold them, whereas rotating the frame here would put a
+			// set of concentric rings on the shoulder — the exact artefact the
+			// unfolded frame exists to avoid. Held well under one lane-width of
+			// gradient, which is the point where lanes would start to overlap.
+			whorl += dome * lm.z * 0.45 * bulk;
 		}
 		// The loin: two long muscles running either side of the spine. Seen from
 		// the side the groove between them is edge-on, so what actually reads is
@@ -531,7 +582,26 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	float frame_ok = 1.0 - 0.92 * smoothstep(0.020, 0.115, frame_twist);
 
 	if (mat == MAT_FUR) {
-		Coat c = pet_fur(pw, groom, coat_density, px_per_unit,
+		// The lane coordinate, in the unfolded surface plane: along the hair, then
+		// across it. `sarc` is arc length round the barrel from the spine line, so
+		// equal steps in it are equal steps *on the animal* — which is what makes
+		// the lanes crowd into the silhouette instead of holding one screen pitch
+		// all the way to the outline. Clamped just short of the pole because
+		// `asin` has an infinite derivative there and a lane of infinite density is
+		// a rim that shimmers whenever the pet moves.
+		float sarc = R * asin(clamp(dv, -0.985, 0.985));
+		vec2 t = vec2(arc * ctil - sarc * stil, arc * stil + sarc * ctil + whorl);
+		// Three small octaves of wander, the finest at strand scale, so neighbouring
+		// lanes drift apart from each other instead of the whole field bending as a
+		// block — a single large low-frequency warp bends every lane the same way at
+		// once, and smoothly wavy parallel lines are the definition of wood grain.
+		// Applied to the lane coordinate rather than to the sample point: it is the
+		// same displacement, and doing it here keeps it inside the unfolded frame
+		// where it provably cannot fold one lane over another.
+		t += vec2(pet_noise(p * 3.6 + 11.0), pet_noise(p * 3.6 + 43.0)) * 0.024
+			+ vec2(pet_noise(p * 11.0 + 3.0), pet_noise(p * 11.0 + 71.0)) * 0.009
+			+ vec2(pet_noise(p * 34.0 + 5.0), pet_noise(p * 34.0 + 17.0)) * 0.0026;
+		Coat c = pet_fur(t, across_s, coat_density, px_groom,
 			fluff * (1.0 - wetness * 0.7));
 		nxy += c.slope * ctx.detail * frame_ok;
 		micro_occ = mix(1.0, c.occ, ctx.detail * frame_ok);

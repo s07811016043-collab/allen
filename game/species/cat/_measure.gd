@@ -24,8 +24,20 @@ extends Node2D
 ## nothing under it, and `lumbar` is the unsupported run between the girdles.
 
 const FORE_IDS := [&"leg_fl_upper", &"leg_fl_lower", &"paw_fl"]
-const HIND_IDS := [&"leg_bl_upper", &"leg_bl_lower", &"paw_bl"]
-const TRUNK_IDS := [&"hip", &"torso", &"chest", &"belly", &"scapula"]
+const HIND_IDS := [&"leg_bl_upper", &"leg_bl_lower", &"leg_bl_hock", &"paw_bl"]
+const TRUNK_IDS := [&"hip", &"torso", &"chest", &"belly", &"brisket"]
+
+## Distal part of each limb, near then far. The far pair has no paw of its own —
+## its shank runs to the floor — so "where does this leg touch down" cannot be
+## asked by part name alone.
+const FEET := [&"paw_fl", &"leg_fl_far_lower", &"paw_bl", &"leg_bl_far_hock"]
+const FEET_LABELS := ["FN", "FF", "HN", "HF"]
+
+## Pixels per rig unit on the shipped 260 px frame. Measured, not assumed: the
+## harness fits the settled pose to the frame, so an adult cat's 1.391 units of
+## vertical extent land on 157 px. Every gap below is quoted in these as well as
+## in rig units, because a 0.03 gap is a fix at one size and nothing at the other.
+const SHIP_PX := 112.9
 
 
 func _ready() -> void:
@@ -77,33 +89,126 @@ func _report(spec: CreatureSpec, g: float) -> void:
 	withers = -trunk_top
 
 	var l: float = head_x - rump_x
-	var fore_x: float = _paw_x(by, FORE_IDS[2])
-	var hind_x: float = _paw_x(by, HIND_IDS[2])
-	var scapula: SDFPart = by.get(&"scapula", by.get(&"chest"))
-	var scapula_x: float = (scapula.a.x + scapula.b.x) * 0.5
+	var fore_x: float = _paw_x(by, FEET[0])
+	var hind_x: float = _paw_x(by, FEET[2])
+	var blade: SDFPart = by.get(&"brisket", by.get(&"chest"))
+	var blade_x: float = (blade.a.x + blade.b.x) * 0.5
 
 	print("g=%.0f  H=%.3f L=%.3f  L/H=%.2f | chest_depth=%.0f%%H  stance=%.2fH" % [
 		g, withers, l, l / withers,
 		(trunk_bottom - trunk_top) / withers * 100.0, (fore_x - hind_x) / withers])
-	print("       scapula=%.0f%% of L from nose | cantilever=%.0f%% of L ahead of the fore paw"
-		% [(head_x - scapula_x) / l * 100.0, (head_x - fore_x) / l * 100.0])
+	print("       shoulder=%.0f%% of L from nose | cantilever=%.0f%% of L ahead of the fore paw"
+		% [(head_x - blade_x) / l * 100.0, (head_x - fore_x) / l * 100.0])
 	# Girdle to girdle: the shoulder joint to the hip joint, which is the run of
 	# spine with nothing under it. ~0.80H on a cat, ~1.5H on a dachshund.
 	var girdles: float = (by[FORE_IDS[0]].a.x - by[HIND_IDS[0]].a.x) / withers
 	print("       girdles=%.2fH apart | far/near fore split=%.3f hind=%.3f" % [
 		girdles,
-		_paw_x(by, &"paw_fl") - _paw_x(by, &"paw_fl_far"),
-		_paw_x(by, &"paw_bl") - _paw_x(by, &"paw_bl_far")])
+		_paw_x(by, FEET[0]) - _paw_x(by, FEET[1]),
+		_paw_x(by, FEET[2]) - _paw_x(by, FEET[3])])
+	_report_gaps(live, withers)
+	_report_front(live, withers)
+
+
+## Daylight inside each leg pair, which is the whole of review item 1.
+##
+## Split measured at the paw is not the question the eye asks — two legs can be
+## 0.15 apart at the floor and still share one silhouette run all the way up, and
+## a silhouette run is what the reviewer counts. So this walks the free length of
+## the limb and reports the *narrowest* separation between the near group's
+## trailing edge and the far group's leading edge at each height, which is the
+## number that has to stay positive.
+func _report_gaps(live: Array[SDFPart], withers: float) -> void:
+	var near_fore: Array[SDFPart] = _group(live, ["leg_fl_lower", "paw_fl"])
+	var far_fore: Array[SDFPart] = _group(live, ["leg_fl_far_lower"])
+	var near_hind: Array[SDFPart] = _group(live, ["leg_bl_lower", "leg_bl_hock", "paw_bl"])
+	var far_hind: Array[SDFPart] = _group(live, ["leg_bl_far_lower", "leg_bl_far_hock"])
+	# The far fore sits behind the near fore and the far hind ahead of the near
+	# hind, so each pair is asked the question that way round.
+	_print_gap("fore", near_fore, far_fore, true, withers)
+	_print_gap("hind", far_hind, near_hind, true, withers)
+
+
+func _print_gap(label: String, front: Array[SDFPart], back: Array[SDFPart],
+		_unused: bool, withers: float) -> void:
+	var line := "       %s gap:" % label
+	var worst := INF
+	for i in 9:
+		# From the floor up to 45% of withers height — above that the limbs
+		# converge into the girdle and are *supposed* to share a run.
+		var y: float = -withers * (0.05 + 0.05 * float(i))
+		var f := _span_at(front, y)
+		var b := _span_at(back, y)
+		if not is_finite(f.x) or not is_finite(b.x):
+			continue
+		var gap: float = f.x - b.y  # front group's rear edge minus back group's front edge
+		worst = minf(worst, gap)
+		if i % 2 == 0:
+			line += "  y%.2f=%+.3f" % [y, gap]
+	print("%s | worst=%+.3f (%.1f px at ship)" % [line, worst, worst * SHIP_PX])
+
+
+## Leading edge of the body from throat to elbow, which is review item 2. A cat
+## is deepest at the chest; a column of identical numbers is the flat wall.
+func _report_front(live: Array[SDFPart], withers: float) -> void:
+	var trunk: Array[SDFPart] = _group(live,
+		["brisket", "chest", "neck", "belly", "leg_fl_upper", "leg_fl_lower"])
+	var line := "       front:"
+	var lead := -INF
+	var leg := -INF
+	for i in 8:
+		var y: float = -withers * (0.85 - 0.05 * float(i))
+		var s := _span_at(trunk, y)
+		if not is_finite(s.y):
+			continue
+		lead = maxf(lead, s.y)
+		line += " %+.3f" % s.y
+	var legs: Array[SDFPart] = _group(live, ["leg_fl_upper", "leg_fl_lower"])
+	for i in 8:
+		var s := _span_at(legs, -withers * (0.85 - 0.05 * float(i)))
+		if is_finite(s.y):
+			leg = maxf(leg, s.y)
+	print("%s | chest leads the foreleg by %+.3f (%.1f px)" % [line, lead - leg,
+		(lead - leg) * SHIP_PX])
+
+
+func _group(live: Array[SDFPart], ids: Array) -> Array[SDFPart]:
+	var out: Array[SDFPart] = []
+	for p in live:
+		if String(p.id) in ids:
+			out.append(p)
+	return out
+
+
+## Horizontal span of a group of capsules on the scanline `y`, as (min_x, max_x).
+## Sampled along each spine rather than solved, because a tapered capsule's
+## outline is a pair of tangent lines and the closed form is not worth the risk
+## of getting it subtly wrong in a probe whose whole job is to be trusted.
+func _span_at(group: Array[SDFPart], y: float) -> Vector2:
+	var lo := INF
+	var hi := -INF
+	for p in group:
+		for i in 33:
+			var t: float = float(i) / 32.0
+			var c: Vector2 = p.a.lerp(p.b, t)
+			var r: float = lerpf(p.radius_a, p.radius_b, t)
+			var dy: float = absf(y - c.y)
+			if dy > r:
+				continue
+			var half: float = sqrt(r * r - dy * dy)
+			lo = minf(lo, c.x - half)
+			hi = maxf(hi, c.x + half)
+	return Vector2(lo, hi)
 
 
 ## Lowest posed point, per leg, so a rig-introduced float shows up per limb
 ## rather than as one body-wide number that a single planted paw can hide.
 func _report_posed(anim: StringName, live: Array[SDFPart]) -> void:
 	var line := "posed %s:" % anim
-	for id in [&"paw_fl", &"paw_fl_far", &"paw_bl", &"paw_bl_far"]:
+	for i in FEET.size():
 		for p in live:
-			if p.id == id:
-				line += "  %s y=%+.4f x=%+.3f" % [id, maxf(p.a.y + p.radius_a,
+			if p.id == FEET[i]:
+				line += "  %s y=%+.4f x=%+.3f" % [FEET_LABELS[i], maxf(p.a.y + p.radius_a,
 					p.b.y + p.radius_b), p.b.x]
 	print(line)
 

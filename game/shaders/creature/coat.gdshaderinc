@@ -158,9 +158,18 @@ float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 // while the pet is being resized; its amplitude is small enough that this is the
 // cheaper of the two errors, and the alternative is locks the size of the whole
 // animal as soon as anyone zooms in.
-Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
-	vec2 across = vec2(-groom.y, groom.x);
-	vec2 t = vec2(dot(p, groom), dot(p, across));
+//
+// `t` arrives already in the groom frame — (along the hair, across the hair), in
+// rig-space *surface* arc length — because the caller is the only thing that
+// knows the shape of the body the hair is lying on. See the groom-frame block in
+// `creature_body.gdshader`: building `t` by projecting a position onto one
+// authored direction, which is what this used to do, is what ran every strand on
+// the animal parallel to every other and put sawn timber on the flank.
+// `across_s` is the same across-hair axis expressed as a *screen* direction, for
+// the normal perturbation, and `px` is screen pixels per rig unit measured
+// across the hair, which on a barrel is not the same number as along it.
+Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
+	vec2 across = across_s;
 
 	// Four rungs, and the count is forced rather than chosen. A desktop pet is
 	// drawn anywhere from about 150 to about 1100 screen pixels to the rig unit —
