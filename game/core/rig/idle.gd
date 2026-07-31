@@ -106,8 +106,15 @@ func _advance_breath(dt: float) -> void:
 
 
 ## Breathing amplitude as a body-scale multiplier, applied to the ribcage.
+##
+## Deliberately larger than life. A resting cat's flank moves a couple of
+## millimetres, which at desktop-pet scale is a third of a pixel — a contact
+## sheet of one whole breath cycle differenced against itself showed literally
+## no change in the silhouette. Breathing you cannot see is breathing that isn't
+## there, and a still pet reads as a prop, so the amplitude is pushed to where
+## the torso visibly rises and the shoulders carry the head with them.
 func breath_swell() -> float:
-	return breath * (0.012 + 0.030 * exertion)
+	return breath * (0.035 + 0.045 * exertion)
 
 
 # --- blinking ---------------------------------------------------------------

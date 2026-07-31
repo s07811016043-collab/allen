@@ -25,6 +25,8 @@ struct Coat {
 	vec2  slope;  // rig-space normal perturbation
 	float tint;   // per-strand albedo modulation, signed
 	float glint;  // per-strand sparkle, drives the TRT lobe
+	float spec;   // per-strand multiplier on the whole hair lobe
+	float tilt;   // per-strand deflection of the strand tangent, radians
 	float tuft;   // low-frequency clump mask, hand-sized
 };
 
@@ -42,31 +44,61 @@ struct Surf {
 // Fur
 // ---------------------------------------------------------------------------
 
-// One tier of strands in the groom frame (`t.x` along the hair, `t.y` across).
+// A lane tier is honest down to roughly two pixels per lane; below that it can
+// only alias. Being timid about this threshold is what emptied the coat at body
+// scale: at ~330 px per rig unit the guard tier is under three pixels a lane, so
+// a cutoff at four or five removes every tier the body has and leaves nothing
+// but the clump field — which is exactly the smooth-clay read.
+float pet_tier_fade(float px_per_lane) {
+	return smoothstep(1.25, 2.55, px_per_lane);
+}
+
+
+// One tier of fibres in the groom frame (`t.x` along the hair, `t.y` across).
 //
-// `pitch` is strands per rig unit. The across-hair coordinate is warped by a
-// slow field *before* it is quantised, which makes neighbouring lanes converge:
-// that convergence is clumping, and clumping is most of the difference between
-// fur and carpet. `clump` is measured in lane widths, so a tier clumps by the
-// same visible amount whatever its pitch.
-float pet_hair_tier(vec2 t, float pitch, float clump, float seed,
-		out float dcross, out float rnd) {
-	// The warp's across-frequency is tied to the pitch so every tier clumps by
-	// the same *visible* amount. Too slow a warp shifts whole bands of lanes
-	// together and they stay parallel; the point is for neighbours to converge.
-	float w = pet_noise(vec2(t.x * pitch * 0.030 + seed * 3.7, t.y * pitch * 0.15));
+// `pitch` is fibres per rig unit and `aspect` is how long each one is in units
+// of its own width — a guard hair is roughly fifteen times as long as it is
+// wide, a lock only four or five. The across-hair coordinate is warped *before*
+// it is quantised, which makes neighbouring lanes converge, and that convergence
+// is clumping. `clump` is measured in lane widths so a tier clumps by the same
+// visible amount whatever its pitch.
+float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
+		out float dcross, out float rnd, out float lean) {
+	// The warp has to *diverge* between neighbouring lanes, not shift them as a
+	// block: a low-frequency warp with a large amplitude slides whole bands of
+	// parallel lanes together, and smoothly wavy parallel lines are wood grain.
+	// Two octaves, the finer one only a few lanes across, is what makes lanes
+	// merge into each other instead of travelling in formation.
+	float w = pet_noise(vec2(t.x * pitch * 0.055 + seed * 3.7, t.y * pitch * 0.11))
+		+ 0.45 * pet_noise(vec2(t.x * pitch * 0.20 + seed, t.y * pitch * 0.34));
 	float y = t.y * pitch + w * clump;
 	float lane = floor(y);
 	float f = fract(y) - 0.5;
 	rnd = pet_hash1(vec2(lane, seed));
 
-	float width = mix(0.22, 0.46, rnd);
+	float width = mix(0.20, 0.42, rnd);
 	float dprofile;
 	float core = pet_ridge(abs(f) / width, dprofile);
-	// Strands overlap and fade along their own length. Without this a lane is a
-	// ruled line, which is exactly how combed-noise fur ends up looking like
-	// wood grain.
-	float seg = 0.76 + 0.24 * sin(t.x * pitch * 1.6 + rnd * PETALIA_TAU);
+
+	// A fibre is a finite object, and a lane left running forever is a ruled
+	// line. So each lane is chopped into fibre-length cells, and the phase of
+	// the chop is offset per lane so neighbours start and end at different
+	// places instead of forming a seam across the coat. Each cell draws its own
+	// length from the hash: some fibres lie flat against the next one, some end
+	// in a clear gap.
+	float span = t.x * pitch / max(aspect, 1.0) + rnd * 11.0;
+	float cell = floor(span);
+	float rc = pet_hash1(vec2(cell, lane * 0.61 + seed));
+	float dseg;
+	float seg = 0.22 + 0.78
+		* pet_ridge(abs(fract(span) - 0.5) / mix(0.30, 0.58, rc), dseg);
+
+	// No two hairs point exactly the same way, and that scatter is the whole
+	// reason a coat glitters instead of gleaming: it splits one broad sheen into
+	// hundreds of individual fibre highlights. Half of it is per-strand and half
+	// follows the clump, so locks catch the key as groups the way a real one
+	// does. Returned unscaled; the caller decides the angle.
+	lean = (rnd - 0.5) * 2.0 + w * 0.9;
 
 	dcross = dprofile * sign(f) / width * pitch * seg;
 	return core * seg;
@@ -75,75 +107,112 @@ float pet_hair_tier(vec2 t, float pitch, float clump, float seed,
 
 // The layered coat.
 //
-// Four scales, because a pelt has four. Clumps are the locks a hand would part
-// and they are visible at every size the pet is ever drawn at; guard hairs are
-// the tier the eye reads as "fur" on the desktop; the midcoat and undercoat only
-// resolve when the player zooms in, and fade out below Nyquist rather than
-// aliasing into sparkle. Each tier shadows the ones under it, which is where the
-// depth in a real coat comes from.
+// Four scales, because a pelt has four, and the ladder is anchored at the top by
+// physics rather than by taste. A cat's guard hair is about a tenth of a
+// millimetre across on an animal a quarter of a metre tall, so an individual
+// hair is sub-pixel at every size a desktop pet is ever drawn at: at body scale
+// it is not the hair the eye resolves, it is the *lock* — a few dozen hairs
+// travelling together, roughly ten hairs wide. That fixes the coarsest tier at a
+// tenth of the guard pitch, and everything finer arrives only as the player
+// zooms in.
+//
+// The lock tier is what makes or breaks the body-scale read, and it is a fibre
+// tier rather than a blob of fractal noise for one reason: fractal noise has no
+// strands in it, so it can only ever be soft blotches, and soft blotches on a
+// brown animal look like wet clay. But it is a *short* fibre — four or five
+// times as long as it is wide, not fifteen — because a lock is a stubby thing,
+// and long ones would just be corduroy at a bigger scale.
 Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	vec2 across = vec2(-groom.y, groom.x);
 	vec2 t = vec2(dot(p, groom), dot(p, across));
 
 	Coat c;
 
-	// Locks are the one tier that must not be lanes. Real fur parts into
-	// irregular clumps that merge and split; parallel lanes at this scale read as
-	// wood grain no matter how they are shaded. So the lock field is a stretched
-	// fractal instead, and it modulates the tiers above it rather than shading
-	// directly.
-	float lock = pet_fbm(vec2(t.x * 5.0, t.y * 23.0), 3);
-	c.tuft = lock;
+	float pitch_g = 135.0 * density;
+	float pitch_c = pitch_g * 0.10;
+	float pitch_m = 340.0 * density;
+	float pitch_u = 810.0 * density;
 
-	// Real hair on a cat is a tenth of a millimetre across — sub-pixel at every
-	// size the pet is ever drawn at. So the interior coat is deliberately fine
-	// and low contrast, and the *silhouette* carries the visible-strand read,
-	// which is exactly where you see individual hairs on a real animal. Coarse
-	// high-contrast lanes across the body are what make procedural fur look like
-	// straw.
-	float pitch_g = 105.0 * density;
-	float pitch_m = 240.0 * density;
-	float pitch_u = 540.0 * density;
+	float fc = pet_tier_fade(px / pitch_c);
+	float fg = pet_tier_fade(px / pitch_g);
+	float fm = pet_tier_fade(px / pitch_m);
+	float fu = pet_tier_fade(px / pitch_u);
 
-	// Fade a tier in as soon as its pitch clears ~2.5 px. Below that it is
-	// sub-Nyquist and can only alias.
-	float fg = smoothstep(2.1, 4.6, px / pitch_g);
-	float fm = smoothstep(2.1, 4.6, px / pitch_m);
-	float fu = smoothstep(2.1, 4.6, px / pitch_u);
+	float dc = 0.0, dg = 0.0, dm = 0.0, du = 0.0;
+	float rc = 0.5, rg = 0.5, rm = 0.5, ru = 0.5;
+	float lc = 0.0, lg = 0.0, lm = 0.0, lu = 0.0;
+	float hc = 0.0, hg = 0.0, hm = 0.0, hu = 0.0;
+	if (fc > 0.002) { hc = pet_fibre_tier(t, pitch_c, 1.6, 4.5, 31.0, dc, rc, lc); }
+	if (fg > 0.002) { hg = pet_fibre_tier(t, pitch_g, 2.6, 15.0, 1.0, dg, rg, lg); }
+	if (fm > 0.002) { hm = pet_fibre_tier(t, pitch_m, 2.2, 17.0, 7.0, dm, rm, lm); }
+	if (fu > 0.002) { hu = pet_fibre_tier(t, pitch_u, 1.8, 19.0, 19.0, du, ru, lu); }
 
-	float dg = 0.0, dm = 0.0, du = 0.0;
-	float rg = 0.5, rm = 0.5, ru = 0.5;
-	float hg = 0.0, hm = 0.0, hu = 0.0;
-	if (fg > 0.002) { hg = pet_hair_tier(t, pitch_g, 2.6, 1.0, dg, rg); }
-	if (fm > 0.002) { hm = pet_hair_tier(t, pitch_m, 2.2, 7.0, dm, rm); }
-	if (fu > 0.002) { hu = pet_hair_tier(t, pitch_u, 1.8, 19.0, du, ru); }
+	// The coat parts along the locks, so the finer tiers thin out where a lock
+	// edge runs. Modulating *coverage* like this is what gives the coat a second
+	// scale of structure, and it costs nothing in albedo.
+	float lockmask = 0.35 + 0.65 * hc;
+	c.tuft = hc;
 
-	// The coat thins where the locks part, so the shadowed undercoat shows.
-	float lockmask = 0.5 + 0.5 * lock;
-	float guard = hg * (0.55 + 0.45 * lockmask);
+	// Whichever tier is currently the finest resolvable is the one the eye
+	// should be reading, so each tier hands most of its weight to the next one
+	// down as that one arrives. Holding every tier at a fixed share is what
+	// leaves coarse brush-strokes sitting on top of a close-up.
+	float wc = fc * (1.0 - 0.70 * fg);
+	float wg = fg * (1.0 - 0.70 * fm) * mix(0.55, 1.0, lockmask);
+	float wm = fm * (1.0 - 0.70 * fu) * mix(0.55, 1.0, lockmask);
+	float wu = fu * mix(0.55, 1.0, lockmask);
+	float wsum = wc + wg + wm + wu;
+	float inv = 1.0 / max(wsum, 1e-4);
+	// How much resolvable fibre structure there is at all. Every fibre-derived
+	// term fades toward its neutral value with this, so a pet shrunk to a taskbar
+	// icon loses its coat cleanly instead of dissolving into low-frequency mush.
+	float res = min(wsum, 1.0);
 
-	// The finer tiers carry more weight than the coarse one, so whichever tier
-	// is currently the finest resolvable is the one that dominates the read.
-	float wg = 0.30 * fg;
-	float wm = 0.40 * fm;
-	float wu = 0.30 * fu;
-	float wsum = wg + wm + wu;
-	float cover = wsum > 1e-4 ? (wg * guard + wm * hm + wu * hu) / wsum : lockmask;
+	float cover = (wc * hc + wg * hg + wm * hm + wu * hu) * inv;
 
-	// Between the strands you are looking down at shadowed skin; on a strand you
-	// are looking at a lit fibre. The spread of that is the coat's contrast, and
-	// it wants to stay modest — hair reads through direction and count, not
-	// through how black the gaps are.
-	c.occ = mix(1.0 - 0.30 * fluffy * min(wsum * 3.0, 1.0), 1.05, cover)
-		* mix(0.90, 1.07, lockmask);
+	// The hair tiers are kept apart from the lock tier for everything specular.
+	// Blending them into one coverage figure lets the lock — which outweighs them
+	// whenever the pet is small — set the frequency of the highlight break-up
+	// too, and a highlight breaking at lock scale is a set of broad soft bands,
+	// which is the smooth-clay read wearing a different hat. The diffuse can have
+	// the blend; the gloss has to be at fibre frequency or it says nothing.
+	float wf = wg + wm + wu;
+	float finv = 1.0 / max(wf, 1e-4);
+	float fine = (wg * hg + wm * hm + wu * hu) * finv;
+	float lean = (wg * lg + wm * lm + wu * lu) * finv;
+	float rnd = (wg * rg + wm * rm + wu * ru) * finv;
+	float fres = min(wf, 1.0);
+
+	// Between the fibres you are looking down at shadowed skin; on one you are
+	// looking at a lit fibre. The mean of `cover` sits near a fifth, not a half —
+	// narrow fibres with gaps between them — so the endpoints are chosen to
+	// average out near unity. Getting that wrong is not a subtle bug: it darkens
+	// the whole animal by a fifth and every value in the lighting rig then has to
+	// be re-tuned around a coat.
+	c.occ = mix(1.0, mix(0.86, 1.30, cover), fluffy * res);
 
 	// Slopes are divided by their own pitch so a fine tier does not tilt the
 	// normal harder than a coarse one just for being denser.
-	c.slope = across * fluffy * (0.048 * wg * dg / pitch_g
-		+ 0.042 * wm * dm / pitch_m + 0.030 * wu * du / pitch_u);
+	c.slope = across * fluffy * inv * (0.045 * wc * dc / pitch_c
+		+ 0.055 * wg * dg / pitch_g + 0.050 * wm * dm / pitch_m
+		+ 0.040 * wu * du / pitch_u);
 
-	c.tint = lock * 0.60 + (rg - 0.5) * 0.22 * fg + (rm - 0.5) * 0.16 * fm;
-	c.glint = rg * rg * fg;
+	// Albedo now carries almost none of the coat. Real hair is one pigment: what
+	// changes from fibre to fibre is which way it points, not what colour it is.
+	// Painting the variation into albedo is what produced the soft blotches that
+	// made the animal look wet, so the strand read lives in `spec` and `tilt`
+	// below and this is left as the faint pigment drift a lock has.
+	c.tint = (rnd - 0.5) * 0.50 * mix(0.35, 1.0, fres);
+
+	// The visible structure of a short coat is specular. Each fibre is a tiny
+	// cylinder: the highlight breaks across it, dies in the gap to the next one,
+	// and comes back. `spec` is that break, `tilt` deflects the fibre tangent so
+	// neighbours catch the key at slightly different angles, and `glint` drives
+	// the tinted second lobe. The lock only shades it — a lock lying against the
+	// light is duller than one standing away from it — it never sets its scale.
+	c.glint = rnd * rnd;
+	c.spec = mix(1.0, mix(0.26, 2.90, fine), fres) * mix(0.82, 1.16, hc);
+	c.tilt = lean * 0.30 * fres;
 	return c;
 }
 
@@ -159,16 +228,16 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 // strongly the pixel belongs to a spike rather than to the body proper, so the
 // caller can make hair tips translucent.
 float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
-		out float cover) {
+		float sharp, out float cover) {
 	vec2 across = vec2(-grad.y, grad.x);
 	// Shear the lane coordinate along the outward normal so spikes lean the way
 	// the coat is groomed instead of standing up like a brush.
 	float arc = dot(p, across) + dot(p, grad) * dot(groom, across) * 1.4;
 
-	float pitch_a = 78.0 * density;
-	float pitch_b = 205.0 * density;
-	float fa = smoothstep(1.5, 3.6, px / pitch_a);
-	float fb = smoothstep(1.5, 3.6, px / pitch_b);
+	float pitch_a = 92.0 * density;
+	float pitch_b = 230.0 * density;
+	float fa = pet_tier_fade(px / pitch_a) * sharp;
+	float fb = pet_tier_fade(px / pitch_b) * sharp;
 
 	float total = 0.0;
 	cover = 0.0;
@@ -180,7 +249,10 @@ float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
 		float s = arc * pitch_a + pet_noise(vec2(arc * 5.0, 3.1)) * 2.2;
 		float f = fract(s) - 0.5;
 		float r = pet_hash1(vec2(floor(s), 5.0));
-		float w = mix(0.17, 0.40, r);
+		// Narrow spikes with real gaps between them. Wide ones overlap into a
+		// continuous skirt, and a continuous skirt is a blurred outline — which
+		// is the thing this whole function exists to avoid.
+		float w = mix(0.13, 0.32, r);
 		float taper = clamp(1.0 - abs(f) / w, 0.0, 1.0);
 		// Squaring the length keeps most hairs short with a few standing proud.
 		// A flat distribution reads as a comb.
@@ -191,14 +263,15 @@ float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
 		float s = arc * pitch_b + pet_noise(vec2(arc * 14.0, 8.7)) * 1.6;
 		float f = fract(s) - 0.5;
 		float r = pet_hash1(vec2(floor(s), 11.0));
-		float w = mix(0.20, 0.42, r);
+		float w = mix(0.15, 0.34, r);
 		float taper = clamp(1.0 - abs(f) / w, 0.0, 1.0);
 		total += fb * (0.08 + 0.44 * r * r) * taper * 0.5;
 		cover = max(cover, taper * fb * 0.8);
 	}
 	// A thin continuous skirt under the spikes: real coats have down between the
-	// guard hairs, and without it the silhouette reads as a saw blade.
-	return total + 0.07;
+	// guard hairs, and without it the silhouette reads as a saw blade. It stays
+	// thin, though — every unit of skirt is a unit of blur on the outline.
+	return total + 0.045;
 }
 
 
@@ -220,9 +293,13 @@ vec3 pet_hair_spec(vec3 tangent, vec3 n, vec3 l, vec3 v, float rough,
 		vec3 tint, float glint) {
 	vec3 tr = normalize(tangent + n * 0.10);
 	vec3 ttrt = normalize(tangent - n * 0.16);
-	float r = pet_strand_lobe(tr, l, v, rough * 0.40);
+	// The R lobe has to stay *broad*. Narrowed to a mirror it only fires where
+	// the key happens to sit at the reflection angle, which on a side-on animal
+	// is nowhere on the flank — so the per-fibre break-up that this whole model
+	// exists to produce would be invisible across the entire torso.
+	float r = pet_strand_lobe(tr, l, v, rough * 0.62);
 	float trt = pet_strand_lobe(ttrt, l, v, rough * 1.20);
-	return vec3(1.0) * r * 0.20 + tint * trt * (0.26 + glint * 0.70);
+	return vec3(1.0) * r * 0.24 + tint * trt * (0.26 + glint * 0.70);
 }
 
 

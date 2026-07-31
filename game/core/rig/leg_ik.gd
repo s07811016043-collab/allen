@@ -39,6 +39,13 @@ class Chain:
 	var fold_rest := 0.0
 	var root_bind := Vector2.ZERO
 	var ankle_bind := Vector2.ZERO
+	## Where this limb actually touches the floor in the bind pose, and the
+	## bind-frame vector from the ankle out to it. The ankle is a joint, not a
+	## contact: a cat's wrist sits 0.13 units above the ground and its hock
+	## nearly 0.2, so planting the ankle and then rolling the foot about it drags
+	## the visible paw across the floor. `Gait` pivots about the contact instead.
+	var contact_bind := Vector2.ZERO
+	var contact_arm := Vector2.ZERO
 	## Straight-line reach, used by the gait for step height and body support.
 	var reach := 0.0
 	var fore := true
@@ -95,6 +102,14 @@ static func _build_chain(skeleton: RigSkeleton, fore: bool, far: bool) -> Chain:
 	c.root_bone = seq[0]
 	c.root_bind = skeleton.bones[seq[0]].rest_xform.origin
 	c.ankle_bind = skeleton.bones[ankle].rest_xform.origin
+	# The contact patch sits under the far end of the foot, on the ground plane.
+	# Taking y from the convention (y = 0 is the floor) rather than from the tip
+	# bone keeps the pivot honest even when a species draws its toe capsule with
+	# the centreline a radius above the floor.
+	var tip := skeleton.index_of(RigBones.limb_bone(fore, far, false, -1))
+	c.contact_bind = Vector2(
+		skeleton.bones[tip].rest_xform.origin.x if tip >= 0 else c.ankle_bind.x, 0.0)
+	c.contact_arm = c.contact_bind - c.ankle_bind
 	for i in seq.size():
 		var next: int = seq[i + 1] if i + 1 < seq.size() else ankle
 		c.lengths.append(skeleton.bones[seq[i]].rest_xform.origin.distance_to(

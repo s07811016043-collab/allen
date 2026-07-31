@@ -338,10 +338,12 @@ func _count_live(id: StringName) -> int:
 
 
 func _acquire(id: StringName, reg: Dictionary) -> VfxEffect:
-	var arr: Array = _pool.get(id)
-	if arr == null:
-		arr = []
-		_pool[id] = arr
+	# `_pool.get(id)` returns Nil for a missing key, and assigning Nil to a typed
+	# Array is a hard error — so the null check below never got the chance to
+	# run, the pool stayed empty, and every spawn leaked a fresh node.
+	if not _pool.has(id):
+		_pool[id] = []
+	var arr: Array = _pool[id]
 	for e in arr:
 		if not e.is_playing():
 			return e

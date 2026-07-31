@@ -29,6 +29,8 @@ const RigBones := preload("res://core/rig/bone_map.gd")
 ## scaled, so a stall cannot make a spring explode or change the resulting pose.
 const STEP := 1.0 / 120.0
 const MAX_STEPS := 16
+## Fore-aft head lag per unit of the body's vertical speed, in rig units.
+const HEAD_LEAD := 0.06
 
 var skeleton: RigSkeleton
 var gait := Gait.new()
@@ -257,7 +259,10 @@ func _pose_body(dt: float) -> void:
 ## an animated character whose head rides the body bob rigidly looks like a toy
 ## on a stick.
 func _pose_head(dt: float) -> void:
-	var bob_delta: float = gait.bob - _prev_bob
+	# A *velocity*, not the per-step difference it used to be: a lead written as
+	# a raw delta silently scales with the step size, and at 120 Hz it came to a
+	# third of a pixel — a term that looked deliberate and did nothing.
+	var bob_vel: float = clampf((gait.bob - _prev_bob) / maxf(dt, 1e-5), -2.0, 2.0)
 	_prev_bob = gait.bob
 	# Track the body's vertical motion with a lag, then cancel most of it.
 	_head_level = lerpf(_head_level, gait.bob, clampf(dt * 11.0, 0.0, 1.0))
@@ -283,7 +288,11 @@ func _pose_head(dt: float) -> void:
 	if _head >= 0:
 		var h := skeleton.bones[_head]
 		h.angle += _head_aim * 0.56 - gait.pitch * 0.7
-		h.offset += Vector2(-bob_delta * 0.6, cancel)
+		# The muzzle noses forward as the shoulders drop out from under it and
+		# settles back as they rise. Small — a couple of pixels at walking pace —
+		# but it is the difference between a head that is carried and one bolted
+		# to the spine.
+		h.offset += Vector2(-bob_vel * HEAD_LEAD, cancel)
 		# A braced animal carries its head higher and further forward.
 		h.offset += Vector2(0.012, -0.020) * tension
 

@@ -31,6 +31,10 @@ extends Node2D
 ##                       chart per frame. This is how motion gets judged from a
 ##                       still: a planted foot must stay on the same ruler tick
 ##                       across every frame it is down.
+##   --window=<seconds>  span the strip covers, instead of one gait cycle. The
+##                       events worth inspecting are not all stride-length: a
+##                       blink is 180 ms and is invisible on a sheet that steps
+##                       half a second at a time.
 ##
 ## Motion is advanced at a fixed step from a settled rig, never from wall time,
 ## so two runs of the same command are pixel-identical.
@@ -44,6 +48,19 @@ const WARMUP_CYCLES := 2.0
 ## Ground ruler spacing in rig units. A planted foot must not move between ticks.
 const RULER_STEP := 0.1
 
+## Rig-space padding added around the measured pose before fitting. Coat fringe
+## and rim light live just outside the capsule surface, and a silhouette that
+## ends exactly on the frame edge reads as a crop even when nothing was cut.
+const POSE_MARGIN := 0.05
+## Frame furniture reserved inside every cell. On a contact sheet the top holds
+## two header lines, the bottom holds the stance chart, and the ruler ticks hang
+## below the ground line; the animal is fitted into what is left, so a raised
+## tail can never end up behind the caption.
+const CELL_INSET := 8.0
+const STRIP_PAD_TOP := 44.0
+const STRIP_PAD_BOTTOM := 30.0
+const RULER_DEPTH := 16.0
+
 var species := &"cat"
 var growth := 3.0
 var out_path := "user://shot.png"
@@ -56,6 +73,7 @@ var focus := ""
 var anim := &""
 var start_t := -1.0
 var strip := 0
+var window := -1.0
 
 var _frames := 0
 var _done := false
@@ -90,6 +108,7 @@ func _parse_args() -> void:
 			"anim": anim = StringName(kv[1])
 			"t": start_t = float(kv[1])
 			"strip": strip = int(kv[1])
+			"window": window = float(kv[1])
 
 
 func _build_backdrop() -> void:
@@ -144,13 +163,13 @@ func _build_creature() -> void:
 		get_tree().quit(2)
 		return
 
-	var vp := get_viewport_rect().size
 	var count: int = maxi(strip, 1)
-	var natural_h: float = _spec.adult_height * _spec.scale_at(growth) * _spec.pixels_per_unit
-	var cells := _layout(count, vp, natural_h)
-	var fit: float = _cell_fit(cells[0].size, natural_h) * zoom
-
 	var times := _frame_times()
+	# Every cell is built and driven *before* anything is measured or placed. The
+	# frame can only be fitted honestly to the pose the rig actually settles
+	# into: the tail spring hangs well outside the bind pose, a swing foot
+	# reaches past the paws, and across a contact sheet the union of all that is
+	# wider still.
 	for i in count:
 		var c := Creature.new()
 		add_child(c)
@@ -158,47 +177,130 @@ func _build_creature() -> void:
 		# on how many frames the renderer happened to take to warm up.
 		c.set_process(false)
 		c.setup_preview(_spec, growth, 0x5EED)
-		c.scale = Vector2(fit, fit)
-		var cell: Rect2 = cells[i]
-		var origin := Vector2(cell.position.x + cell.size.x * 0.5,
-			cell.position.y + cell.size.y * (0.80 if strip > 0 else 0.80))
 		_drive(c, times[i])
-		c.position = origin
-		if focus != "":
-			c.position = cell.position + cell.size * 0.5 \
-				- _focus_point() * _spec.pixels_per_unit * fit
 		_cells.append(c)
 
-		if draw_contact and focus == "":
+	var vp := get_viewport_rect().size
+	var extent := _posed_extent()
+	var cells := _layout(count, vp, extent)
+	var fit: float = _cell_fit(cells[0], extent) * zoom
+
+	for i in count:
+		var c: Creature = _cells[i]
+		c.scale = Vector2(fit, fit)
+		var origin := _cell_origin(cells[i], extent, fit)
+		c.position = origin
+		if focus != "":
+			c.position = cells[i].position + cells[i].size * 0.5 \
+				- _focus_point() * _spec.pixels_per_unit * fit
+			# Every cell of a close-up sheet still draws the whole animal, just
+			# framed elsewhere, so without a clip cell 3's rump lands across cell
+			# 2's face. Give each one its own window onto the creature.
+			if strip > 0:
+				var clip := _CellClip.new()
+				clip.rect = cells[i]
+				remove_child(c)
+				clip.add_child(c)
+				add_child(clip)
+		elif draw_contact:
 			var shadow := _make_contact_shadow()
 			add_child(shadow)
-			move_child(shadow, 1)
+			# Behind every creature by depth rather than by sibling index: with
+			# `--bg=alpha` there is no backdrop node to sit in front of, and an
+			# index-based insert would then bury one cell's creature.
+			shadow.z_index = -1
 			shadow.position = origin
 			shadow.scale = Vector2(fit, fit)
 
 	if strip > 0:
 		_overlay = _StripOverlay.new()
-		(_overlay as _StripOverlay).setup(_cells, times, cells, fit, _spec)
+		(_overlay as _StripOverlay).setup(_cells, times, cells, fit, _spec, focus == "")
 		add_child(_overlay)
 
 
-## Scale that fits one creature into a cell. The height budget is the usual
-## constraint, but a walking quadruped is about twice as long as it is tall, so
-## on a contact sheet the width budget frequently wins.
-func _cell_fit(cell: Vector2, natural_h: float) -> float:
-	var by_h: float = (cell.y * (0.56 if strip > 0 else 0.62)) / maxf(natural_h, 1.0)
-	# A standing cat is about twice as long as it is tall, so fitting by height
-	# alone runs the rump and tail off the side of the frame. Measure the actual
-	# body length rather than assuming an aspect ratio: species differ, and a
-	# reviewer looking at a cropped animal reports the crop, not the animal.
-	var span: float = _body_span() * _spec.pixels_per_unit
-	# The margin has to absorb the tail: the span above is the bind pose, but the
-	# tail spring swings wider than the pose it was measured from.
-	var by_w: float = (cell.x * (0.84 if strip > 0 else 0.88)) / maxf(span, 1.0)
-	return minf(by_h, by_w)
+## Bounding box of every cell's posed geometry, in rig units, y down.
+##
+## Measured off the live parts after `_drive`, never off the bind pose. A tail
+## that has settled 0.3 units wider than it was authored is exactly the thing
+## that used to run off the side of a review shot, and a reviewer who sees a
+## cropped animal reports the crop instead of the animal.
+func _posed_extent() -> Rect2:
+	var mn := Vector2(INF, INF)
+	var mx := Vector2(-INF, -INF)
+	for c in _cells:
+		for p in c.renderer.live_parts:
+			# The smooth-union blend pushes the surface out past the capsule, so
+			# it is part of the silhouette and has to be part of the bound.
+			var r: float = maxf(p.radius_a, p.radius_b) + p.blend
+			mn = mn.min((p.a - Vector2(r, r)).min(p.b - Vector2(r, r)))
+			mx = mx.max((p.a + Vector2(r, r)).max(p.b + Vector2(r, r)))
+	if not is_finite(mn.x):
+		return Rect2(-0.5, -1.0, 1.0, 1.0)
+	mn -= Vector2(POSE_MARGIN, POSE_MARGIN)
+	mx += Vector2(POSE_MARGIN, POSE_MARGIN)
+	# The ground plane is y = 0 by convention and the contact shadow spreads out
+	# below it, so the frame has to hold both even when no part reaches there.
+	mn.y = minf(mn.y, 0.0)
+	mx.y = maxf(mx.y, 0.0)
+	if draw_contact and focus == "":
+		mx.y = maxf(mx.y, _shadow_depth())
+	return Rect2(mn, mx - mn)
 
 
-## Widest horizontal extent of the bind pose, in rig units.
+## How far the contact shadow reaches below the ground line, in rig units. Sized
+## from `_make_contact_shadow`, which centres its ellipse at UV y = 0.62.
+func _shadow_depth() -> float:
+	return _body_span() * 1.05 * 0.34 * 0.38
+
+
+## The part of a cell the animal may occupy, once frame furniture is subtracted.
+func _content_rect(cell: Rect2) -> Rect2:
+	var top: float = STRIP_PAD_TOP if strip > 0 else CELL_INSET
+	var bottom: float = STRIP_PAD_BOTTOM if strip > 0 else CELL_INSET
+	return Rect2(cell.position + Vector2(CELL_INSET, top),
+		cell.size - Vector2(CELL_INSET * 2.0, top + bottom))
+
+
+## Scale that fits the measured pose into a cell. A walking quadruped is about
+## twice as long as it is tall, so the width budget usually wins — but a raised
+## tail can flip that, which is why both are measured rather than assumed.
+func _cell_fit(cell: Rect2, extent: Rect2) -> float:
+	if focus != "":
+		# A `--focus` shot is a deliberate crop, so it keeps the older bind-pose
+		# rule unchanged: close-ups stay comparable between captures instead of
+		# rescaling every time the tail settles somewhere new.
+		var natural_h: float = _spec.adult_height * _spec.scale_at(growth) * _spec.pixels_per_unit
+		var by_h: float = (cell.size.y * (0.56 if strip > 0 else 0.62)) / maxf(natural_h, 1.0)
+		var by_w: float = (cell.size.x * (0.84 if strip > 0 else 0.88)) \
+			/ maxf(_body_span() * _spec.pixels_per_unit, 1.0)
+		return minf(by_h, by_w)
+	var box := _content_rect(cell)
+	var ppu: float = _spec.pixels_per_unit
+	var ruler: float = RULER_DEPTH if strip > 0 else 0.0
+	var by_w: float = box.size.x / maxf(extent.size.x * ppu, 1.0)
+	var by_h: float = maxf(box.size.y - ruler, 1.0) / maxf(extent.size.y * ppu, 1.0)
+	return maxf(minf(by_w, by_h), 0.01)
+
+
+## Where this cell's rig origin lands on screen — which is also where the ground
+## line and the ruler are drawn, since the origin sits on the ground plane.
+func _cell_origin(cell: Rect2, extent: Rect2, fit: float) -> Vector2:
+	var box := _content_rect(cell)
+	var ppu: float = _spec.pixels_per_unit * fit
+	var above: float = -extent.position.y * ppu
+	var below: float = extent.end.y * ppu + (RULER_DEPTH if strip > 0 else 0.0)
+	# Centre the measured content in whatever is left over, then place the origin
+	# inside it. Centring the *content* rather than the origin is the whole fix:
+	# a cat's origin sits between its paws, nowhere near the middle of a body
+	# that runs from tail tip to nose.
+	return Vector2(
+		box.position.x + (box.size.x - extent.size.x * ppu) * 0.5 - extent.position.x * ppu,
+		box.position.y + (box.size.y - above - below) * 0.5 + above)
+
+
+## Widest horizontal extent of the bind pose, in rig units. Used to size the
+## contact shadow, which should track the body's footprint and stay the same in
+## every cell of a sheet rather than swelling with a raised tail.
 func _body_span() -> float:
 	var lo := INF
 	var hi := -INF
@@ -215,12 +317,13 @@ func _body_span() -> float:
 ## Choose the grid that makes the creature largest. A single long row wastes
 ## most of the frame on empty sky; picking the column count by measuring is
 ## simpler than guessing an aspect ratio and always beats it.
-func _layout(count: int, vp: Vector2, natural_h: float) -> Array[Rect2]:
+func _layout(count: int, vp: Vector2, extent: Rect2) -> Array[Rect2]:
 	var best_cols := count
 	var best_fit := -1.0
 	for cols in range(1, count + 1):
 		var rows: int = int(ceil(float(count) / float(cols)))
-		var f := _cell_fit(Vector2(vp.x / float(cols), vp.y / float(rows)), natural_h)
+		var f := _cell_fit(Rect2(Vector2.ZERO,
+			Vector2(vp.x / float(cols), vp.y / float(rows))), extent)
 		if f > best_fit:
 			best_fit = f
 			best_cols = cols
@@ -265,6 +368,8 @@ func _frame_times() -> PackedFloat32Array:
 
 
 func _cycle_seconds() -> float:
+	if window > 0.0:
+		return window
 	# Reactions and idles have no stride, so they get a fixed window chosen to
 	# show the whole event: a startle resolves in about a second.
 	match anim:
@@ -361,6 +466,20 @@ func _process(_delta: float) -> void:
 	get_tree().quit(0)
 
 
+## A window onto one cell of a close-up sheet. Draws its own rectangle and clips
+## its child to it; `CLIP_CHILDREN_ONLY` means the rectangle itself never shows.
+class _CellClip:
+	extends Node2D
+
+	var rect := Rect2()
+
+	func _ready() -> void:
+		clip_children = CanvasItem.CLIP_CHILDREN_ONLY
+
+	func _draw() -> void:
+		draw_rect(rect, Color.WHITE, true)
+
+
 ## Contact-sheet furniture: cell dividers, a ground ruler that scrolls with the
 ## distance travelled, and a stance chart per frame.
 ##
@@ -386,14 +505,20 @@ class _StripOverlay:
 	var rects: Array[Rect2] = []
 	var fit := 1.0
 	var spec: CreatureSpec
+	## A close-up is framed on a body part, so the ground plane is off-frame and
+	## every piece of ground furniture would be a lie. Caption those cells and
+	## draw nothing else.
+	var grounded := true
 
 	func setup(p_cells: Array[Creature], p_times: PackedFloat32Array,
-			p_rects: Array[Rect2], p_fit: float, p_spec: CreatureSpec) -> void:
+			p_rects: Array[Rect2], p_fit: float, p_spec: CreatureSpec,
+			p_grounded: bool) -> void:
 		cells = p_cells
 		times = p_times
 		rects = p_rects
 		fit = p_fit
 		spec = p_spec
+		grounded = p_grounded
 		z_index = 50
 
 	func _draw() -> void:
@@ -401,8 +526,18 @@ class _StripOverlay:
 		for i in cells.size():
 			var c: Creature = cells[i]
 			var r: Rect2 = rects[i]
-			var ground_y: float = r.position.y + r.size.y * 0.80
-			var mid: float = r.position.x + r.size.x * 0.5
+			if not grounded:
+				draw_rect(r, Color(1, 1, 1, 0.09), false, 1.0)
+				draw_string(font, r.position + Vector2(8.0, 18.0),
+					"%d  t=%.3fs" % [i, times[i]],
+					HORIZONTAL_ALIGNMENT_LEFT, -1, 13, Color(1, 1, 1, 0.78))
+				continue
+			# The creature's own origin *is* the ground plane in rig space, so the
+			# furniture reads it off the node rather than re-deriving the layout.
+			# Any disagreement between the two would show up as a permanent fake
+			# slide on every foot in the sheet.
+			var ground_y: float = c.position.y
+			var mid: float = c.position.x
 			draw_rect(r, Color(1, 1, 1, 0.09), false, 1.0)
 
 			# Ground line plus a ruler fixed to the *ground*, not to the frame:
@@ -413,9 +548,10 @@ class _StripOverlay:
 				Vector2(r.end.x - 4.0, ground_y), Color(1, 1, 1, 0.26), 1.0)
 			var gait: Gait = c.rig.gait
 			var px: float = spec.pixels_per_unit * fit
-			var span: float = r.size.x * 0.5 / maxf(px, 1e-3)
-			var first: int = int(floor((gait.travel - span) / RULER_STEP))
-			for n in range(first, first + int(2.0 * span / RULER_STEP) + 2):
+			var left: float = gait.travel + (r.position.x - mid) / maxf(px, 1e-3)
+			var right: float = gait.travel + (r.end.x - mid) / maxf(px, 1e-3)
+			var first: int = int(floor(left / RULER_STEP))
+			for n in range(first, int(ceil(right / RULER_STEP)) + 1):
 				var tx: float = mid + (float(n) * RULER_STEP - gait.travel) * px
 				if tx <= r.position.x + 3.0 or tx >= r.end.x - 3.0:
 					continue

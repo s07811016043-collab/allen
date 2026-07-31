@@ -50,6 +50,21 @@ uniform float coat_density : hint_range(0.1, 8.0) = 1.0;
 uniform float translucency : hint_range(0.0, 1.0) = 0.35;
 uniform float roughness : hint_range(0.02, 1.0) = 0.55;
 
+// Coat markings. A wild-type mammal coat is never one flat colour, and the
+// second pigment is already in every species palette — it is the shade the
+// shadowed parts are drawn in. `marking_index` says which slot that is, so the
+// stripes stay inside the palette indirection instead of being a colour the
+// shader invented.
+uniform int marking_index = 1;
+uniform float marking_strength : hint_range(0.0, 1.0) = 1.0;
+
+// Skeletal landmarks, packed (x, y, radius, slope) in rig space, uploaded by
+// `CreatureRenderer` from where each limb enters the body. The part budget is
+// full at 28 of 28, so a scapula cannot be a capsule; it has to be relief.
+const int MAX_LANDMARKS = 4;
+uniform vec4 landmarks[4];
+uniform int landmark_count = 0;
+
 uniform float growth : hint_range(0.0, 3.0) = 3.0;
 uniform float wetness : hint_range(0.0, 1.0) = 0.0;
 uniform float fluff : hint_range(0.0, 2.0) = 1.0;
@@ -250,6 +265,23 @@ float layer_contact(Field occ, float radius, float depth) {
 	return mix(1.0 - depth, 1.0, smoothstep(0.0, radius, occ.d));
 }
 
+// Ambient occlusion a nearer layer casts on the one behind it.
+//
+// This is the term that makes a far leg a leg. It differs from `layer_contact`
+// in reach and in falloff: something a few centimetres behind a body sees a
+// hemisphere that the body has taken a bite out of, and the bite closes slowly
+// with distance rather than ending at the occluder's outline. Squaring the
+// falloff puts most of the darkening right against the occluder, so the far limb
+// has a dark side where it disappears under the near one and opens up away from
+// it. Without that gradient the far limb is uniformly dark, and a uniformly dark
+// shape next to a lit one reads as its cast shadow, not as another limb.
+float layer_occlude(Field occ, float reach, float depth) {
+	if (!occ.hit) { return 1.0; }
+	float t = clamp(occ.d / max(reach, 1e-5), 0.0, 1.0);
+	float open = t * t;
+	return 1.0 - depth * (1.0 - open);
+}
+
 // ---------------------------------------------------------------------------
 // Shading
 // ---------------------------------------------------------------------------
@@ -257,8 +289,10 @@ float layer_contact(Field occ, float radius, float depth) {
 struct LayerCtx {
 	float shadow;   // directional shadow cast by nearer layers
 	float ao;       // ambient occlusion from nearer layers
+	float contact;  // tight crevice darkening, applied *after* the haze
 	float atmos;    // 0 = up front, 1 = fully receded
 	float soften;   // antialias width multiplier, for depth softening
+	float detail;   // 0 = defocused, 1 = crisp: scales micro-surface and fringe
 	float body_h;   // creature height in rig units, for scale-free falloffs
 };
 
@@ -278,8 +312,11 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	float tip_cover = 0.0;
 	if (mat == MAT_FUR && coat > 1e-5) {
 		float cover;
+		// A receded layer gets its individual hairs taken away, not just blurred:
+		// you cannot resolve a strand on the far side of an animal, and leaving
+		// the fringe crisp back there is a depth cue pointing the wrong way.
 		float spikes = pet_fur_fringe(p, f.grad, f.groom, coat_density,
-			px_per_unit, cover);
+			px_per_unit, ctx.detail, cover);
 		float band = smoothstep(-coat * 3.0, coat * 0.2, f.d);
 		fringe = coat * spikes * band * (1.0 - wetness * 0.85);
 		tip_cover = cover * band;
@@ -329,10 +366,16 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	// integrable, so lanes close into concentric loops and the coat turns into
 	// wood grain. Displacing the *sample point* through a smooth vector field
 	// with the frame held fixed bends the lanes and can never form a loop.
+	//
+	// The frequencies matter as much as the trick. A large displacement at a low
+	// frequency bends every lane the same way at once, and smoothly wavy parallel
+	// lines are the definition of wood grain. Three small octaves, the finest at
+	// strand scale, make lanes wander apart from their neighbours instead.
 	vec2 pw = p;
 	if (furry) {
-		pw += vec2(pet_noise(p * 2.4 + 11.0), pet_noise(p * 2.4 + 43.0)) * 0.055
-			+ vec2(pet_noise(p * 7.5 + 3.0), pet_noise(p * 7.5 + 71.0)) * 0.016;
+		pw += vec2(pet_noise(p * 3.6 + 11.0), pet_noise(p * 3.6 + 43.0)) * 0.024
+			+ vec2(pet_noise(p * 11.0 + 3.0), pet_noise(p * 11.0 + 71.0)) * 0.009
+			+ vec2(pet_noise(p * 34.0 + 5.0), pet_noise(p * 34.0 + 17.0)) * 0.0026;
 	}
 	// The shading tangent does follow the surface, though: a strand lies on the
 	// body, so it sweeps around the barrel as the surface turns away from us.
@@ -348,6 +391,53 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	float arc = dot(p, groom);
 	float side = dot(f.grad, across) >= 0.0 ? 1.0 : -1.0;
 	float v = (f.d + R) * side;
+	// Dorsal-to-ventral coordinate: +1 at the top line of the part, 0 across the
+	// middle of the flank where the surface faces the viewer, -1 at the belly
+	// line. It falls out of the capsule frame for free and it is what lets a
+	// marking or a landmark be told to keep to the back and off the underside.
+	float dv = clamp(v / R, -1.0, 1.0);
+
+	// --- skeleton -----------------------------------------------------------
+	// A cat's back is not a tube. The blade of the scapula stands proud where the
+	// foreleg swings under it, the point of the hip sits above the femur head,
+	// the loin muscles roll either side of the spine and the last ribs show on
+	// the lower flank. Those are most of what makes light read as falling on an
+	// animal rather than on a sausage, and none of them can be a capsule: the cat
+	// is at 28 parts of 28. So they are relief, added to the same height-field
+	// slope everything else in this shader uses.
+	//
+	// `bulk` keeps them on the body masses. The identical field stamped onto a
+	// leg or an ear is a dent in a tube, and the gate is a ratio against body
+	// height so it means the same thing for a kitten and an adult.
+	float bulk = smoothstep(0.055, 0.100, R / ctx.body_h);
+	float skel = 0.0;
+	if (bulk > 0.002) {
+		for (int i = 0; i < MAX_LANDMARKS; i++) {
+			if (i >= landmark_count) { break; }
+			vec4 lm = landmarks[i];
+			vec2 dp = p - lm.xy;
+			float q = length(dp);
+			float dsl;
+			float dome = pet_ridge(q / max(lm.z, 1e-4), dsl);
+			// The dome's own analytic slope *is* the normal tilt, exactly as for
+			// the capsule height field: bone catches the key on its upper face
+			// and the surface falls away under it.
+			nxy -= (dp / max(q, 1e-5)) * dsl * lm.w * bulk;
+			skel = max(skel, dome * bulk);
+		}
+		// The loin: two long muscles running either side of the spine. Seen from
+		// the side the groove between them is edge-on, so what actually reads is
+		// the roll of the muscle just below the top line — which is why this is a
+		// band near dv = 0.7 and not a groove at dv = 1.
+		float loin = smoothstep(0.42, 0.78, dv) * smoothstep(1.0, 0.82, dv);
+		nxy -= across * 0.085 * loin * bulk;
+		// Ribs, on the lower flank only: covered by muscle up at the spine, and
+		// past the ribcage down at the belly. Very shallow — on a short-coated
+		// cat in condition these are a change in how the light runs, not relief
+		// you could feel, and pushed any further they read as corduroy.
+		float ribs = smoothstep(0.40, -0.05, dv) * smoothstep(-0.80, -0.35, dv);
+		nxy += across * cos(arc * 128.0) * 0.014 * ribs * bulk;
+	}
 
 	float micro_occ = 1.0;
 	float micro_tint = 0.0;
@@ -355,14 +445,20 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	float glint = 0.0;
 	float irid = 0.0;
 	float piping = 0.0;
+	float strand_tilt = 0.0;
 	float wet_film = wetness;
 
 	if (mat == MAT_FUR) {
 		Coat c = pet_fur(pw, groom, coat_density, px_per_unit,
 			fluff * (1.0 - wetness * 0.7));
-		nxy += c.slope;
-		micro_occ = c.occ;
-		micro_tint = c.tint * 0.16;
+		nxy += c.slope * ctx.detail;
+		micro_occ = mix(1.0, c.occ, ctx.detail);
+		// A twentieth of what it used to be. Everything the coat used to say
+		// through albedo it now says through the specular break-up below —
+		// pigment noise at this scale is what made the body read as damp clay.
+		micro_tint = c.tint * 0.085 * ctx.detail;
+		spec_mul = mix(1.0, c.spec, ctx.detail);
+		strand_tilt = c.tilt * ctx.detail;
 		glint = c.glint;
 	} else if (mat == MAT_FEATHER) {
 		Surf s = pet_feather(arc, v, u, coat_density, px_per_unit);
@@ -400,20 +496,59 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 
 	// --- albedo -------------------------------------------------------------
 	vec3 albedo = f.albedo;
-	// Agouti banding: pigment in a mammal coat is laid down in bands along each
-	// hair, and the bands line up into the soft vertical ticking every tabby,
-	// brindle and wild-type coat has. It is the difference between a coloured
-	// shape and an animal. Pale parts (muzzle, belly, chin) keep out of it.
 	if (furry) {
-		// Agouti ticking. Pigment is laid down in bands across the body, and in
-		// most wild-type coats those bands line up into soft mackerel stripes.
-		// It only ever darkens — pigment adds, it does not bleach — and it keeps
-		// off the pale markings, because a dirty muzzle reads as a mistake.
-		float wobble = pet_fbm(p * 2.6, 3);
-		float bands = sin(arc * 26.0 + wobble * 4.2);
-		float tick = smoothstep(0.05, 0.9, bands) * (0.55 + 0.45 * (wobble * 0.5 + 0.5));
+		// Tabby. Pigment in a mammal coat is laid down in bands along each hair,
+		// and in wild-type coats those bands line up into stripes: bars running
+		// down the flanks off a solid dorsal line, rings round the legs and the
+		// tail. One expression does all three, because it is written in the
+		// part's own groom frame — a band of constant `arc` is a vertical bar on
+		// the ribs and a ring on a limb, since the groom already turns with the
+		// part. Without this the whole animal is one flat brown, which is the
+		// single cheapest-looking thing a coat can be.
+		//
+		// Pale markings keep out of it. A muzzle, a chin, a belly and the inside
+		// of an ear are a different pigment, and a tabby never stripes them —
+		// striping them anyway reads as dirt, so the mask keys off luminance.
 		float lum = dot(albedo, vec3(0.2126, 0.7152, 0.0722));
-		albedo *= 1.0 - tick * 0.24 * smoothstep(0.80, 0.38, lum);
+		// The window has to straddle the gap between the two pigments, not hug
+		// the ground colour: set too tight it fades the stripes out over the
+		// whole mid-flank, where a smooth-union with the belly has already lifted
+		// the luminance a little, and the markings end up a collar round the
+		// shoulders instead of a coat.
+		float takes = smoothstep(0.88, 0.60, lum) * marking_strength;
+		if (takes > 0.004) {
+			// The bars have to bend and break. A clean periodic set reads as a
+			// paint job on a toy: one field warps them, a second and much slower
+			// one lets whole bars thin out or drop, which is what mackerel
+			// actually does along a real flank.
+			//
+			// Both warps are budgeted against the bar *wavelength*, which is the
+			// thing that is easy to get wrong here. A phase term of a couple of
+			// radians is half a period: it does not bend the stripes, it destroys
+			// them, and what comes back is the field of soft blotches the coat
+			// spent this whole pass getting away from.
+			float wob = pet_fbm(p * 3.4, 3);
+			float bars = sin(arc * 33.0 + wob * 1.4 + dv * 1.1);
+			float broken = pet_fbm(p * 2.1 + 19.0, 2);
+			// A bar is about a third of the period wide, not a tenth: narrow the
+			// dark core any further and the stripes stop being stripes and turn
+			// into a pinstripe nobody reads as a cat.
+			float bar = smoothstep(0.02, 0.50, bars)
+				* mix(0.40, 1.0, smoothstep(-0.50, -0.05, broken));
+			// The dorsal line is solid, and the pigment fades out under the
+			// animal: a tabby's belly is always the palest part of it.
+			float dorsal = smoothstep(0.58, 0.94, dv);
+			float flank = smoothstep(-0.55, 0.05, dv);
+			float mark = clamp(max(bar * flank, dorsal * 0.92), 0.0, 1.0);
+			albedo = mix(albedo, palette[marking_index].rgb, mark * takes * 0.88);
+
+			// Agouti ticking over the top of it, at hair-band frequency rather
+			// than stripe frequency, so the ground colour between the bars is not
+			// flat either. It only ever darkens — pigment adds, it does not
+			// bleach.
+			float tick = smoothstep(0.15, 0.95, sin(arc * 96.0 + wob * 7.0));
+			albedo *= 1.0 - tick * 0.09 * takes;
+		}
 	}
 	albedo *= 1.0 + micro_tint;
 	albedo *= mix(1.0, 0.58, wet_film * 0.8);
@@ -479,8 +614,10 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	}
 
 	// Rim. Broken up by the coat so it reads as backlit hair rather than as a
-	// stroke drawn round the animal.
-	float rim = pet_rim(n) * ao;
+	// stroke drawn round the animal. A receded layer gets almost none of it: a
+	// crisp bright edge is the strongest "this is the nearest thing in frame"
+	// cue there is, and putting one on a far leg undoes the whole depth pass.
+	float rim = pet_rim(n) * ao * (1.0 - ctx.atmos * 0.80);
 	if (mat == MAT_FUR) { rim *= mix(0.45, 1.20, tip_cover + micro_occ * 0.30); }
 	lit += rim_color.rgb * rim * (0.16 + 0.30 * translucency);
 
@@ -494,7 +631,16 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		// tangent plane first. Leaving it flat in screen space is what makes a
 		// Kajiya-Kay lobe saturate over the whole body instead of forming the
 		// band of sheen that runs along a real animal's back.
-		vec3 g3 = vec3(groom_s, 0.0);
+		// Every strand leans a little differently, and rotating the tangent by
+		// that lean is what splits one broad sheen into hundreds of individual
+		// fibre highlights. This is the coat's *visible* structure now: it is
+		// specular, it lives at strand frequency, and unlike albedo noise it
+		// disappears where the light does — which is exactly how hair behaves.
+		float ct = cos(strand_tilt);
+		float st = sin(strand_tilt);
+		vec2 gs = vec2(groom_s.x * ct - groom_s.y * st,
+			groom_s.x * st + groom_s.y * ct);
+		vec3 g3 = vec3(gs, 0.0);
 		vec3 tangent = normalize(g3 - n * dot(g3, n) + 1e-6);
 		spec = pet_hair_spec(tangent, n, L, V, roughness, albedo, glint);
 		if (mat == MAT_FEATHER) {
@@ -514,24 +660,34 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 		float fr = 0.04 + 0.96 * pow(1.0 - max(dot(h, V), 0.0), 5.0);
 		spec = vec3(dt * fr) * (mat == MAT_SKIN ? 0.55 : 1.1);
 	}
-	spec *= spec_mul * mix(1.0, 2.2, wet_film);
+	spec *= spec_mul * mix(1.0, 2.2, wet_film) * (1.0 - ctx.atmos * 0.70);
 	lit += key_color.rgb * key_energy * spec * lit_face * ctx.shadow * ao;
 
 	// --- depth --------------------------------------------------------------
 	// Atmospheric separation. A far leg is not "the same leg, darker": it loses
 	// saturation and, crucially, *contrast* — haze lifts its shadows and pulls
-	// its highlights down. Only darkening it produces a black cut-out, which is
-	// the failure this replaces.
+	// its highlights down toward one flat value. Only darkening it produces a
+	// black cut-out, and a black cut-out beside a lit limb reads as that limb's
+	// shadow rather than as another limb. That is the failure this replaces.
 	if (ctx.atmos > 0.002) {
 		float lum = dot(lit, vec3(0.2126, 0.7152, 0.0722));
-		lit = mix(lit, vec3(lum), ctx.atmos * 0.22);
-		// The haze is only part-way to the sky colour: mixing all the way there
-		// turns a brown animal grey-blue, which reads as fog rather than as a
-		// few centimetres of depth.
-		vec3 haze = mix(ambient_tint.rgb, vec3(1.0), 0.35) * ambient_energy * 1.7;
-		lit = mix(lit, haze, ctx.atmos * 0.28);
-		lit *= mix(1.0, 0.88, ctx.atmos);
+		lit = mix(lit, vec3(lum), ctx.atmos * 0.34);
+		// The value the range collapses toward is what *this material* looks like
+		// under ambient alone, because that is physically what the far side of an
+		// animal is: five centimetres of air does nothing, the key is simply
+		// blocked and only the sky still reaches it. Pivoting on an absolute haze
+		// colour is the obvious formulation and it is wrong twice over — it is
+		// brighter than the limb, so compression pushes the limb *up* past the
+		// background, and it is blue, so a brown limb arrives grey. A pale blue
+		// smear behind a cat reads as fog. This reads as the same cat, in shadow.
+		vec3 pivot = albedo * mix(ambient_tint.rgb, vec3(1.0), 0.45)
+			* ambient_energy * 3.0;
+		lit = mix(lit, pivot + (lit - pivot) * 0.52, ctx.atmos);
 	}
+	// After the haze, not before it: the crack where a near limb crosses the one
+	// behind it is dark all the way to the viewer, so compressing it toward the
+	// haze first is precisely what lets two overlapping legs fuse into one shape.
+	lit *= ctx.contact;
 
 	return vec4(lit, alpha);
 }
@@ -550,27 +706,51 @@ void fragment() {
 	vec2 lxy = pet_key_dir().xy;
 	float reach = body_h * 0.085;
 
+	// The far side of the animal. Everything here is deliberately overdriven
+	// compared with a physical estimate, because the layers are only a few
+	// centimetres apart in world terms and a physically honest separation at
+	// that distance is invisible. The brief is that a viewer must be able to
+	// count four legs without effort, and that costs: a hard cast shadow, a
+	// hemisphere that the near body has bitten a chunk out of, a crevice line
+	// where the two limbs overlap, a soft outline, and no resolvable coat.
+	//
+	// Every reach here is calibrated against how much of the far limb is
+	// actually *visible*, which is a sliver twenty pixels wide beside the near
+	// limb — not against how far apart the two limbs are in the world. A falloff
+	// wider than the sliver puts the whole thing in the darkest part of the
+	// curve, and a far leg crushed to black is no more countable than one that
+	// melted into the torso. So the torso's occlusion is broad (it really does
+	// shade everything under the belly) and the near limb's is tight: a crevice
+	// line, then daylight.
 	LayerCtx c0;
-	c0.shadow = min(layer_shadow(f1, lxy, reach, 0.40),
-		layer_shadow(f2, lxy, reach, 0.26));
-	c0.ao = min(layer_contact(f1, reach * 1.6, 0.40),
-		layer_contact(f2, reach * 1.6, 0.26));
-	c0.atmos = 0.80;
-	c0.soften = 1.5;
+	c0.shadow = min(layer_shadow(f1, lxy, reach * 1.8, 0.46),
+		layer_shadow(f2, lxy, reach * 1.2, 0.40));
+	c0.ao = layer_occlude(f1, body_h * 0.22, 0.30)
+		* layer_occlude(f2, body_h * 0.055, 0.26);
+	c0.contact = layer_contact(f2, body_h * 0.020, 0.46)
+		* layer_contact(f1, body_h * 0.018, 0.34);
+	c0.atmos = 0.85;
+	c0.soften = 2.6;
+	c0.detail = 0.30;
 	c0.body_h = body_h;
 
 	LayerCtx c1;
 	c1.shadow = layer_shadow(f2, lxy, reach, 0.42);
-	c1.ao = layer_contact(f2, reach * 1.3, 0.32);
-	c1.atmos = 0.14;
+	c1.ao = layer_contact(f2, reach * 1.3, 0.32)
+		* layer_occlude(f2, body_h * 0.16, 0.22);
+	c1.contact = layer_contact(f2, body_h * 0.028, 0.26);
+	c1.atmos = 0.12;
 	c1.soften = 1.0;
+	c1.detail = 1.0;
 	c1.body_h = body_h;
 
 	LayerCtx c2;
 	c2.shadow = 1.0;
 	c2.ao = 1.0;
+	c2.contact = 1.0;
 	c2.atmos = 0.0;
 	c2.soften = 0.95;
+	c2.detail = 1.0;
 	c2.body_h = body_h;
 
 	// Back to front so a far leg is occluded by the torso.

@@ -17,6 +17,9 @@ const VEC4S_PER_PART := 3
 ## Eyes are packed separately from parts: four `vec4` each.
 const MAX_EYES := 4
 const VEC4S_PER_EYE := 4
+## Skeletal landmarks handed to the body shader as relief. See
+## `_pack_landmarks` for why the renderer, and not the species, finds them.
+const MAX_LANDMARKS := 4
 
 ## Rig-space padding added around the part bounds so coat fringe, rim light and
 ## contact shadow are never clipped by the quad edge.
@@ -35,6 +38,8 @@ var _rect: ColorRect
 var _mat: ShaderMaterial
 var _packed := PackedVector4Array()
 var _packed_eyes := PackedVector4Array()
+var _packed_landmarks := PackedVector4Array()
+var _landmark_count := 0
 var _palette := PackedColorArray()
 var _bounds_min := Vector2.ZERO
 var _bounds_max := Vector2.ONE
@@ -87,6 +92,7 @@ func _ready() -> void:
 	add_child(_rect)
 	_packed.resize(MAX_PARTS * VEC4S_PER_PART)
 	_packed_eyes.resize(MAX_EYES * VEC4S_PER_EYE)
+	_packed_landmarks.resize(MAX_LANDMARKS)
 	_palette.resize(MAX_PALETTE)
 
 
@@ -146,6 +152,7 @@ func _process(_delta: float) -> void:
 	_recompute_bounds()
 	_pack_parts()
 	_pack_eyes()
+	_pack_landmarks()
 	_upload_dynamic()
 
 
@@ -216,11 +223,92 @@ func _pack_eyes() -> void:
 		_packed_eyes[b + 3] = Vector4.ZERO
 
 
+## Skeletal landmarks for the body shader, packed (x, y, radius, slope) in rig
+## space.
+##
+## Where a limb enters the body is where the skeleton shows through it: the blade
+## of the scapula over the shoulder, the point of the hip over the femur head.
+## The part budget is full — a cat is 28 of 28 — so those cannot be capsules, and
+## the shader raises them as relief instead. It needs to be told where.
+##
+## They are found geometrically rather than by part name, for two reasons. A
+## species should not have to declare its own anatomy twice, and the landmarks
+## have to *track the rig*: a scapula that stayed put while the foreleg swung
+## under it would read worse than none at all.
+##
+## The one invariant this leans on is the rig-space convention itself — the
+## origin sits between the paws on the ground plane, so a limb is the only thing
+## on the animal that hangs below the body mass. Everything else follows.
+func _pack_landmarks() -> void:
+	_landmark_count = 0
+	var core_r := 0.0
+	var core := Vector2.ZERO
+	for p in live_parts:
+		var r: float = maxf(p.radius_a, p.radius_b)
+		if p.layer == SDFPart.Layer.BODY and r > core_r:
+			core_r = r
+			core = (p.a + p.b) * 0.5
+	if core_r <= 0.0:
+		return
+
+	# Limb roots: the top of anything thin enough not to be a body mass that also
+	# hangs below the body's centre. The second test is what keeps ears and a
+	# raised tail out — both are thin, and both sit above the torso rather than
+	# under it.
+	var roots: Array[Vector2] = []
+	for p in live_parts:
+		if maxf(p.radius_a, p.radius_b) >= core_r * 0.62:
+			continue
+		if maxf(p.a.y, p.b.y) <= core.y:
+			continue
+		roots.append(p.a if p.a.y < p.b.y else p.b)
+
+	# One landmark per limb, not per part: the near and far leg of a pair sit
+	# within a torso radius of each other in x, and the fore and hind pair are
+	# most of a body length apart, so a single tolerance separates them.
+	var tol: float = core_r * 2.2
+	var sum_x := PackedFloat32Array()
+	var top_y := PackedFloat32Array()
+	var count := PackedInt32Array()
+	for root in roots:
+		var hit := -1
+		for i in sum_x.size():
+			if absf(sum_x[i] / float(count[i]) - root.x) <= tol:
+				hit = i
+				break
+		if hit < 0:
+			if sum_x.size() >= MAX_LANDMARKS:
+				continue
+			sum_x.append(root.x)
+			top_y.append(root.y)
+			count.append(1)
+		else:
+			sum_x[hit] += root.x
+			top_y[hit] = minf(top_y[hit], root.y)
+			count[hit] += 1
+
+	for i in sum_x.size():
+		var at := Vector2(sum_x[i] / float(count[i]), top_y[i])
+		# The bone that shows is not the joint itself: the scapula blade sits
+		# above and behind the shoulder, the point of the hip above and in front
+		# of the femur head. Both are toward the body's centre, so nudging the
+		# landmark that way covers both without needing to know which is which.
+		at.y -= core_r * 0.42
+		at.x += signf(core.x - at.x) * core_r * 0.28
+		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.80, 0.45)
+	_landmark_count = sum_x.size()
+	Log.info("LMDEBUG", "core_r=%f roots=%d clusters=%d" % [core_r, roots.size(), sum_x.size()])
+	for i in range(_landmark_count, MAX_LANDMARKS):
+		_packed_landmarks[i] = Vector4(1e6, 1e6, 1.0, 0.0)
+
+
 func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("eyes", _packed_eyes)
 	_mat.set_shader_parameter("eye_count", live_eyes.size())
 	_mat.set_shader_parameter("parts", _packed)
 	_mat.set_shader_parameter("part_count", live_parts.size())
+	_mat.set_shader_parameter("landmarks", _packed_landmarks)
+	_mat.set_shader_parameter("landmark_count", _landmark_count)
 	_mat.set_shader_parameter("bounds_min", _bounds_min)
 	_mat.set_shader_parameter("bounds_max", _bounds_max)
 	_mat.set_shader_parameter("growth", growth)
