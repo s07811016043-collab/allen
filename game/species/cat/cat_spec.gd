@@ -50,15 +50,15 @@ static func _part(id: StringName, a: Vector2, b: Vector2, ra: float, rb: float,
 ## away and an offset on a femur translates the whole limb. Returning it for all
 ## of them is harmless and keeps the rule in one place.
 ##
-## The top-up is small now, and the reason is worth recording because the review
+## The top-up is small, and the reason is worth recording because the review
 ## asked for the opposite. Measured on a 260 px kitten frame, growth 0 already
-## showed four separate silhouette runs with 5-9 px between them — the baby was
-## never the broken one, the adult was. Shortening a limb toward its root scales
-## its paw's offset from the girdle by `baby_length_scale`, but it does *not*
-## shrink the body, so a kitten inherits a split that is a larger fraction of its
-## own height than the adult's is of theirs. With the adult stagger now at 0.18
-## and 0.15 the old 0.135 of top-up would splay the baby into a spider; 0.049
-## keeps the gap the same handful of pixels it already measured.
+## showed four separate silhouette runs — the baby was never the broken one, the
+## adult was. Shortening a limb toward its root scales its paw's offset from the
+## girdle by `baby_length_scale`, but it does *not* shrink the body, so a kitten
+## inherits a split that is a larger fraction of its own height than the adult's
+## is of theirs. With the adult stagger now at 0.213 fore and 0.197 hind, a large
+## top-up would splay the baby into a spider; 0.049 lands the kitten at 13 and 15
+## rendered pixels of daylight at the floor, which is where the adult sits too.
 ##
 ## The direction still matches the adult's three-quarter offset: the far fore
 ## paw goes further back and the far hind paw further forward, so the far pair
@@ -142,8 +142,8 @@ static func build() -> S:
 	#                                    1.70 was that number with the head held
 	#                                    out level, which is an ox, not a cat.
 	#   shoulder joint to hip     19     0.80   the span with nothing under it
-	#   chest depth               11     0.46   built at 0.53, brisket to withers
-	#   fore paw to hind paw      22     0.92   built at 0.89; nearly square
+	#   chest depth               11     0.46   built at 0.52, brisket to withers
+	#   fore paw to hind paw      22     0.92   built at 0.92; nearly square
 	#   head length                9     0.38   built at 0.42 — see the head block
 	#   neck thickness             —     0.75 of head height. This one matters:
 	#                                    a neck as thick as the skull is an ox,
@@ -156,22 +156,30 @@ static func build() -> S:
 	# side of a barrel with nothing over it. Hence `brisket`, which now carries
 	# both the blade above the shoulder joint and the chest in front of it.
 	#
-	# Withers sit at y = -0.97, the ear tips reach -1.31, and the body spans
+	# Withers sit at y = -0.99, the ear tips reach -1.31, and the body spans
 	# x = -0.80 (rump) to +0.76 (muzzle tip), with the tail out to -1.07.
 
 	# --- far-side limbs (drawn behind the torso) ----------------------------
-	# The stagger the previous pass intended, at a size that actually shows. An
-	# alpha threshold across the shipped 260 px frame found *two* silhouette runs
-	# 16 px wide through the shins where there should be four 9 px ones: the old
-	# 0.05 fore / 0.03 hind offsets were smaller than the legs are thick, so the
-	# far limb never cleared the near one and the animal had no negative space to
-	# count legs by. A pair has to be separated by more than r_near + r_far ≈
-	# 0.085 before any daylight appears at all, so anything under ~0.12 is spent
-	# for nothing. These are 0.18 fore and 0.15 hind, measured back at 5-10 px of
-	# gap down the whole free length of the leg.
+	# The stagger, sized off the rendered frame rather than off the spec. Two
+	# numbers govern it and both were measured on a 260 px alpha capture with the
+	# contact shadow turned off, scanline by scanline:
+	#
+	#   * A pair only shows daylight once its two axes are further apart than
+	#     r_near + r_far, which down the shins is ~0.09.
+	#   * The coat then eats another ~0.030 of it. A 0.038 geometric gap at the
+	#     shin measured as *zero* rendered pixels; 0.082 measured as 7. So
+	#     rendered_px ≈ geometric_px − 3.5, and anything under 0.085 of axis
+	#     separation is spent for nothing.
+	#
+	# The previous pass set the offset at the paws and let the legs converge on
+	# their way up, which gave a wedge: 15 px of daylight at the floor and 2 px
+	# at mid-shin, where the animal is read. So the offset is now held roughly
+	# *constant* over the free length instead — the far shank runs parallel to
+	# the near one, 0.18-0.19 behind it, and both pairs hold 6-14 rendered pixels
+	# of gap from the floor all the way up to the elbow and the stifle.
 	#
 	# The direction is the three-quarter one the far girdles already use — far
-	# fore paw *behind* the near one, far hind paw *ahead* of it, so the far
+	# fore foot *behind* the near one, far hind foot *ahead* of it, so the far
 	# side's stance is the compressed one. It is more compression than a true
 	# projection of a 0.90 girdle foreshortening would give, and that is the
 	# trade being made on purpose: at 260 px "this animal has four legs" is worth
@@ -182,14 +190,23 @@ static func build() -> S:
 	# test, failed — and their two slots pay for the hock below. Each far shank
 	# now runs to the floor and ends on its own cap, which is all a leg lying in
 	# the body's shadow needs in order to read as ending in a foot.
-	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.198, -0.648), Vector2(0.170, -0.466), 0.072, 0.050, COL_COAT_DARK, 0)
-	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.170, -0.466), Vector2(0.112, -0.041), 0.052, 0.045, COL_COAT_DARK, 0)
+	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.190, -0.648), Vector2(0.128, -0.466), 0.072, 0.050, COL_COAT_DARK, 0)
+	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.128, -0.466), Vector2(0.104, -0.040), 0.050, 0.042, COL_COAT_DARK, 0)
 	# The far hind gets the same three-segment Z as the near one; a hind pair
 	# where one leg zigzags and the other is a straight post reads as a break,
 	# not as depth. Its metatarsus doubles as its foot for the reason above.
-	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.508, -0.660), Vector2(-0.386, -0.446), 0.098, 0.064, COL_COAT_DARK, 0)
-	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.386, -0.446), Vector2(-0.492, -0.250), 0.066, 0.044, COL_COAT_DARK, 0)
-	var bl_far_h := _part(&"leg_bl_far_hock", Vector2(-0.492, -0.250), Vector2(-0.398, -0.038), 0.042, 0.042, COL_COAT_DARK, 0)
+	#
+	# The whole far hind limb has moved 0.09 forward of where it was, and its
+	# femur is raked over to something like the 35° a real one carries rather
+	# than the 18° it had. The pair used to fuse from 20% of the animal's height
+	# upward — one 31 px column where four 12 px legs were wanted — because both
+	# femurs are thick and both converged on the same x under the hip. Forward is
+	# the only direction that opens it without thinning a haunch that carries a
+	# cat's entire sprint, and raking the femur is what carries the opening up
+	# past the stifle instead of leaving it to start below.
+	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.470, -0.658), Vector2(-0.322, -0.454), 0.092, 0.060, COL_COAT_DARK, 0)
+	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.322, -0.454), Vector2(-0.432, -0.254), 0.060, 0.042, COL_COAT_DARK, 0)
+	var bl_far_h := _part(&"leg_bl_far_hock", Vector2(-0.432, -0.254), Vector2(-0.334, -0.036), 0.040, 0.040, COL_COAT_DARK, 0)
 	var ear_far := _part(&"ear_far", Vector2(0.570, -1.066), Vector2(0.532, -1.266), 0.072, 0.017, COL_COAT_DARK, 0)
 	ear_far.height_scale = 0.30
 	ear_far.blend = 0.03
@@ -223,26 +240,50 @@ static func build() -> S:
 	# the leading edge of the body ran 192, 191, 191, 189, 188, 188, 188, 188,
 	# 188, 187 px from throat to elbow — five pixels of movement over seventy,
 	# which is a plank, and it is why the torso reads as a loaf however good the
-	# topline is. A cat is deepest at the chest: this profile now peaks 0.084
-	# ahead of the foreleg at the point of shoulder and tucks back behind it
-	# again by the elbow, which is the shape the eye is looking for.
-	var brisket := _part(&"brisket", Vector2(0.100, -0.860), Vector2(0.286, -0.596), 0.126, 0.132, COL_COAT)
-	brisket.blend = 0.10
-	# Standing slightly proud of the height field, so the mass catches the key
-	# light as its own form rather than disappearing into the ribcage the moment
-	# the smooth-union blends them.
-	brisket.height_scale = 1.12
-	# Belly with a real flank tuck: the brisket drops to -0.450, 0.11 below the
-	# tucked flank at -0.536. Without that the underline is a straight plank and
-	# the animal reads as a barrel on sticks no matter what the back does. The
-	# pale palette slot doubles as the chest bib, which is the one broad value
-	# break on the underside that survives at 260 px.
-	var belly := _part(&"belly", Vector2(-0.290, -0.576), Vector2(0.125, -0.530), 0.040, 0.080, COL_BELLY)
+	# topline is.
+	#
+	# The first brisket bought 0.066 of movement between the throat notch and the
+	# point of shoulder, and 0.066 is 7 px at ship — a curve you can measure and
+	# cannot see. The sternum is 0.030 further forward and 0.006 fatter again
+	# here, which takes the profile to 0.34 at the notch and 0.46 at its peak:
+	# 13 px of swell over 28 px of height, and an overhang of 0.117 in front of
+	# the elbow. That is the number the eye is actually reading — not how far the
+	# chest reaches, but how much it moves between the throat and the leg.
+	var brisket := _part(&"brisket", Vector2(0.100, -0.860), Vector2(0.306, -0.604), 0.126, 0.134, COL_COAT)
+	# Blended wider than the parts it joins, and standing less proud than it did.
+	# Pushed forward at 0.10 blend and 1.12 height it stopped being a chest and
+	# became a ball: a sphere with its own highlight and a hard crease ringing it
+	# where the neck and the humerus arrived. What the eye wants at the point of
+	# shoulder is a *mass* that the neck runs into and the leg comes out of, and
+	# the difference between the two is entirely in how fast the union closes.
+	brisket.blend = 0.125
+	brisket.height_scale = 1.06
+	# Belly, and with it the tuck. Two things were wrong with the old one and
+	# both were measured off the rendered frame, not off these numbers.
+	#
+	# Its front cap sat at -0.450, which put the lowest point of the whole trunk
+	# *behind* the sternum — the belly, not the chest, was the deepest thing on
+	# the animal, which is the profile of a badger. It now bottoms out at -0.475
+	# against the brisket's -0.470, so the chest is the deepest point by a hair
+	# and everything behind it rises.
+	#
+	# And the tuck itself was too shallow to survive the blend. Across the belly
+	# columns of a 260 px alpha capture the rendered underline moved *three
+	# pixels* while the topline moved ten, which is what a curved back on a flat
+	# bottom looks like, and it is most of the loaf. The union costs about 45% of
+	# whatever is authored here — 0.070 of tuck rendered as 0.027 — so the tuck
+	# is 0.105 now and runs over a shorter span, which turns a ramp into a curve.
+	# Behind its rear cap the torso's own underline takes over and drops again
+	# into the groin, which is the second half of the shape.
+	#
+	# The pale palette slot doubles as the chest bib, which is the one broad
+	# value break on the underside that survives at 260 px.
+	var belly := _part(&"belly", Vector2(-0.185, -0.612), Vector2(0.140, -0.557), 0.032, 0.082, COL_BELLY)
 	# Sunk until its top edge barely clears the torso's underline, and blended
 	# wide. Sitting 0.10 higher it painted a hard pale stripe up the flank, and a
 	# bright band across the middle of the body at 260 px is the same plank
 	# artifact the coat was pulled up for — countershading is a gradient.
-	belly.blend = 0.135
+	belly.blend = 0.105
 	belly.coat_length = 1.35
 	# Thinner than the skull by a quarter, and steeper than before (38° rather
 	# than 30°), which is what lifts the head off the shoulder line.
@@ -292,24 +333,36 @@ static func build() -> S:
 	# rather than the end of a taper, because at ship size a leg with no paw
 	# shape is a noodle.
 	#
-	# Both upper segments sit on BODY, not FRONT, while everything below the
-	# elbow and the stifle stays on FRONT. Only parts sharing a layer are
-	# smooth-unioned, so on FRONT the thigh composited *over* the hip as a
-	# separate sausage with a seam down it. On BODY it fuses into the girdle the
-	# way a real haunch and shoulder do, and the free leg still draws in front of
-	# the flank where it has to. Neither part carries a near/far token, so their
-	# side is inferred from the layer — BODY still resolves to near, BEHIND to
-	# far, which is exactly what the far pair below relies on.
+	# Every segment of a near limb sits on BODY, girdle to toe. Only parts sharing
+	# a layer are smooth-unioned; across layers they are *composited*, and the
+	# joint the composite lands on is where the leg breaks. The previous split —
+	# upper on BODY, everything below the elbow on FRONT — put that break in the
+	# open air halfway down the limb, and the ship-size frame showed the result
+	# plainly: a pale hemispherical knob at the elbow and another at the stifle,
+	# each with a hard edge against the segment above, so the legs read as doll
+	# limbs pinned on rather than as one continuous tapering column.
+	#
+	# The knob was not just an outline. `f.crease` — the volume a smooth union
+	# adds — is what the shader turns into joint occlusion, and it only
+	# accumulates *within* a layer. A segment that unions with nothing arrives at
+	# its own cap with zero crease AO, so the cap is not merely seamed, it is the
+	# brightest thing on the leg.
+	#
+	# Nothing is lost by fusing them: below the girdle the near free leg does not
+	# overlap the trunk at all (the hip's lowest surface is y = -0.53, the tibia
+	# passes it 0.23 lower), so there is no place the limb still needed to be
+	# composited in *front* of the flank. Neither upper carries a near/far token,
+	# so their side is inferred from the layer — BODY resolves to near, BEHIND to
+	# far, which is exactly what the far pair above relies on.
 	var fl_u := _part(&"leg_fl_upper", Vector2(0.240, -0.650), Vector2(0.285, -0.462), 0.080, 0.055, COL_COAT, 1)
-	fl_u.blend = 0.075
-	# Starts a hair wider than the humerus ends (0.058 against 0.055) so the
-	# elbow overlaps rather than butting: the two are on different layers and are
-	# composited, not blended, and an exact match shows the seam.
-	var fl_l := _part(&"leg_fl_lower", Vector2(0.285, -0.462), Vector2(0.300, -0.140), 0.058, 0.034, COL_COAT, 2)
+	# Wide enough that the humerus leaves the chest as a taper rather than as a
+	# rim: the shoulder crease is a real feature and it was drawing as a line.
+	fl_u.blend = 0.100
+	var fl_l := _part(&"leg_fl_lower", Vector2(0.285, -0.462), Vector2(0.306, -0.140), 0.056, 0.034, COL_COAT, 1)
 	# The paw is its own short, swelling capsule — 0.044 against the 0.034 the
 	# forearm arrives at. A taper that just runs out at the floor is the noodle
 	# the review saw; the swell is the only paw shape that survives at 260 px.
-	var fl_paw := _part(&"paw_fl", Vector2(0.300, -0.140), Vector2(0.348, -0.040), 0.038, 0.044, COL_COAT, 2)
+	var fl_paw := _part(&"paw_fl", Vector2(0.306, -0.140), Vector2(0.352, -0.040), 0.038, 0.044, COL_COAT, 1)
 	fl_paw.blend = 0.03
 	# The hind leg, as a Z rather than an L. This is the single most recognisable
 	# thing about a cat and the old spec did not have it: femur, tibia and paw
@@ -319,11 +372,18 @@ static func build() -> S:
 	#
 	# The real chain is three bones and two folds. The femur swings forward and
 	# down so the stifle tucks just under the flank at -0.470; the tibia rakes
-	# back to put the point of the hock at -0.640, the rearmost thing on the
+	# back to put the point of the hock at -0.672, the rearmost thing on the
 	# standing animal below the tail; the metatarsus drops forward again to the
-	# paw at -0.547, back under the hip. That is 0.170 of horizontal travel and
-	# then 0.093 back — 19 px and 10 px at ship size, where the whole leg is only
-	# 9 px wide, so the zigzag is the widest feature the limb has.
+	# toe at -0.504, back under the hip. That is 0.202 of horizontal travel and
+	# then 0.168 back — 23 px and 19 px at ship size, where the whole leg is only
+	# 9 px wide, so the zigzag is by a long way the widest feature the limb has.
+	#
+	# The return leg of the Z is the half that was missing. At 0.093 it was ten
+	# pixels, and ten pixels of forward rake under a twenty-two pixel backward
+	# one does not read as a fold — it reads as a leg that leans back. Both
+	# strokes have to be about the same length before the eye sees a zigzag, and
+	# that is why the metatarsus is now nearly as long a horizontal run as the
+	# tibia.
 	#
 	# The rig gets it too, not just the bind pose: naming the third segment
 	# `hock` classifies it as `Seg.CANNON`, which is what promotes the chain from
@@ -333,14 +393,11 @@ static func build() -> S:
 	# The haunch still carries a cat's whole sprint, so the femur stays the
 	# widest mass below the spine (0.115 against the forearm's 0.058) rather than
 	# a stick the same gauge as the foreleg.
-	var bl_u := _part(&"leg_bl_upper", Vector2(-0.545, -0.665), Vector2(-0.470, -0.432), 0.115, 0.072, COL_COAT, 1)
+	var bl_u := _part(&"leg_bl_upper", Vector2(-0.545, -0.665), Vector2(-0.470, -0.436), 0.115, 0.072, COL_COAT, 1)
 	bl_u.blend = 0.095
-	# Same overlap trick as the elbow: 0.076 against the 0.072 the femur arrives
-	# at, because these two are composited across layers rather than blended and
-	# an exact match shows the seam.
-	var bl_l := _part(&"leg_bl_lower", Vector2(-0.470, -0.432), Vector2(-0.640, -0.228), 0.076, 0.046, COL_COAT, 2)
-	var bl_h := _part(&"leg_bl_hock", Vector2(-0.640, -0.228), Vector2(-0.578, -0.062), 0.044, 0.034, COL_COAT, 2)
-	var bl_paw := _part(&"paw_bl", Vector2(-0.578, -0.062), Vector2(-0.516, -0.042), 0.038, 0.045, COL_COAT, 2)
+	var bl_l := _part(&"leg_bl_lower", Vector2(-0.470, -0.436), Vector2(-0.672, -0.230), 0.072, 0.045, COL_COAT, 1)
+	var bl_h := _part(&"leg_bl_hock", Vector2(-0.672, -0.230), Vector2(-0.612, -0.058), 0.043, 0.033, COL_COAT, 1)
+	var bl_paw := _part(&"paw_bl", Vector2(-0.612, -0.058), Vector2(-0.548, -0.038), 0.037, 0.044, COL_COAT, 1)
 	bl_paw.blend = 0.03
 	parts.append_array([fl_u, fl_l, fl_paw, bl_u, bl_l, bl_h, bl_paw])
 

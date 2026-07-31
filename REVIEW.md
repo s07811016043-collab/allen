@@ -24,59 +24,47 @@ tools/capture.sh --species=cat --growth=3 --out=_captures/adult.png --size=720x7
 tools/capture.sh --species=cat --growth=3 --out=_captures/head.png  --size=720x720 --zoom=3.4 --focus=head
 ```
 
-## Blocking — round 5 blind review at 260 px, most damaging first
+## Blocking — round 6 blind review at 260 px, all four species
 
-The reviewer identified the build as *"a small four-legged mammal — probably a
-cat, possibly a whippet or a young deer."* The head is now convincingly feline;
-the body is not. Everything below is body.
+The cat now reads as a cat within a second, carried entirely by the head. The
+reviewer checked every species at ship size for the first time, and three of the
+four fail outright. A store page shows all four.
 
-1. **The legs are collinear, so the silhouette has two columns, not four.** In
-   the standing pose the near and far leg of each pair sit on the same x, so
-   there is no negative space inside a pair — and negative space is what tells
-   the eye it is looking at a quadruped. Stagger the stance in the spec.
-2. **There is no chest.** Below the neck the front of the body drops as a flat
-   vertical wall to the foreleg, because no capsule fills the brisket between
-   the forelimbs. A cat's chest is the deepest part of its body.
-3. **The hind limb is an L with no hock zigzag.** The double-bend of a feline
-   hind leg is the single most recognisable cue in the animal and it is absent.
-4. **Groom runs lengthwise along the whole torso regardless of surface flow**, so
-   the strokes cross the form instead of wrapping it — and at 260 px that is
-   *precisely* what aliases into wood grain. This is the root cause the previous
-   two coat passes were treating symptomatically.
-5. **The belly is a blown-out pale slab** with a hard straight bottom edge, at
-   essentially the same value as the lit back. No occlusion where the limbs
-   enter the body, no ground-bounce gradient on the underside.
-6. **No per-paw contact shadow in the standing shot.** `contact_shadow.gd` grew
-   the capability but the standing capture still shows one body-wide ellipse, so
-   nothing disambiguates the fused leg pair.
-7. **Animation regressed to 3/10.** Body pitch, tail lag and a live idle were
-   the brief last round and the reviewer still reads the torso as carried
-   furniture. Re-measure with `--probe` rather than assuming the fix landed.
+1. **THE DOG READS AS TWO-HEADED.** The curled Shiba tail has fused into a solid
+   rear mass with a snout-like taper and no daylight under the arc, so at 260 px
+   the animal is a pushmi-pullyu. Confirmed by eye — it is unmistakable. Open
+   the arc so the tail reads as a tail, or drop the curl.
+2. **The cat's body reads as a hairless Sphynx or a clay maquette.** Smooth
+   latex with crater dents. The head sells the species and the body contradicts
+   it. The coat is not reaching the torso at ship size.
+3. **Every species carries the same white-streak-over-black-stipple seam along
+   the belly.** One shared artifact, four animals — so it is in the shared
+   marking or decal path, not in any species file.
+4. **The lizard reads as a brass ornament** and **the bird floats off its own
+   shadow.**
+5. **Animation scored 2/10**, its lowest yet, and the tail is described as a
+   rigid stick that never moves. Secondary motion has now been briefed twice
+   without landing. Before writing anything, measure what is actually there with
+   `--probe` and report the numbers; if the previous round's work is not
+   present, find out why rather than writing it a third time.
+6. **Grounding 3/10.** Per-paw contact patches were briefed and the bird still
+   floats.
 
-## Core bugs found while authoring the bird
+### Method notes worth keeping
 
-Found by dumping *posed* geometry instead of trusting the bind pose. All three
-are in files another agent owned at the time, so they were reported rather than
-patched. They affect every species, not just the bird.
-
-10. **`marking_strength` is never set.** It is a shader uniform and
-    `CreatureRenderer` has zero occurrences of it, so the mammal tabby code runs
-    at full strength on birds and reptiles. On the bird this lightened the navy
-    wing into four hard blocks that looked exactly like a wing geometry bug and
-    were actually a palette-luminance bug.
-11. **The FEATHER path was gated off at ship scale.** `pet_feather` gates relief,
-    occlusion and iridescence on a term where *raising* density closes the gate —
-    the comment had the inequality backwards. At the shipped density the gate
-    evaluated to exactly 0.00, so the bird had no vanes and no thin-film at all.
-12. **`Slot.WING` parts are fitted twice** in `RigSkeleton.build`; the `fore`
-    loop is only skipped for `Slot.LIMB`. Duplicate bone names mean parts bind
-    against the wrong rest transform, which collapsed the wing. Worked around in
-    the bird spec by naming the parts so they classify as `SPINE`; the rig bug
-    itself is still there.
-13. **Captures shade at roughly twice ship scale.** The harness fits the pose to
-    the frame, so a 560 px shot runs at an effective 294 px per rig unit against
-    a nominal 158. Any density tuned by eye in a capture is tuned at the wrong
-    scale — another face of the ship-size problem.
+- **The coat fringe closes about 3.6 px of any authored gap at ship size.** A
+  0.038 rig-unit gap between the shins measured as *zero* rendered pixels. Three
+  rounds of leg staggering had been signed off on the geometric number and none
+  of it reached the picture. `_measure.gd` now names the constant and subtracts
+  it. Measure in rendered pixels, never in rig units.
+- **`f.crease` only accumulates within a depth layer.** A limb segment that
+  unions with nothing arrives at its cap with zero occlusion and is the
+  brightest thing on the animal — which is why the legs looked like doll limbs
+  with pale knobs at every joint.
+- **A debug view now exists.** `PETALIA_DEBUG_VIEW=<1..12>` renders groom
+  direction, lane index, occlusion, marking mask and more straight to the
+  framebuffer. Three of the four root causes found this round could not have
+  been found by reasoning.
 
 ## Closed
 

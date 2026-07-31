@@ -519,37 +519,95 @@ vec3 pet_hair_spec(vec3 tangent, vec3 n, vec3 l, vec3 v, float rough,
 // Feather
 // ---------------------------------------------------------------------------
 
-// Barbs indexed off the rachis. `arc` runs along the shaft and `v` is the signed
-// distance out to the vane edge, both in rig units, so barbs wrap the part's
-// spine instead of being stamped in screen space. Barbs lean toward the tip and
-// separate into distinct points near the trailing edge — the separations are
-// what stop a wing reading as a painted shell.
+// Contour feathers: discrete overlapping plumes, each with its own rachis, laid
+// in staggered rows over the body.
+//
+// The discreteness is the whole point, and getting it wrong is what put a
+// topographic map on the bird. One continuous barb field indexed off the body's
+// own coordinates draws a single unbroken family of curves across the entire
+// animal — which is, precisely, what a contour line is. Real plumage never reads
+// that way, because a bird is not covered in barbs, it is covered in *feathers*:
+// a few hundred lens-shaped objects, each a couple of centimetres long, each
+// overlapping the one behind it. The barbs inside one of them run for a
+// centimetre and stop at its edge.
+//
+// So this tiles first and draws barbs second, the same way `pet_scale` tiles
+// plates. Two frequencies fall out of that, and they fade independently: the
+// feather is a body-sized detail that survives the downsample, the barbs are a
+// close-up detail that does not. At 260 px the bird keeps its plumage and loses
+// its barbs, which is the right trade and is what a photograph of a bird at that
+// size looks like.
+//
+// `arc` runs along the body, `v` is the signed depth out to the vane edge and
+// `u` is `|v|/R`. Rows follow `v`, which means they follow the body's own
+// contour — that part was right, and pterylae really do run that way; the error
+// was letting the *barbs* follow it too.
 Surf pet_feather(float arc, float v, float u, float density, float px) {
 	Surf s;
-	float pitch = 150.0 * density;
-	float fade = smoothstep(1.8, 4.2, px / pitch);
+	// One feather, in rig units. Sized so an adult songbird carries roughly
+	// fifteen of them nose to tail, which is about nine screen pixels each at
+	// desktop size — small enough to read as plumage, large enough to survive.
+	float fl = 0.023 / max(density, 0.05);
+	float fw = fl * 0.55;
+	float plume_fade = smoothstep(2.2, 5.5, px * fl);
+	// Barbs are an order finer, so they get their own gate. About seven to a
+	// feather.
+	float barb_px = px * fl / 7.0;
+	float fade = smoothstep(1.7, 4.0, barb_px) * plume_fade;
 
-	float lane = (arc + abs(v) * 1.6) * pitch;
+	vec2 cell = vec2(arc / fl, v / fw);
+	float row = floor(cell.y);
+	// Half a feather of stagger per row, so the tips of one row sit over the gaps
+	// of the next instead of forming a seam down the bird.
+	// Plus a slow warp along each row. A tract of skin is not a printed grid, and
+	// a stagger this regular reads as basket weave at the size the plumage is
+	// actually drawn — which is a different wrong answer from contour lines, not a
+	// right one.
+	cell.x += fract(row * 0.5) + pet_hash1(vec2(row, 3.0)) * 0.30
+		+ pet_noise(vec2(cell.x * 0.20, row * 0.85)) * 0.50;
+	vec2 g = fract(cell) - 0.5;
+	float rnd = pet_hash1(vec2(floor(cell.x), row));
+
+	// Shingling. A feather's tip points caudally and lies *over* the feather
+	// behind it, so height ramps from the buried quill at +g.x to the exposed tip
+	// at -g.x and then falls off the edge. That step is the single strongest cue
+	// that the surface is made of separate objects.
+	float shingle = smoothstep(0.5, -0.34, g.x);
+	float lip = smoothstep(0.5, 0.30, abs(g.x));
+
+	// The vane: a lens, wider at the quill end and drawn to a point at the tip.
+	float half_w = (0.50 - 0.28 * smoothstep(-0.1, 0.5, -g.x)) * mix(0.86, 1.0, rnd);
+	float vane = 1.0 - clamp(abs(g.y) / max(half_w, 1e-3), 0.0, 1.0);
+
+	// The rachis runs the length of the feather, not the length of the bird.
+	float rachis = smoothstep(0.22, 0.0, abs(g.y)) * vane;
+
+	// Barbs, *inside* this feather. They leave the rachis at an angle and sweep
+	// toward the tip, so the lane index mixes the two cell axes; both terms are
+	// per-cell, so a barb cannot outlive the feather it belongs to.
+	float lane = (abs(g.y) * 1.35 - g.x * 0.55) * 7.0 + rnd * 3.0;
 	float f = fract(lane) - 0.5;
-	float r = pet_hash1(vec2(floor(lane), 4.0));
-	float w = mix(0.28, 0.46, r);
 	float dp;
-	float barb = pet_ridge(abs(f) / w, dp) * fade;
+	float barb = pet_ridge(abs(f) / 0.40, dp) * fade * vane;
+	// Barbs unzip toward the vane edge: coverage falls away and the gaps open,
+	// which is what stops the outline of each feather being a drawn line.
+	barb *= 1.0 - smoothstep(0.55, 1.0, abs(g.y) / max(half_w, 1e-3))
+		* (0.35 + 0.65 * rnd);
 
-	// Barbs unzip toward the vane edge: coverage falls away and the gaps open.
-	float unzip = smoothstep(0.55, 1.0, u);
-	barb *= 1.0 - unzip * (0.35 + 0.65 * r);
-
-	// The rachis is a raised shaft along the spine of the part.
-	float rachis = smoothstep(0.30, 0.0, u);
-
-	s.slope = vec2(dp * sign(f) / w * pitch * fade * 0.0016, 0.0);
-	s.occ = mix(1.0 - 0.30 * fade, 1.04, barb) * mix(1.0, 1.10, rachis);
-	s.tint = (r - 0.5) * 0.35 * fade + rachis * 0.18;
-	s.spec = mix(0.7, 1.35, barb);
-	// Iridescence is strongest on the smooth outer face of the vane and dies in
-	// the gaps, so it tracks barb coverage rather than being painted flat.
-	s.extra = barb * (1.0 - rachis * 0.6);
+	// Relief: mostly the shingle step, with the barbs as a fine ripple on top.
+	// The step is along the cell's `arc` axis, which is `across` in the caller.
+	s.slope = vec2((shingle - 0.5) * plume_fade * 0.42
+		+ dp * sign(f) * fade * 0.055, 0.0);
+	s.occ = mix(1.0, mix(0.72, 1.06, shingle) * mix(0.86, 1.0, lip), plume_fade)
+		* mix(1.0 - 0.12 * fade, 1.05, barb) * mix(1.0, 1.08, rachis);
+	s.tint = (rnd - 0.5) * 0.26 * plume_fade + rachis * 0.14
+		+ (barb - 0.5) * 0.10 * fade;
+	s.spec = mix(1.0, mix(0.62, 1.45, shingle * mix(0.5, 1.0, vane)), plume_fade)
+		* mix(1.0, 1.25, barb);
+	// Iridescence is strongest on the smooth exposed face of the vane and dies in
+	// the gaps and under the overlaps, so it tracks the shingle rather than being
+	// painted flat.
+	s.extra = mix(0.35, 1.0, shingle) * vane * (1.0 - rachis * 0.5);
 	return s;
 }
 

@@ -39,6 +39,10 @@ var _mat: ShaderMaterial
 var _packed := PackedVector4Array()
 var _packed_eyes := PackedVector4Array()
 var _packed_landmarks := PackedVector4Array()
+## Where each limb *enters* the body, parallel to `_packed_landmarks`. Distinct
+## from the landmark, which is the crest of the bone up under the top line; this
+## is the socket down on the side of the barrel. See `_pack_landmarks`.
+var _packed_limb_roots := PackedVector4Array()
 var _landmark_count := 0
 ## Whisker pad, packed (x, y, length, amount) in rig space. See `_pack_whiskers`.
 var _whisker_pad := Vector4.ZERO
@@ -81,6 +85,13 @@ var exposure: float = 1.0
 ## not tonemapped twice.
 var defer_tonemap: bool = false
 
+## Diagnostic channel for `creature_body.gdshader`; see the `debug_view` uniform
+## there for the list. Read once from the environment rather than plumbed through
+## the capture harness, because the harness is not this agent's file and a
+## diagnostic that needs a second file edited to switch on is a diagnostic nobody
+## uses. Zero in every shipped run.
+static var _debug_view: int = int(OS.get_environment("PETALIA_DEBUG_VIEW"))
+
 
 func _ready() -> void:
 	_rect = ColorRect.new()
@@ -95,6 +106,7 @@ func _ready() -> void:
 	_packed.resize(MAX_PARTS * VEC4S_PER_PART)
 	_packed_eyes.resize(MAX_EYES * VEC4S_PER_EYE)
 	_packed_landmarks.resize(MAX_LANDMARKS)
+	_packed_limb_roots.resize(MAX_LANDMARKS)
 	_palette.resize(MAX_PALETTE)
 
 
@@ -144,8 +156,20 @@ func _upload_static() -> void:
 	_mat.set_shader_parameter("roughness", spec.roughness)
 	# Lashes are a mammal feature. A bird with eyelashes reads as a cartoon, and
 	# a gecko with them reads as a mistake.
-	_mat.set_shader_parameter("eye_lash",
-		1.0 if spec.coat_surface == SDFPart.Surface.FUR else 0.0)
+	var mammal: bool = spec.coat_surface == SDFPart.Surface.FUR
+	_mat.set_shader_parameter("eye_lash", 1.0 if mammal else 0.0)
+	# The marking block in the body shader is the *mammal* one: countershading, a
+	# saddle, points on the extremities and a mackerel tabby. It is written for a
+	# pelt, and it was running at full strength on everything because nothing ever
+	# set this uniform and its default is 1.0. On the bird that showed up as four
+	# pale blocks across a navy wing — read as a wing geometry bug for a whole
+	# round, and actually this: a tabby, drawn on feathers.
+	#
+	# A bird's plumage pattern and a lizard's banding are palette decisions their
+	# species files already make, part by part. They do not want a second pattern
+	# invented on top, so the mammal one is switched off for them entirely rather
+	# than merely turned down.
+	_mat.set_shader_parameter("marking_strength", 1.0 if mammal else 0.0)
 
 
 func _process(_delta: float) -> void:
@@ -258,13 +282,18 @@ func _pack_landmarks() -> void:
 	# hangs below the body's centre. The second test is what keeps ears and a
 	# raised tail out — both are thin, and both sit above the torso rather than
 	# under it.
-	var roots: Array[Vector2] = []
+	# `z` carries the limb's own half-thickness, because the socket a limb makes in
+	# the body is the size of the limb and not of the body: a whippet's armpit is
+	# not a cat's, and scaling the shadow off the torso gives both the same one.
+	var roots: Array[Vector3] = []
 	for p in live_parts:
-		if maxf(p.radius_a, p.radius_b) >= core_r * 0.62:
+		var lr: float = maxf(p.radius_a, p.radius_b)
+		if lr >= core_r * 0.62:
 			continue
 		if maxf(p.a.y, p.b.y) <= core.y:
 			continue
-		roots.append(p.a if p.a.y < p.b.y else p.b)
+		var top: Vector2 = p.a if p.a.y < p.b.y else p.b
+		roots.append(Vector3(top.x, top.y, lr))
 
 	# One landmark per limb, not per part: the near and far leg of a pair sit
 	# within a torso radius of each other in x, and the fore and hind pair are
@@ -272,6 +301,7 @@ func _pack_landmarks() -> void:
 	var tol: float = core_r * 2.2
 	var sum_x := PackedFloat32Array()
 	var top_y := PackedFloat32Array()
+	var limb_r := PackedFloat32Array()
 	var count := PackedInt32Array()
 	for root in roots:
 		var hit := -1
@@ -284,14 +314,32 @@ func _pack_landmarks() -> void:
 				continue
 			sum_x.append(root.x)
 			top_y.append(root.y)
+			limb_r.append(root.z)
 			count.append(1)
 		else:
 			sum_x[hit] += root.x
 			top_y[hit] = minf(top_y[hit], root.y)
+			# The thickest segment of the limb, which is the one at the shoulder —
+			# a limb tapers toward the paw, and sizing the socket off a toe capsule
+			# would put a pinprick where the armpit is.
+			limb_r[hit] = maxf(limb_r[hit], root.z)
 			count[hit] += 1
 
 	for i in sum_x.size():
 		var at := Vector2(sum_x[i] / float(count[i]), top_y[i])
+		# The socket, before the landmark is lifted off it. A limb does not simply
+		# abut the barrel, it sinks into it, and the crease it makes there is the
+		# darkest thing on the underside of a standing animal — the armpit and the
+		# groin. Nothing in the shader can find these on its own: the limbs live on
+		# a different depth layer from the torso, so they smooth-union with nothing
+		# and accumulate no crease at all, which is exactly why the belly came out
+		# as one unbroken pale slab from elbow to groin.
+		#
+		# Pushed a little *up* into the body from the top of the limb capsule,
+		# because the crease is where the two volumes meet and the limb's own top
+		# cap is already inside the barrel by about its own radius.
+		_packed_limb_roots[i] = Vector4(at.x,
+			at.y - limb_r[i] * 0.55, maxf(limb_r[i] * 2.10, core_r * 0.46), 1.0)
 		# The bone that shows is not the joint itself: the scapula blade sits
 		# above and behind the shoulder, the point of the hip above and in front
 		# of the femur head. Both are toward the body's centre, so nudging the
@@ -317,6 +365,7 @@ func _pack_landmarks() -> void:
 	_landmark_count = sum_x.size()
 	for i in range(_landmark_count, MAX_LANDMARKS):
 		_packed_landmarks[i] = Vector4(1e6, 1e6, 1.0, 0.0)
+		_packed_limb_roots[i] = Vector4(1e6, 1e6, 1.0, 0.0)
 
 
 ## Whisker pad for the body shader, packed (x, y, length, amount) in rig space.
@@ -364,6 +413,7 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("parts", _packed)
 	_mat.set_shader_parameter("part_count", live_parts.size())
 	_mat.set_shader_parameter("landmarks", _packed_landmarks)
+	_mat.set_shader_parameter("limb_roots", _packed_limb_roots)
 	_mat.set_shader_parameter("landmark_count", _landmark_count)
 	_mat.set_shader_parameter("whisker_pad", _whisker_pad)
 	_mat.set_shader_parameter("bounds_min", _bounds_min)
@@ -388,6 +438,7 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("bounce_energy", bounce_energy)
 	_mat.set_shader_parameter("exposure", exposure)
 	_mat.set_shader_parameter("defer_tonemap", defer_tonemap)
+	_mat.set_shader_parameter("debug_view", _debug_view)
 	# The on-screen pixel density, not the spec's nominal one: every coat
 	# level-of-detail decision keys off this, so a pet the player has scaled up
 	# has to be told it is bigger or its fur stays at desktop-size frequencies.

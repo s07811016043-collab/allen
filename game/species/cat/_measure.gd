@@ -39,6 +39,18 @@ const FEET_LABELS := ["FN", "FF", "HN", "HF"]
 ## in rig units, because a 0.03 gap is a fix at one size and nothing at the other.
 const SHIP_PX := 112.9
 
+## Pixels of gap the coat closes before anything is drawn.
+##
+## The capsules are not the silhouette: the fur fringe stands outside them, and
+## an alpha threshold across the shipped frame catches it. Calibrated by holding
+## the geometry still and comparing this probe against a 260 px alpha capture at
+## matching scanlines — a 0.038 gap between the shins measured as *zero* rendered
+## pixels, and 0.082 measured as seven. So a pair separated by less than about
+## 0.035 is not separated at all, and every gap below is worth roughly this much
+## less on screen than it is here. Subtracted rather than left to the reader,
+## because three rounds of leg staggering were signed off on the geometric number.
+const COAT_PX := 3.6
+
 
 func _ready() -> void:
 	var spec: CreatureSpec = GameState.spec_for(&"cat")
@@ -145,7 +157,8 @@ func _print_gap(label: String, front: Array[SDFPart], back: Array[SDFPart],
 		worst = minf(worst, gap)
 		if i % 2 == 0:
 			line += "  y%.2f=%+.3f" % [y, gap]
-	print("%s | worst=%+.3f (%.1f px at ship)" % [line, worst, worst * SHIP_PX])
+	print("%s | worst=%+.3f (%.1f px geometric, %.1f rendered)"
+		% [line, worst, worst * SHIP_PX, worst * SHIP_PX - COAT_PX])
 
 
 ## Leading edge of the body from throat to elbow, which is review item 2. A cat

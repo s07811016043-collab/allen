@@ -27,9 +27,16 @@ const MAX_PAWS := 4
 const RigBones := preload("res://core/rig/bone_map.gd")
 
 ## Darkest the contact patch under a fully planted paw gets.
-const CONTACT_STRENGTH := 0.78
+const CONTACT_STRENGTH := 0.82
 ## Opacity of the broad ambient ellipse at its centre.
-const AMBIENT_STRENGTH := 0.36
+##
+## Held below the contact patches on purpose, and lower than it used to be. The
+## ambient term says "there is a body above this"; the patches say "these four
+## points are touching". Run the ambient near the patches' own value and the
+## composite is one even smudge the width of the animal — which is exactly what
+## the standing capture has been showing, and it is the reason four separate
+## plants read as one.
+const AMBIENT_STRENGTH := 0.30
 ## Height above the floor, as a fraction of the creature's standing height, at
 ## which a lifted paw has no contact shadow left at all.
 const LIFT_RANGE := 0.20
@@ -82,6 +89,19 @@ func _process(_delta: float) -> void:
 
 ## Cache what does not change between frames: the paw parts to follow, which gait
 ## slot each belongs to, and the footprint the ambient ellipse is sized from.
+##
+## Exactly one part per gait slot, chosen as the *most distal segment of that
+## limb* rather than as "the part whose id contains the word paw". Insisting on a
+## named foot is why the standing cat has been shipping one body-wide ellipse:
+## the cat spec deliberately drops its far paws — at ship size each was two pixels
+## of shadow tucked behind a near one — so its far legs end in a lower segment
+## that still stands on the floor and was never asked to cast anything. Two
+## patches instead of four is precisely the case where nothing disambiguates a
+## fused leg pair, which is the whole reason the per-paw term exists.
+##
+## One part per slot also matters for the other direction: a lizard has six parts
+## classifying as limbs across four slots, and the old loop simply let the last
+## one it happened to see win.
 func _bind() -> void:
 	_paw_parts.clear()
 	_paw_slots = PackedInt32Array()
@@ -92,14 +112,27 @@ func _bind() -> void:
 		_ppu = spec.pixels_per_unit
 	var lowest := 0.0
 	var highest := 0.0
+	# Per slot: the best part so far, and how distal it is. Rank on the parsed
+	# segment first, then on which reaches lower — a chain that names none of its
+	# segments still resolves, because the foot is the end that touches the floor.
+	var best: Array = [null, null, null, null]
+	var rank := PackedFloat32Array([-INF, -INF, -INF, -INF])
 	for p in creature.renderer.live_parts:
-		lowest = maxf(lowest, maxf(p.a.y + p.radius_a, p.b.y + p.radius_b))
+		var sole: float = maxf(p.a.y + p.radius_a, p.b.y + p.radius_b)
+		lowest = maxf(lowest, sole)
 		highest = minf(highest, minf(p.a.y - p.radius_a, p.b.y - p.radius_b))
 		var tag = RigBones.classify(p.id, int(p.layer))
-		if tag.slot != RigBones.Slot.LIMB or tag.seg < RigBones.Seg.FOOT:
+		if tag.slot != RigBones.Slot.LIMB:
 			continue
-		_paw_parts.append(p)
-		_paw_slots.append((0 if tag.fore else 2) + (1 if tag.far else 0))
+		var slot: int = (0 if tag.fore else 2) + (1 if tag.far else 0)
+		var score: float = float(tag.seg) + sole
+		if score > rank[slot]:
+			rank[slot] = score
+			best[slot] = p
+	for slot in MAX_PAWS:
+		if best[slot] != null:
+			_paw_parts.append(best[slot])
+			_paw_slots.append(slot)
 	_body_h = maxf(lowest - highest, 0.05)
 
 
@@ -230,18 +263,29 @@ float ellipse(vec2 p, vec2 c, vec2 r) {
 
 // A contact patch: near-opaque core, short penumbra. Flattened to 0.45 of its
 // width vertically because it is a ground plane seen almost edge on.
+//
+// The core has to be a real core. Faded from the rim all the way in — which is
+// what a single wide smoothstep does — the patch is a soft blob with no value
+// anywhere near its nominal opacity except at one point, and against the ambient
+// ellipse underneath it that is invisible at 260 px. What says "touching" is a
+// small flat dark centre with the penumbra outside it.
 float patch(vec2 p, vec4 q) {
 	if (q.w <= 0.0) return 0.0;
 	float d = ellipse(p, q.xy, vec2(q.z, q.z * 0.45));
-	return smoothstep(1.0, 0.30, d) * q.w;
+	float core = smoothstep(0.62, 0.30, d);
+	float penumbra = smoothstep(1.0, 0.45, d);
+	return (0.30 * penumbra + 0.70 * core) * q.w;
 }
 
 void fragment() {
 	vec2 p = rect_min + UV * rect_size;
-	// Two stacked falloffs on the ambient term: most of it lives in the inner
-	// half so the body still has a dark footprint, with a wide haze outside it.
+	// Two stacked falloffs on the ambient term. Both are gradients all the way to
+	// the centre rather than plateaux: an ambient term with a flat top is a slab
+	// the width of the animal, and the four contact patches then have nothing to
+	// stand out against. The body's weight should read as a pool that deepens
+	// toward the middle, with the plants punched into it.
 	float d = ellipse(p, ambient.xy, ambient.zw);
-	float a = (smoothstep(1.0, 0.15, d) * 0.65 + smoothstep(1.30, 0.0, d) * 0.35)
+	float a = (smoothstep(1.0, 0.0, d) * 0.62 + smoothstep(1.45, 0.0, d) * 0.38)
 		* ambient_strength;
 	// Composited as transmittance, not added: four overlapping patches under a
 	// gathered gallop must not stack into a black hole.

@@ -82,6 +82,13 @@ var _by_name := {}
 ## is what makes `update_pose` a single forward sweep.
 func add_bone(bone_name: StringName, parent_name: StringName, rest_pos: Vector2,
 		rest_angle: float) -> int:
+	# A duplicate name is always a fitting bug, and a silent one: the name table
+	# keeps the last copy so every lookup finds it, while `_bind_parts_to_bones`
+	# scans the array and matches the first, so the parts end up skinned to a bone
+	# nothing poses. That cost the bird its wings for a whole round and read as a
+	# geometry fault. Cheap to shout about, and it can only fire on a real defect.
+	if _by_name.has(bone_name):
+		Log.warn("RigSkeleton", "duplicate bone '%s'; the fit is wrong" % bone_name)
 	var b := Bone.new()
 	b.name = bone_name
 	b.parent = index_of(parent_name)
@@ -252,7 +259,17 @@ static func build(spec: CreatureSpec, bind_parts: Array[SDFPart],
 	for i in RigBones.NECK_BONES:
 		var t := float(i) / float(RigBones.NECK_BONES)
 		var name_i := RigBones.neck_bone(i)
-		sk.add_bone(name_i, prev, neck_base.lerp(head_p, t), neck_dir)
+		var idx := sk.add_bone(name_i, prev, neck_base.lerp(head_p, t), neck_dir)
+		# Trunk deformation stops at the neck. Breathing and impact squash are
+		# authored as bone scale on the spine and chest so the ribcage genuinely
+		# fattens, but scale compounds down a chain, and the head hangs off the end
+		# of that chain: measured, a resting cat's breath was stretching the neck
+		# enough to pump the skull 30 px at ship size against 5.6 px of chest
+		# travel — a slow deliberate nod, once every four seconds, that nobody
+		# asked for. The neck still *follows* the chest wherever the ribcage puts
+		# it; it just is not inflated by it.
+		if i == 0:
+			sk.bones[idx].inherit_scale = false
 		prev = name_i
 	sk.add_bone(RigBones.HEAD, prev, head_p, neck_dir)
 
@@ -280,13 +297,22 @@ static func build(spec: CreatureSpec, bind_parts: Array[SDFPart],
 		RigBones.spine_bone(1), pelvis_p, 2, true)
 
 	# --- limbs --------------------------------------------------------------
-	for wing in [false, true]:
-		var slot: int = RigBones.Slot.WING if wing else RigBones.Slot.LIMB
-		for fore in [true, false]:
-			for far in [true, false]:
-				var anchor := chest_p if (fore or wing) else pelvis_p
-				var parent := RigBones.CHEST if (fore or wing) else RigBones.PELVIS
-				sk._fit_limb(bind_parts, tags, slot, fore, far, wing, parent, anchor)
+	for fore in [true, false]:
+		for far in [true, false]:
+			sk._fit_limb(bind_parts, tags, RigBones.Slot.LIMB, fore, far, false,
+				RigBones.CHEST if fore else RigBones.PELVIS,
+				chest_p if fore else pelvis_p)
+	# Wings are fitted once per side, *not* once per girdle. A wing has no fore or
+	# hind — `limb_base` does not even put one in the name — so running them through
+	# the same fore/hind loop as legs called `add_bone` twice with identical names.
+	# The name table kept the second copy, which is what every lookup by name found,
+	# while `_bind_parts_to_bones` matched the first: the wing was skinned to a
+	# duplicate that nothing ever posed, and it collapsed. The bird spec currently
+	# works around it by naming its wing parts so they classify as SPINE; with this
+	# fixed it can call them wings again.
+	for far in [true, false]:
+		sk._fit_limb(bind_parts, tags, RigBones.Slot.WING, true, far, true,
+			RigBones.CHEST, chest_p)
 
 	sk._bind_parts_to_bones(bind_parts, tags)
 	sk._bind_eyes(spec, bind_eyes)

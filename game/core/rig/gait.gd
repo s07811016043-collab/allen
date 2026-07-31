@@ -106,6 +106,20 @@ var roll := 0.0
 ## across the trunk, which the rig splits half backwards into the croup and half
 ## forwards into the withers. Positive lifts the withers.
 var girdle_twist := 0.0
+## Sagittal curvature of the back: total radians of bend shared across the lumbar
+## run, positive rounding the topline *up*. Distinct from `pitch`, which rotates
+## the trunk rigidly — this is the only channel that changes the trunk's shape,
+## and until it existed the torso could only ever translate and tilt, which is
+## precisely what a blind reviewer called "furniture being carried".
+var flex := 0.0
+## Vertical slide of the pectoral girdle over the ribcage, rig units, positive up.
+##
+## A cat has no clavicle: the shoulder blade is slung in muscle and rides up the
+## side of the ribcage every time the limb takes load. From the side that is the
+## most conspicuous thing a walking cat's topline does, and it runs at twice the
+## stride rate, so it is also the only body channel that is not in lockstep with
+## the bob — which is what stops the whole animal reading as one oscillator.
+var withers := 0.0
 var surge := 0.0
 ## Lateral body wave for sprawling locomotion, sampled per spine bone.
 var undulation := 0.0
@@ -147,6 +161,22 @@ const TWIST_GAIN := 0.064
 ## Whole-body lean from the near/far load split. A strict side view can barely
 ## show a roll at all, so this stays a hint rather than a statement.
 const ROLL_GAIN := 0.022
+## Radians of lumbar bend per unit of girdle gather, where one unit is the two
+## girdles' feet closing by a whole trunk length.
+##
+## Driven off the actual gap between the fore and hind contact patches rather
+## than off a phase table, which makes it self-scaling in the way that matters:
+## at a walk the two feet of a pair are half a cycle apart so the gap barely
+## moves and the back stays nearly rigid, while a gallop gathers both pairs under
+## the body at once and the back rounds hard. That is the real difference between
+## the two gaits and no per-gait constant has to encode it.
+const FLEX_GAIN := 1.75
+## Ceiling on that bend. A galloping cat's spine really does work through 30°+,
+## but the trunk here is three capsules and pushing past this folds them into
+## each other instead of arching.
+const FLEX_MAX := 0.42
+## Scapula travel at full load swing, as a fraction of leg reach.
+const WITHERS_GAIN := 0.30
 
 var _spec: CreatureSpec
 var _family: int = CreatureSpec.Locomotion.QUADRUPED
@@ -174,6 +204,15 @@ var _support_hi := 0.5
 var _reach_ref := 0.5
 ## Constant downward offset that buys the legs their flexion reserve.
 var _crouch := 0.0
+## Gap between the fore and hind feet in the bind pose. `flex` is a differential
+## against it, the same way `pitch` is a differential against `support_ref`: a
+## species whose girdles sit unusually close together must not walk permanently
+## hunched.
+var _span_ref := 0.5
+## Slow-followed mean of the fore girdle's load. Subtracting it makes `withers` a
+## deviation by construction, so a gait whose duty factor gives the pair a high
+## average load does not park the shoulder permanently raised.
+var _fore_load_mean := 0.0
 ## Extra flexion carried once the animal is actually moving, faded in with speed.
 var _move_crouch := 0.0
 
@@ -220,6 +259,7 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 	_reach_ref = reach_sum / float(maxi(support_n, 1))
 	_crouch = _reach_ref * (1.0 - STANCE_COMPRESSION)
 	_body_len = maxf(max_x - min_x, 0.2) if support_n > 1 else 0.5
+	_span_ref = maxf(_girdle_span(), 0.05)
 
 	# `spec.stride` is the ground distance covered by one full cycle at the
 	# comfortable walking speed — the reference point the frequency law below
@@ -306,6 +346,9 @@ func settle() -> void:
 	pitch = 0.0
 	roll = 0.0
 	girdle_twist = 0.0
+	flex = 0.0
+	withers = 0.0
+	_fore_load_mean = 0.0
 	surge = 0.0
 	undulation = 0.0
 	for f in feet:
@@ -648,6 +691,37 @@ func _solve_body(dt: float) -> void:
 	roll = lerpf(roll, roll_to, clampf(dt * 16.0, 0.0, 1.0))
 	girdle_twist = lerpf(girdle_twist, twist_to, clampf(dt * 20.0, 0.0, 1.0))
 
+	# Trunk *shape*, as opposed to trunk attitude. Both channels are differentials
+	# against a rest value and both are gated on the animal actually moving, for
+	# the same reason the attitude channels are: at a standstill the phases are
+	# frozen wherever the gait stopped, and a frozen phase read as a pose is a
+	# permanent deformity.
+	var flex_to := 0.0
+	var withers_to := 0.0
+	if frequency > 0.0:
+		# The two girdles' feet closing toward each other is the animal gathering,
+		# and a gathering quadruped rounds its back — that coupling is the whole of
+		# a bound and most of a gallop. Normalised by the trunk so it means the same
+		# thing on a lizard and a whippet.
+		flex_to = _soft_clip((_span_ref - _girdle_span()) / maxf(_body_len, 1e-3)
+			* FLEX_GAIN, FLEX_MAX)
+		# A sprawling animal's trunk already carries all its motion laterally
+		# through `undulation`; adding a sagittal arch on top only lifts the middle
+		# of a lizard off the floor.
+		if _family == CreatureSpec.Locomotion.SPRAWLING:
+			flex_to *= 0.25
+		var fore_load: float = _pair_load(load, FORE_NEAR, FORE_FAR)
+		_fore_load_mean = lerpf(_fore_load_mean, fore_load, clampf(dt * 1.4, 0.0, 1.0))
+		withers_to = (fore_load - _fore_load_mean) * WITHERS_GAIN * _reach_ref
+	else:
+		_fore_load_mean = lerpf(_fore_load_mean, 0.0, clampf(dt * 1.4, 0.0, 1.0))
+	# Faster followers than the attitude channels above. Both of these are shape
+	# changes driven by a limb taking load, and a limb takes load in about a tenth
+	# of a second; smoothed at the trunk's rate they arrive after the footfall that
+	# caused them, which reads as the body sagging rather than bracing.
+	flex = lerpf(flex, flex_to, clampf(dt * 22.0, 0.0, 1.0))
+	withers = lerpf(withers, withers_to, clampf(dt * 26.0, 0.0, 1.0))
+
 	# Fore-aft surge: the body decelerates against each braking forelimb and is
 	# pushed on by each hind. Small, but its absence is why naive walk cycles
 	# look like a puppet sliding along a rail.
@@ -668,6 +742,29 @@ func _solve_body(dt: float) -> void:
 		undulation = sin(TAU * cycle) * (0.10 + 0.16 * exertion)
 	else:
 		undulation = 0.0
+
+
+## Fore-aft gap between the two girdles' feet, right now. Measured off the live
+## targets rather than off the cycle phase, so it stays honest through a
+## suspension, a turn, or a foot placed somewhere the pattern did not predict.
+func _girdle_span() -> float:
+	var fore := 0.0
+	var fore_n := 0
+	var hind := 0.0
+	var hind_n := 0
+	for i in FOOT_COUNT:
+		var f: Foot = feet[i]
+		if not f.present:
+			continue
+		if i == FORE_NEAR or i == FORE_FAR:
+			fore += f.target.x
+			fore_n += 1
+		else:
+			hind += f.target.x
+			hind_n += 1
+	if fore_n == 0 or hind_n == 0:
+		return _span_ref
+	return fore / float(fore_n) - hind / float(hind_n)
 
 
 ## Mean vertical load across one girdle's pair, ignoring limbs the species never
