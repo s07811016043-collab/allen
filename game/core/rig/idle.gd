@@ -260,8 +260,10 @@ func _advance_ears(dt: float) -> void:
 	# smeared a hundred-millisecond flick down to a third of its amplitude before
 	# the ear spring ever saw it — the impulse has to survive to the chain or it
 	# is not a flick, it is a drift.
-	var idle_near := sin(_t * 0.73 + 1.1) * 0.030 + _tick(_t, 0.37) * EAR_FLICK
-	var idle_far := sin(_t * 0.61 + 2.7) * 0.024 + _tick(_t + 3.1, 0.29) * EAR_FLICK * 0.8
+	# Same rate correction as the tail and the postural creep: an ear that sways on
+	# a nine-second period is an ear that does not sway.
+	var idle_near := sin(_t * 1.60 + 1.1) * 0.034 + _tick(_t, 0.37) * EAR_FLICK
+	var idle_far := sin(_t * 1.27 + 2.7) * 0.028 + _tick(_t + 3.1, 0.29) * EAR_FLICK * 0.8
 	var k: float = clampf(dt * 20.0, 0.0, 1.0)
 	ear_near = lerpf(ear_near, _ear_target_near + idle_near + alertness * 0.16, k)
 	ear_far = lerpf(ear_far, _ear_target_far + idle_far + alertness * 0.16, k)
@@ -313,25 +315,41 @@ func _advance_weight(dt: float) -> void:
 	# back, so the term is written to *sink* on the exhale instead of rising past
 	# what the legs can pay for — and the ribcage is what carries the visible half
 	# of the breath anyway, through `breath_swell`.
+	#
+	# The rates were the same bug the tail had. Written at 0.23–0.41 rad/s these
+	# had periods of **fifteen to twenty-seven seconds** and amplitudes under a
+	# pixel at ship size, so between two discrete shifts the creep contributed
+	# nothing a viewer could see and the animal was, for seconds at a time,
+	# perfectly still — the exact thing the term exists to prevent. Six to eleven
+	# seconds is slow enough to read as postural rather than as a wobble.
 	var breath_sink: float = (1.0 - breath) * 0.5 * BREATH_SINK
-	weight_shift = _shift + Vector2(sin(_t * 0.41) * 0.007,
-		sin(_t * 0.29 + 2.0) * 0.003 + breath_sink)
-	weight_roll = _shift_roll + sin(_t * 0.33 + 1.4) * 0.014
-	weight_pitch = _shift_pitch + sin(_t * 0.37 + 0.6) * 0.010 \
-		+ sin(_t * 0.23 + 2.4) * 0.006
+	weight_shift = _shift + Vector2(sin(_t * 1.05) * 0.009,
+		sin(_t * 0.78 + 2.0) * 0.003 + breath_sink)
+	weight_roll = _shift_roll + sin(_t * 0.85 + 1.4) * 0.016
+	weight_pitch = _shift_pitch + sin(_t * 0.95 + 0.6) * 0.014 \
+		+ sin(_t * 0.58 + 2.4) * 0.008
 
 
 # --- resting tail -----------------------------------------------------------
 
 func _advance_tail() -> void:
-	# Two slow swings well apart in frequency, so the tail wanders instead of
+	# Two swings well apart in frequency, so the tail wanders instead of
 	# metronoming, plus the same sparse impulse train the ears use — a resting
 	# cat's tail spends most of its time drifting and then flicks once.
-	var drift: float = sin(_t * 0.44) * 0.055 + sin(_t * 0.19 + 0.9) * 0.038
-	# The flick is a *base* angle handed to a soft, under-damped chain that tapers
-	# it down the joints, so the tip travels several times this. Under-driven it
-	# read as the tail breathing rather than flicking.
-	var flick: float = _tick(_t + 1.7, 0.21) * lerpf(0.14, 0.30, _spec.energy)
+	#
+	# The rates are the load-bearing part and they were the bug. Authored at 0.44
+	# and 0.19 rad/s, the resting tail's two components had periods of **fourteen
+	# and thirty-three seconds**: a viewer watching for three seconds — which is
+	# all a desktop pet ever gets — saw the tip move about four pixels, and a blind
+	# reviewer called it "a rigid stick that never moves". Measured on the eight-
+	# second idle sheet the tip travelled 16 px *in total*, i.e. 2 px/s, which is
+	# below the rate at which motion registers as motion at all. A real resting
+	# cat's tail sweeps on a three-to-four second beat.
+	var drift: float = sin(_t * 1.55) * 0.090 + sin(_t * 0.62 + 0.9) * 0.060
+	# The flick is a *base* angle handed to a soft, under-damped chain that delays
+	# it joint by joint, so it leaves the root and runs out to the tip and the tip
+	# travels several times this. Under-driven it read as the tail breathing.
+	var flick: float = _tick(_t + 1.7, 0.34) * lerpf(0.16, 0.34, _spec.energy)
 	# Exertion fades it out: a moving animal's tail is driven by its hips and does
 	# not need — or want — an idle wander fighting the spring.
 	tail_sway = (drift + flick) * (1.0 - clampf(exertion * 1.6, 0.0, 1.0))

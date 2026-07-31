@@ -108,12 +108,24 @@ uniform bool defer_tonemap = false;
 // `PETALIA_DEBUG_VIEW` environment variable so it costs the shipped build one
 // dead branch and no plumbing anywhere else.
 //
+// Every one of this round's four root causes was found here and none of them
+// could have been reasoned to. The pattern worth copying: when a bright artefact
+// has several candidate sources, put the candidates in *separate channels* of one
+// view rather than capturing them one at a time — view 14 named the belly bar as
+// the hair lobe in a single shot, and view 18 then showed the half of it that was
+// left after the lobe was fixed.
+//
 //   1 groom direction, as a colour wheel   7 marking mask
 //   2 dv, red dorsal / blue ventral        8 total occlusion
 //   3 fibre lane coordinate, banded        9 local radius, banded
 //   4 key only                            10 `arc`, banded
-//   5 sky + bounce only                   12 field albedo, before markings
-//   6 albedo after markings, unlit
+//   5 sky + bounce only                   11 surface normal, xy as red/green
+//   6 albedo after markings, unlit        12 field albedo, before markings
+//  13 local radius as a smooth ramp       16 `px_per_unit`/600, flat — the one
+//  14 hair lobe / sheen / rim, one per        number every LOD gate keys off
+//     channel: which term drew the line   17 `region`, `decal_w`, decal dome
+//  15 coat `res`, `crisp`, `px_groom`      18 fwidth of the gradient and of the
+//                                             normal: where the field is lying
 uniform int debug_view = 0;
 
 const int MAT_FUR = 0;
@@ -160,6 +172,18 @@ struct Field {
 	float d;        // signed distance to the layer's surface
 	float radius;   // local half-thickness, drives the height lift
 	vec2  grad;     // unit gradient of d
+	// Length of that gradient *before* it was normalised, which is a different
+	// number from 1 and carries the information normalising destroys.
+	//
+	// The exact gradient of the quadratic smooth minimum is `h*ga + (1-h)*gb` — the
+	// two extra terms cancel identically, which is worth knowing — and that is a
+	// unit vector only where the two parts agree about which way is out. Where they
+	// disagree it is short, and where they oppose it is zero, because on the medial
+	// ridge between two unioned capsules the field genuinely *is* flat. The
+	// direction still has to be renormalised, so the magnitude has to be kept
+	// separately or the height lift tilts a full-strength normal along an
+	// ill-conditioned direction. That is what draws the seam.
+	float grad_mag;
 	vec3  albedo;
 	vec2  groom;    // unit grooming direction
 	// Unit direction of the dominant part's own spine, tail-to-tip. Distinct from
@@ -216,7 +240,18 @@ struct Field {
 	float decal_w;
 	float decal_d;
 	float decal_r;
+	// Region-ness of the part that painted it, read off the *part*. The dome below
+	// used to ask the locally interpolated radius instead, and a belly capsule
+	// tapers: the same capsule answered "object" at its thin end and "region" at its
+	// thick one, so a band of it kept a full raised lip and the rest kept none. That
+	// band is a straight bright line down the middle of the underside.
+	float decal_region;
 	vec2  decal_grad;
+	// How much the dominant part here is a *pigment region* rather than a volume —
+	// a long thin capsule laid along a body mass to carry a second colour, which is
+	// how every species in this project paints a pale underside. Carried on the
+	// field because the height lift has to know: see the radius blend.
+	float region;
 	bool  hit;
 };
 
@@ -225,6 +260,7 @@ Field eval_layer(vec2 p, int want_layer) {
 	f.d = 1e6;
 	f.radius = 0.1;
 	f.grad = vec2(0.0, -1.0);
+	f.grad_mag = 1.0;
 	f.albedo = vec3(0.5);
 	f.groom = vec2(0.0, 1.0);
 	f.axis = vec2(1.0, 0.0);
@@ -240,6 +276,8 @@ Field eval_layer(vec2 p, int want_layer) {
 	f.decal_d = 1e6;
 	f.decal_r = 0.1;
 	f.decal_grad = vec2(0.0, -1.0);
+	f.decal_region = 0.0;
+	f.region = 0.0;
 	f.hit = false;
 
 	for (int i = 0; i < MAX_PARTS; i++) {
@@ -280,6 +318,34 @@ Field eval_layer(vec2 p, int want_layer) {
 		vec2 axis = dot(seg, seg) > 1e-8 ? normalize(seg) : groom;
 		if (axis.x < -1e-3 || (abs(axis.x) <= 1e-3 && axis.y < 0.0)) { axis = -axis; }
 
+		// Which markings are *objects* and which are *regions* of different pigment.
+		// The colour blend, the decal edge and — from this pass — the height field
+		// all need the distinction, so it is made once, here, before anything reads
+		// it.
+		//
+		// Size alone cannot make the call, and trying it is what left a hard-edged
+		// pale lens under this cat on the first attempt: measured against body
+		// height the belly capsule is 0.046 and the muzzle mask 0.040, which is no
+		// separation at all, and the threshold that softened the belly softened the
+		// face with it. The face is the one part of this animal a blind reviewer
+		// already reads correctly and it is not available to spend.
+		//
+		// Elongation is the honest second axis. A region of pigment is painted with
+		// a long thin capsule laid along the body — the belly runs seven radii —
+		// while an object is compact: the muzzle is one radius long, the nose half of
+		// one. Requiring both separates them with room to spare.
+		//
+		// Both are read off the *part*, never off the locally interpolated radius.
+		// That distinction is not cosmetic: a belly capsule tapers, and keyed on the
+		// local radius the same capsule came out a region at its thick end and an
+		// object at its thin one, so half of it kept the stencil edge — which is
+		// exactly the pale sliver that survived two rounds of work here and was only
+		// found by painting the qualifying pixels green and looking.
+		float pr = max(g1.x, g1.y);
+		float body_h = max(bounds_max.y - bounds_min.y, 1e-3);
+		float region = smoothstep(0.024, 0.048, pr / body_h)
+			* smoothstep(2.2, 4.5, length(g0.zw - g0.xy) / max(pr, 1e-5));
+
 		if (!f.hit) {
 			f.d = d;
 			f.radius = radius;
@@ -293,6 +359,7 @@ Field eval_layer(vec2 p, int want_layer) {
 			f.height_scale = g1.w;
 			f.along = along;
 			f.mat = g2.x - float(layer) * 16.0;
+			f.region = region;
 			f.hit = true;
 			continue;
 		}
@@ -335,36 +402,44 @@ Field eval_layer(vec2 p, int want_layer) {
 		// interior, so the bias fades out as the surface is approached.
 		float thicker = (f.radius - radius) / max(f.radius + radius, 1e-4);
 		float deep = smoothstep(0.0, -0.55 * min(f.radius, radius), sd);
-		f.radius = mix(radius, f.radius,
+		float rblend = mix(radius, f.radius,
 			clamp(h + 4.0 * h * (1.0 - h) * thicker * 1.6 * deep, 0.0, 1.0));
-		f.grad = normalize(mix(grad, f.grad, h) + 1e-6);
 
-		// Which markings are *objects* and which are *regions* of different pigment.
-		// Both this blend and the decal path below need the distinction, so it is
-		// made once, here.
+		// A pigment region contributes no thickness at all, and that is the shared
+		// belly seam — the one artifact, on all four species, that no species file
+		// could have caused.
 		//
-		// Size alone cannot make the call, and trying it is what left a hard-edged
-		// pale lens under this cat on the first attempt: measured against body
-		// height the belly capsule is 0.046 and the muzzle mask 0.040, which is no
-		// separation at all, and the threshold that softened the belly softened the
-		// face with it. The face is the one part of this animal a blind reviewer
-		// already reads correctly and it is not available to spend.
+		// Every one of these animals carries a pale underside painted with a long
+		// thin capsule slung under the barrel. The renderer had no way to know that
+		// is *pigment*, so it lifted it as its own cylinder: where the capsule
+		// emerges from the torso it gets its own rim, and a thin cylinder's lit rim
+		// running the length of the body is a hard cream bar with a dark line under
+		// it. Rendering the key on its own showed it surviving after the specular
+		// that was stacked on top of it had been prefiltered away, which is what
+		// separated the two halves of the seam.
 		//
-		// Elongation is the honest second axis. A region of pigment is painted with
-		// a long thin capsule laid along the body — the belly runs seven radii —
-		// while an object is compact: the muzzle is one radius long, the nose half of
-		// one. Requiring both separates them with room to spare.
-		//
-		// Both are read off the *part*, never off the locally interpolated radius.
-		// That distinction is not cosmetic: a belly capsule tapers, and keyed on the
-		// local radius the same capsule came out a region at its thick end and an
-		// object at its thin one, so half of it kept the stencil edge — which is
-		// exactly the pale sliver that survived two rounds of work here and was only
-		// found by painting the qualifying pixels green and looking.
-		float pr = max(g1.x, g1.y);
-		float body_h = max(bounds_max.y - bounds_min.y, 1e-3);
-		float region = smoothstep(0.024, 0.048, pr / body_h)
-			* smoothstep(2.2, 4.5, length(g0.zw - g0.xy) / max(pr, 1e-5));
+		// A real animal's belly is not a tube hung under its ribs, it is the bottom
+		// of the same barrel, differently pigmented. So where a region is involved
+		// the half-thickness is the *mass's*, at both ends of the blend and at the
+		// surface as well as inside it — this is the one case where the thin part's
+		// own radius is not the honest one, because the thin part is not a part.
+		// Smooth-maxed rather than maxed: a plain `max` kinks where the two radii
+		// cross, and a kink in the height field is another drawn line.
+		float pig = clamp(max(region, f.region), 0.0, 1.0);
+		float rd = f.radius - radius;
+		float k = 0.35 * min(f.radius, radius) + 1e-5;
+		float rmax = 0.5 * (f.radius + radius + sqrt(rd * rd + k * k)) - 0.5 * k;
+		f.radius = mix(rblend, rmax, pig);
+		// Carried on the same weight that blends everything else, so the flag
+		// survives to the next iteration whichever order the parts arrive in.
+		f.region = mix(region, f.region, h);
+		// Kept as a running minimum. Once a pixel has been found to sit on a medial
+		// ridge it stays flat there however many further parts pass over it — a
+		// later capsule agreeing with the accumulated direction does not undo the
+		// degeneracy, it just fails to notice it.
+		vec2 gmix = mix(grad, f.grad, h);
+		f.grad_mag = min(f.grad_mag, length(gmix));
+		f.grad = normalize(gmix + 1e-6);
 
 		// Colour is blended over its own, wider window rather than over the one that
 		// blended the distance, and *that* is the belly slab.
@@ -435,6 +510,7 @@ Field eval_layer(vec2 p, int want_layer) {
 				f.decal_w = paint;
 				f.decal_d = d;
 				f.decal_r = radius;
+				f.decal_region = region;
 				f.decal_grad = grad;
 			}
 		}
@@ -651,6 +727,14 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	if (debug_view == 1) { dbg = vec3(0.5 + 0.5 * groom_s, 0.35); }
 	if (debug_view == 2) { dbg = vec3(max(dv, 0.0), 0.10, max(-dv, 0.0)); }
 	if (debug_view == 9) { dbg = vec3(fract(R * 24.0), R * 3.0, 0.2); }
+	if (debug_view == 16) { dbg = vec3(px_per_unit / 600.0); }
+	// Is this pixel on a pigment region, is it being painted as a decal, and how
+	// much dome is the decal getting. The three questions the belly seam turned on.
+	if (debug_view == 17) {
+		dbg = vec3(f.region, f.decal_w,
+			(1.0 - smoothstep(0.020, 0.036, f.decal_r / ctx.body_h))
+				* (1.0 - f.decal_region) * f.decal_w);
+	}
 	// `arc` banded. Every non-fur family and every marking is written in it, so
 	// wherever these bands close into rings that family gets a fingerprint.
 	if (debug_view == 10) { dbg = vec3(step(0.5, fract(arc * 40.0))); }
@@ -662,6 +746,9 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	float coat = f.coat_len * fluff * (1.0 + 0.35 * (3.0 - growth) / 3.0);
 	float fringe = 0.0;
 	float tip_cover = 0.0;
+	// How much of this pixel is inside the band the fringe is allowed to disturb.
+	// Hoisted because the coverage antialias below has to know: see there.
+	float fringe_band = 0.0;
 	if (mat == MAT_FUR && coat > 1e-5) {
 		float cover;
 		// A receded layer gets its individual hairs taken away, not just blurred:
@@ -678,6 +765,7 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		float band = smoothstep(-min(coat * 3.0, f.radius * 0.55), coat * 0.2, f.d);
 		fringe = coat * spikes * band * (1.0 - wetness * 0.85);
 		tip_cover = cover * band;
+		fringe_band = band;
 	}
 	float d = f.d - fringe;
 
@@ -685,7 +773,20 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	// One-pixel analytic antialias. `fwidth` on the field would be ideal but the
 	// fringe term makes it noisy, so we use the known pixel scale. The far layer
 	// widens it, which is the cheapest honest defocus available.
-	float aa = unit_px * 0.85 * ctx.soften;
+	//
+	// Widened wherever the fringe is live, and that is the black stipple. The
+	// fringe is a saw at the sampling limit *by construction* — `pet_fur_fringe`
+	// caps its spike pitch at about two and a half screen pixels however small the
+	// pet is drawn, which is the right call for the pitch and leaves the coverage
+	// impossible. Resolved with a sub-pixel ramp, each spike lands as one hard dot
+	// rather than as a hair, and along the underside, where every one of those dots
+	// sits in the darkest part of the animal, a row of hard dark dots against the
+	// desktop is exactly the "black stipple" the review reported on all four
+	// species. A silhouette feature at the sampling limit has to become *coverage*,
+	// not an edge, so the ramp opens to about a spike period across the fringe band.
+	// It costs a slightly softer outline, which is what a photograph of fur at this
+	// size actually shows.
+	float aa = unit_px * mix(0.85, 1.70, fringe_band) * ctx.soften;
 	float alpha = smoothstep(aa, -aa, d);
 	if (alpha <= 0.002) { return vec4(0.0); }
 
@@ -704,7 +805,23 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	float u_res = 1.0 - 1.0 / max(R * px_per_unit, 2.0);
 	float su_min = sqrt(max(1.0 - u_res * u_res, 1e-4));
 	float su = sqrt(max(1.0 - u * u, 0.0));
-	float slope = -f.height_scale * u / max(su, su_min);
+	// Scaled by the field's own gradient length, which is the whole of the shared
+	// belly seam and of the starbursts radiating from every capsule cap.
+	//
+	// `u` says how far across the capsule's cross-section the pixel is, and the
+	// height lift turns that into a slope — but only if a step in `f.grad` really is
+	// a step of that size in the field, which is what a unit gradient means. Inside
+	// a smooth union it is not: the blended gradient is short wherever the two parts
+	// disagree and vanishes on the ridge between them, so the surface there is flat
+	// and the honest slope is zero. Renormalising for the *direction* and then using
+	// the full slope anyway tilts the normal hard along a direction that is pure
+	// algebra, and on the cat's belly — a thin pigment capsule slung under a fat
+	// barrel, so the two gradients are close to opposed along its whole length —
+	// that is a cream bar two pixels tall running a quarter of the animal, with the
+	// same construction repeating on every species that paints an underside.
+	// Rendering `fwidth(f.grad)` next to `fwidth(nxy)` is what found it: one yellow
+	// bar on an otherwise dark body.
+	float slope = -f.height_scale * u / max(su, su_min) * clamp(f.grad_mag, 0.0, 1.0);
 	vec2 nxy = -slope * f.grad;
 
 	// A marking still has thickness: nose leather and paw pads stand proud of
@@ -723,7 +840,17 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		// patch that long is a raised lip running the whole underside, catching the
 		// key as a hard bright line. A tenth of the wrong shape is still the wrong
 		// shape when the shape is a quarter of the animal long.
-		float small = 1.0 - smoothstep(0.020, 0.036, f.decal_r / ctx.body_h);
+		// And read off the part, not off the local radius, which is the half that
+		// was still drawing a line. Rendering the *normal* to the framebuffer is what
+		// settled it: a clean magenta streak the length of the underside, on a body
+		// whose neighbours were all cyan — a normal tilted forward and up along one
+		// straight band. That band is exactly where this capsule's taper crosses the
+		// threshold below, 0.031 to 0.055 of a radius, so the front half of the belly
+		// was wearing a full raised lip and the back half none. The same trap the
+		// `region` test was introduced for, still live in the term that gives the
+		// marking its thickness.
+		float small = (1.0 - smoothstep(0.020, 0.036, f.decal_r / ctx.body_h))
+			* (1.0 - f.decal_region);
 		float ud = clamp(1.0 + f.decal_d / max(f.decal_r, 1e-4), 0.0, 1.0);
 		float sud = sqrt(max(1.0 - ud * ud, 0.0));
 		nxy += f.decal_grad * (0.36 * ud / max(sud, 0.46)) * f.decal_w * small;
@@ -810,6 +937,42 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		nxy += across * cos(arc * 128.0) * 0.014 * ribs * bulk;
 	}
 
+	// Arc length round the barrel from the spine line, which is the honest
+	// across-the-body coordinate for anything laid out in rows.
+	//
+	// The three families used to be given `v = dv * R` for that axis — the *screen*
+	// offset from the spine — and a screen offset is arc length multiplied by the
+	// foreshortening, so it compresses to nothing as the surface turns away. What
+	// that does to a tiling is squash every row toward the silhouette and, worse,
+	// leave far too few rows across the body at all: measured on the lizard, `v`
+	// spans about three plate-heights from spine to belly, so the squamation came out
+	// as tall vertical bars — a radiator grille, which is a different wrong answer
+	// from a brass ornament, not a better one. The fur path has always used this;
+	// the other two never did.
+	// Sheared by a fraction of `arc`, and that shear is what stops the rows closing
+	// into a fingerprint.
+	//
+	// `sarc` is `R * asin(dv)`, and `R` has a local extremum wherever a limb blends
+	// into a body mass — so on its own the level sets of `sarc` close into rings
+	// round that extremum, and a tiling whose rows are rings is a thumbprint. It is
+	// the artefact the bird's shoulder was wearing, and rendering `arc` banded ruled
+	// `arc` out in one capture: those bands are clean parallel diagonals, so the
+	// fault was never in the along-body axis.
+	//
+	// The fur frame has been safe from this all along and the reason is worth
+	// borrowing rather than rediscovering: its lane coordinate is a sum of a
+	// function of `arc` and a function of `theta`, and such a sum has no closed
+	// level set whatever either half does. The feather and scale rows were `sarc`
+	// alone, which is the one member of that family with the monotone half missing.
+	// Adding it back costs a shear of about twenty-five degrees, which is what real
+	// squamation and real pterylae do anyway — both run obliquely, never in hoops.
+	//
+	// Kept separate from the fur's own `sarc`, which must stay the pure arc length:
+	// there it is the *along-hair* axis, and shearing that would move where every
+	// dash starts and stops for no benefit.
+	float sarc = R * theta;
+	float row_s = sarc + arc * 0.46;
+
 	float micro_occ = 1.0;
 	float micro_tint = 0.0;
 	float spec_mul = 1.0;
@@ -818,6 +981,12 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	float piping = 0.0;
 	float strand_tilt = 0.0;
 	float wet_film = wetness;
+	// How much of the coat's own fibre structure survives the sampling here.
+	// Defaults say "fully resolved" so the non-fur families are unaffected; the
+	// fur branch overwrites them. The specular reads `coat_crisp`; see the
+	// roughness prefilter below.
+	float coat_res = 1.0;
+	float coat_crisp = 1.0;
 
 	// Where two capsules smooth-union, the blended frame turns fast: `groom` and
 	// `grad` are interpolated by the same weight that blended the distance, and
@@ -864,7 +1033,6 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		// in it are equal steps *on the animal* — which is what makes the lanes
 		// crowd into the silhouette instead of holding one screen pitch all the way
 		// to the outline.
-		float sarc = R * theta;
 		vec2 t = vec2(arc * ctil - sarc * stil,
 			arc * stil + ctil * R * (theta - beta * sin(theta + FLOW_PHASE)) + whorl);
 		// Three small octaves of wander, the finest at strand scale, so neighbouring
@@ -900,8 +1068,11 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		spec_mul = mix(1.0, c.spec, ctx.detail * frame_ok);
 		strand_tilt = c.tilt * ctx.detail;
 		glint = c.glint;
+		coat_res = c.res;
+		coat_crisp = c.crisp * frame_ok;
+		if (debug_view == 15) { dbg = vec3(c.res, c.crisp, px_groom / 600.0); }
 	} else if (mat == MAT_FEATHER) {
-		Surf s = pet_feather(arc, v, u, coat_density, px_per_unit);
+		Surf s = pet_feather(arc, row_s, u, coat_density, px_per_unit);
 		// Gated on `band_ok` for the same reason the fur's relief is: the barb lanes
 		// are written in `arc`, so wherever `arc` stalls they are contour lines round
 		// a stall point rather than vanes. The feather path never had this guard,
@@ -913,7 +1084,7 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		spec_mul = mix(1.0, s.spec, band_ok);
 		irid = s.extra * band_ok;
 	} else if (mat == MAT_SCALE) {
-		Surf s = pet_scale(arc, v, nxy, coat_density, px_per_unit);
+		Surf s = pet_scale(arc, row_s, nxy, coat_density, px_per_unit);
 		// Same guard: squamation rows are indexed off `arc` too, and a lizard with
 		// its plates spiralling round a stall point reads as a machined thread.
 		nxy += (s.slope.x * across + s.slope.y * f.grad) * band_ok;
@@ -947,6 +1118,16 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	micro_occ *= 1.0 - skel * 0.05;
 
 	vec3 n = normalize(vec3(nxy, 1.0));
+	if (debug_view == 11) { dbg = vec3(0.5 + 0.5 * n.x, 0.5 + 0.5 * n.y, 0.5); }
+	// How fast the accumulated gradient and the height field are turning per pixel.
+	// Anywhere this is large the normal is reporting the blend's algebra rather than
+	// the body's shape, and a normal that swings a pixel wide is a drawn line.
+	if (debug_view == 18) {
+		dbg = vec3(length(fwidth(f.grad)) * 6.0, length(fwidth(nxy)) * 1.2, 0.15);
+	}
+	// R without the `fract` wrap of view 9. A step here is a step in the height
+	// field, and a step in the height field is a drawn line in the normal.
+	if (debug_view == 13) { dbg = vec3(clamp(R / max(ctx.body_h, 1e-3) * 4.0, 0.0, 1.0)); }
 
 	// Height above the ground plane, normalised by body height so the falloffs
 	// below mean the same thing for a kitten and for an adult.
@@ -1197,11 +1378,15 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 			if (i >= landmark_count) { break; }
 			vec4 lr = limb_roots[i];
 			vec2 sq = (p - lr.xy) / max(lr.z, 1e-4);
-			// Hanging downward and slightly narrow: the crease runs down the front
-			// and the back of the limb where it enters, and above the joint there is
-			// nothing but the muscle over the shoulder. A round patch centred on the
-			// socket puts as much shadow on the withers as in the armpit.
-			sq.y *= sq.y > 0.0 ? 0.80 : 2.4;
+			// Hanging downward and *narrow*: an armpit is a crease, not a disc. The
+			// crease runs down the front and the back of the limb where it enters,
+			// and above the joint there is nothing but the muscle over the shoulder,
+			// so a round patch centred on the socket puts as much shadow on the
+			// withers as in the armpit — and at 260 px a round patch of shadow on a
+			// flank is a crater, which is what the review called it. Squeezed across
+			// and stretched down it is the shape of the gap a limb actually makes.
+			sq.x *= 1.55;
+			sq.y *= sq.y > 0.0 ? 0.62 : 2.4;
 			socket = max(socket, 1.0 - smoothstep(0.30, 1.10, length(sq)));
 		}
 		// Ventral half only, for the same reason: it is an armpit, not a saddle.
@@ -1316,6 +1501,8 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	vec3 spec = vec3(0.0);
 	// Kept out of `spec` deliberately; see the sheen block below.
 	vec3 sheen_add = vec3(0.0);
+	vec3 dbg_lobe = vec3(0.0);
+	vec3 dbg_sheen = vec3(0.0);
 	if (furry) {
 		// Marschner R + TRT off the strand tangent. Fur has no single surface
 		// normal, so the lobes hang off the groom direction — but the strand
@@ -1334,7 +1521,28 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 			groom_s.x * st + groom_s.y * ct);
 		vec3 g3 = vec3(gs, 0.0);
 		vec3 tangent = normalize(g3 - n * dot(g3, n) + 1e-6);
-		spec = pet_hair_spec(tangent, n, L, V, roughness, albedo, glint);
+		// Prefilter the lobe by the strand scatter the pixel is *not* resolving.
+		//
+		// This is the belly bar, and it took a debug view to see rather than an
+		// argument. The R lobe is narrow — roughness 0.55 gives it an exponent near
+		// seventeen — which is right when a pixel holds one fibre and catastrophic
+		// when it holds thirty pointing thirty ways: the per-fibre break-up that is
+		// supposed to shatter it lives in `spec_mul`, and `spec_mul` fades with
+		// `crisp` for good reasons of its own. So at ship size the coat was running
+		// an unbroken mirror lobe, and an unbroken mirror lobe on a long thin capsule
+		// does not make a highlight, it makes a *line* — a hard cream bar the length
+		// of the belly, on all four species, which is exactly the shared seam the
+		// review reported and which nothing in the marking path was ever drawing.
+		//
+		// The fix is the standard one for a normal distribution you have stopped
+		// resolving: fold the lost variance into the roughness. A pixel averaging
+		// thirty tangents is a rougher fibre, so the lobe widens and dims instead of
+		// staying a mirror. At a head close-up `crisp` is near one and nothing here
+		// changes; at 260 px the bar becomes the broad soft sheen a real pelt has.
+		float scatter = 1.0 - clamp(coat_crisp, 0.0, 1.0);
+		float rough_eff = clamp(roughness + scatter * 0.62, 0.02, 1.0);
+		spec = pet_hair_spec(tangent, n, L, V, rough_eff, albedo, glint)
+			* mix(1.0, 0.42, scatter);
 
 		// Coat sheen — the one specular term deliberately built out of a big
 		// shape rather than out of strands.
@@ -1364,6 +1572,8 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		float sheen = pet_strand_lobe(normalize(tan0 + n * 0.22), L, V, 1.05)
 			* smoothstep(-0.05, 0.62, dv) * (0.34 + 0.66 * up);
 		sheen_add = mix(vec3(1.0), albedo * 2.2, 0.45) * sheen * 0.26;
+		dbg_lobe = spec;
+		dbg_sheen = sheen_add;
 		if (mat == MAT_FEATHER) {
 			// Thin-film on the vane: strongest at grazing angles, gone in the
 			// gaps between barbs.
@@ -1390,7 +1600,16 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	// belly capsule — the coat's own hair lobe running the length of a cylinder,
 	// which is exactly what it is for, fired in the one place the light cannot
 	// reach.
-	lit += key_color.rgb * key_energy * spec * lit_face * key_occ * ao;
+	vec3 spec_add = key_color.rgb * key_energy * spec * lit_face * key_occ * ao;
+	lit += spec_add;
+	// The three bright terms, one per channel, so a single capture says which of
+	// them is drawing a line rather than three captures each saying "not me".
+	if (debug_view == 14) {
+		float gain = key_energy * lit_face * key_occ * ao * 3.0;
+		dbg = vec3(dot(dbg_lobe, vec3(0.333)) * gain,
+			dot(dbg_sheen, vec3(0.333)) * gain,
+			rim * (0.16 + 0.30 * translucency) * 3.0);
+	}
 
 	// --- depth --------------------------------------------------------------
 	// Atmospheric separation. A far leg is not "the same leg, darker": it loses

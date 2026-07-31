@@ -295,6 +295,21 @@ func _pack_landmarks() -> void:
 		var top: Vector2 = p.a if p.a.y < p.b.y else p.b
 		roots.append(Vector3(top.x, top.y, lr))
 
+	# How much bone is allowed to show through, which is a *mammal* question.
+	#
+	# The whole landmark idea is written for a short-coated quadruped: a cat's
+	# scapula blade and the point of its hip stand proud because a centimetre of fur
+	# hides nothing. Contour feathers and keratin plates both hide a skeleton
+	# completely — nobody has ever seen a songbird's shoulder blade — and stamping
+	# one on anyway does not merely fail to help, it puts a dome on the shoulder for
+	# the coat sheen to wrap into a bright annulus. That ring is what the bird has
+	# been wearing at the wing root, and rendering the sheen on its own channel is
+	# what separated it from the tiling artefacts it was sitting next to. Same
+	# argument, and the same test, as `marking_strength` above: a mammal feature is
+	# switched off for the animals that are not mammals rather than merely turned
+	# down.
+	var relief: float = 0.58 if spec.coat_surface == SDFPart.Surface.FUR else 0.12
+
 	# One landmark per limb, not per part: the near and far leg of a pair sit
 	# within a torso radius of each other in x, and the fore and hind pair are
 	# most of a body length apart, so a single tolerance separates them.
@@ -361,7 +376,16 @@ func _pack_landmarks() -> void:
 		# soft round lumps on the flank, which is the silhouette of a bruise. It
 		# has to be the amount that still says "bone" when it is fifteen pixels
 		# across, and that is less than it looks like at four times the size.
-		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.58, 1.02)
+		#
+		# Cut again, and this time against a measurement rather than against a
+		# judgement. At 260 px this cat's coat was reaching the torso as a three per
+		# cent value swing while this landmark was putting a fifteen-pixel dome at
+		# full amplitude on the same flank — so the *only* modulation on the body was
+		# two round marks, one at the shoulder and one at the hip, which is precisely
+		# the "crater dents" in the review and precisely why the surface beneath them
+		# read as latex. The coat now carries the flank; a bone is a note on top of a
+		# coat, not the only thing on it, and at ship size that note is quiet.
+		_packed_landmarks[i] = Vector4(at.x, at.y, core_r * 0.72, relief)
 	_landmark_count = sum_x.size()
 	for i in range(_landmark_count, MAX_LANDMARKS):
 		_packed_landmarks[i] = Vector4(1e6, 1e6, 1.0, 0.0)

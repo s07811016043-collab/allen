@@ -28,6 +28,14 @@ struct Coat {
 	float spec;   // per-strand multiplier on the whole hair lobe
 	float tilt;   // per-strand deflection of the strand tangent, radians
 	float tuft;   // low-frequency clump mask, hand-sized
+	// How much fibre structure the frame can hold, 0..1, and how sharply it is
+	// being sampled. Reported out because the *specular* has to know: a lobe
+	// narrow enough to resolve one fibre, run over a pixel that contains thirty
+	// of them pointing thirty ways, is a mirror where there should be a scatter —
+	// and on a long thin capsule a mirror draws a bar. See where `crisp` widens
+	// the hair roughness in `creature_body.gdshader`.
+	float res;
+	float crisp;
 };
 
 // Generic per-family micro-surface result, for everything that is not fur.
@@ -86,7 +94,15 @@ float pet_tier_crisp(float px_per_lane) {
 // collapsed into. A lane that cannot be resolved gets short dashes instead.
 float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 		float soft, out float dcross, out float rnd, out float lean) {
-	aspect = max(aspect * mix(1.0, 0.55, soft), 1.0);
+	// Measured at ship size: a desktop cat is drawn at 118 screen pixels to the rig
+	// unit and the carrying lane lands at about 2.4 px. At the old 0.55 the dash was
+	// still 3.3 lanes — eight screen pixels, four per cent of the animal, laid down
+	// parallel to its neighbours, which is a plank however wide the profile is. Cut
+	// to two lanes the dash is about as long as it is wide, and a field of stubby
+	// marks with no long axis cannot beat into a stripe whatever contrast it is
+	// given. That is what buys back the contrast raised in `pet_fur` below: the same
+	// coat energy, spent on tooth instead of on length.
+	aspect = max(aspect * mix(1.0, 0.30, soft), 1.0);
 	// The warp has to *diverge* between neighbouring lanes, not shift them as a
 	// block: a warp that changes slowly along the hair slides whole bands of
 	// parallel lanes sideways in formation, and parallel lines with a slow wave
@@ -232,7 +248,18 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// is why every review at 640 px passed a build that reads as carved wood at
 	// 260. The strokes stay — they are what stops it being clay — they just stop
 	// shouting until there are pixels to say it in.
-	float amp = mix(0.22, 1.0, crisp);
+	//
+	// Held at 0.22 it was throttling the coat a *second* time, and that is the
+	// regression. `pet_fibre_tier` has already mip-filtered this rung — wider
+	// profile, lower contrast per fibre, and now a dash two lanes long — so what
+	// arrives here is a feature the frame can hold. Multiplying an already
+	// prefiltered feature by another 0.22 is not anti-aliasing, it is deletion, and
+	// the measurement says so: at ship size `crisp` is 0.205 on this cat's torso,
+	// which took the coat's whole occlusion swing to plus or minus three per cent.
+	// Three per cent is a hairless Sphynx, which is exactly what the blind reviewer
+	// called it. The floor now backs the contrast off by a third at the limit
+	// instead of by four fifths.
+	float amp = mix(0.62, 1.0, crisp);
 	// How much of the fibre structure is allowed to *show*, which is a different
 	// question from how much of it is present, and the one that actually decides
 	// the ship-size read.
@@ -250,7 +277,22 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// That is the only lever that fixes 260 px without emptying 720 px, where
 	// there are four pixels to a lane, nothing beats, and the coat has to be
 	// entirely present — which is the trade every previous attempt got backwards.
-	float show = res * mix(0.18, 1.0, smoothstep(0.06, 0.46, crisp));
+	// Measured: 0.18 put `show` at 0.42 on the ship-size torso, and with `amp`
+	// throttling the endpoints as well the product was a three per cent value swing
+	// across the whole flank. The plank grain that floor was defending against is
+	// not a contrast problem, it is a *shape* problem — long parallel strokes — and
+	// it is fixed where it is made, in the dash length above. What is left here is
+	// the honest mip trade: a barely-resolved rung keeps most of its energy and
+	// loses a little of its bite.
+	float show = res * mix(0.70, 1.0, smoothstep(0.06, 0.46, crisp));
+	// The specular break-up gets its own, lower weight, and the asymmetry is the
+	// point. Occlusion is a bounded multiply on albedo, so an unresolved fibre
+	// averages honestly to the mean and the coat simply gets smoother. A specular is
+	// a product with the key and its bright half clips, so an unresolved fibre
+	// highlight does not average to the mean, it averages to a smear — and run at
+	// the occlusion's weight the dog's flank came back wearing a bright greasy lens
+	// where it should have had a coat. Half is what a lobe can carry at the limit.
+	float show_spec = res * mix(0.42, 1.0, smoothstep(0.06, 0.46, crisp));
 	// The normal perturbation gets a harder gate again, because it is the term
 	// that aliases worst. A tint of a few per cent at sub-pixel pitch averages
 	// away; a six-degree tilt of the normal under a directional key does not — it
@@ -299,11 +341,18 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// the lock to be a grouping of, and a third of a stop of coverage swing at
 	// lock pitch is then just a set of broad stripes down the animal — which,
 	// with the grain running the same way, is the second half of the plank read.
-	float lock_amp = mix(0.14, 1.0, crisp);
+	// The lock keeps a harder gate than the strands do, and for a reason that is
+	// specific to it: a lock is a *grouping*, its pitch is several strands, and
+	// several strands at the sampling limit is a broad stripe. Raised only as far as
+	// the strands under it can now justify — with real tooth beneath it the lock
+	// reads as the coat parting rather than as banding.
+	float lock_amp = mix(0.30, 1.0, crisp);
 	float part = mix(1.0 - 0.34 * lock_amp, 1.0, lock);
 
 	Coat c;
 	c.tuft = lock;
+	c.res = res;
+	c.crisp = crisp;
 
 	// Between the fibres you are looking down at shadowed skin; on one you are
 	// looking at a lit fibre. The mean of `strand` sits near a fifth, not a half —
@@ -336,10 +385,10 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// neighbours catch the key at slightly different angles, and `glint` drives
 	// the tinted second lobe. The lock only shades it — a lock lying against the
 	// light is duller than one standing away from it — it never sets its scale.
-	c.glint = mix(0.25, rnd * rnd, show);
-	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), show)
+	c.glint = mix(0.25, rnd * rnd, show_spec);
+	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), show_spec)
 		* mix(1.0 - 0.20 * lock_amp, 1.0 + 0.16 * lock_amp, lock) * part;
-	c.tilt = lean * 0.34 * show;
+	c.tilt = lean * 0.34 * show_spec;
 	return c;
 }
 
@@ -376,8 +425,20 @@ float pet_fur_fringe(vec2 p, vec2 grad, vec2 groom, float density, float px,
 	// and what breaks its outline is no longer single hairs but the clumps they
 	// lie in, and clumps are exactly what a coarser tier draws. The cap only ever
 	// bites downward, so a head close-up still gets the authored frequency.
-	float pitch_a = min(92.0 * density, px / 2.55);
-	float pitch_b = min(230.0 * density, px / 1.15);
+	float pitch_a = min(92.0 * density, px / 3.30);
+	// The fine tier is *not* capped, and that is the black stipple.
+	//
+	// Capped to `px / 1.15` it put a spike every one and a bit pixels — below the
+	// sampling limit, not near it — so what it drew on the outline was a random
+	// number per pixel. Along the underside, where the coat sits in the darkest
+	// part of the animal, a random number per pixel is a row of hard black dots
+	// against the desktop, which is exactly the stipple the review found beside the
+	// belly seam on all four species. A cap is the right tool for the coarse tier,
+	// whose job is to keep breaking the outline however small the pet is drawn; it
+	// is the wrong tool here, because the fine tier's job is to add detail that only
+	// exists at close-up zoom. Left uncapped it simply fades out at ship size, which
+	// is what it should always have done.
+	float pitch_b = 230.0 * density;
 	float fa = pet_tier_fade(px / pitch_a) * sharp;
 	float fb = pet_tier_fade(px / pitch_b) * sharp;
 
@@ -547,11 +608,24 @@ Surf pet_feather(float arc, float v, float u, float density, float px) {
 	// One feather, in rig units. Sized so an adult songbird carries roughly
 	// fifteen of them nose to tail, which is about nine screen pixels each at
 	// desktop size — small enough to read as plumage, large enough to survive.
-	float fl = 0.023 / max(density, 0.05);
+	// Capped by the frame, the same way the scale plate and the fringe spike are.
+	// Measured at ship size the bird is drawn at 129 screen pixels to the rig unit,
+	// which put the authored feather at 3.0 px and the old gate at 0.13 — thirteen
+	// per cent of a plumage, i.e. a smooth navy blob with a beak. A feather is a
+	// body-scale object and it is the thing that has to survive; the barbs inside it
+	// are not and do not.
+	float fl = max(0.023 / max(density, 0.05), 3.1 / max(px, 1.0));
 	float fw = fl * 0.55;
-	float plume_fade = smoothstep(2.2, 5.5, px * fl);
+	float px_plume = px * fl;
+	float plume_fade = smoothstep(1.9, 3.4, px_plume);
+	// How sharply the plume is sampled, as distinct from whether it is there. The
+	// shingle step and the vane keep their full weight at the limit; the relief
+	// backs off, because a normal tilt at two and a bit pixels is the term that
+	// beats against the grid.
+	float plume_crisp = smoothstep(3.1, 7.0, px_plume);
 	// Barbs are an order finer, so they get their own gate. About seven to a
-	// feather.
+	// feather. No cap here on purpose: a barb genuinely cannot be resolved on a
+	// desktop-sized bird, and faking one is how a plumage becomes a contour map.
 	float barb_px = px * fl / 7.0;
 	float fade = smoothstep(1.7, 4.0, barb_px) * plume_fade;
 
@@ -596,7 +670,7 @@ Surf pet_feather(float arc, float v, float u, float density, float px) {
 
 	// Relief: mostly the shingle step, with the barbs as a fine ripple on top.
 	// The step is along the cell's `arc` axis, which is `across` in the caller.
-	s.slope = vec2((shingle - 0.5) * plume_fade * 0.42
+	s.slope = vec2((shingle - 0.5) * plume_fade * 0.42 * mix(0.55, 1.0, plume_crisp)
 		+ dp * sign(f) * fade * 0.055, 0.0);
 	s.occ = mix(1.0, mix(0.72, 1.06, shingle) * mix(0.86, 1.0, lip), plume_fade)
 		* mix(1.0 - 0.12 * fade, 1.05, barb) * mix(1.0, 1.08, rachis);
@@ -626,8 +700,27 @@ Surf pet_feather(float arc, float v, float u, float density, float px) {
 // parallax available when the view vector is constant.
 Surf pet_scale(float arc, float v, vec2 parallax, float density, float px) {
 	Surf s;
-	float size = 0.030 / max(density, 0.05);
-	float fade = smoothstep(2.5, 6.0, px * size);
+	// The plate size is capped by what the frame can hold, exactly the way
+	// `pet_fur_fringe` caps its spike pitch and for the same reason: shrink a
+	// reptile far enough and what breaks its surface up is no longer the single
+	// scale but the group of scales, and a group is what a coarser tiling draws.
+	//
+	// Without the cap this family was not merely coarse, it was *absent*. Measured
+	// at ship size the lizard is drawn at 40 screen pixels to the rig unit — a third
+	// of what the mammals get, because a lizard is four units long and the frame is
+	// square — so an authored 0.030 plate is 1.2 px and the old gate returned
+	// exactly zero. Every term below then collapsed to its neutral value and what
+	// was left on screen was a bare GGX lobe over a smooth capsule, which is a
+	// polished brass ornament and is precisely what the blind reviewer called it.
+	float size = max(0.030 / max(density, 0.05), 2.9 / max(px, 1.0));
+	// Present, therefore, at every size the pet ships at. What varies instead is how
+	// *sharply* it is sampled, which is the same split fur makes between `res` and
+	// `crisp`: a plate held at the resolution limit keeps its shingle step and its
+	// broken specular and gives up its dome relief, because the dome is the term
+	// that swings a normal under a directional key and it is the one that aliases.
+	float px_plate = px * size;
+	float fade = smoothstep(1.7, 3.0, px_plate);
+	float crisp = smoothstep(2.9, 6.5, px_plate);
 
 	vec2 cell = vec2(arc, v) / size + parallax * 0.55;
 	float row = floor(cell.y);
@@ -647,13 +740,20 @@ Surf pet_scale(float arc, float v, vec2 parallax, float density, float px) {
 	float shingle = smoothstep(-0.5, 0.35, g.x);
 	float lip = smoothstep(0.5, 0.36, abs(g.x));
 
+	// The dome's own relief is the aliasing term — it is a normal tilt under a hard
+	// key — so it rides `crisp`. The shingle step is a *height* step between two
+	// plates, which survives a downsample the way any silhouette-scale feature does,
+	// so it rides `fade` and stays.
 	s.slope = vec2(-dp * 1.35 * sign(g.x), -dp * 1.35 * sign(g.y) * 0.55)
-		* fade * 0.9 + vec2(shingle - 0.5, 0.0) * fade * 0.55;
+		* crisp * 0.9 + vec2(shingle - 0.5, 0.0) * fade * 0.55;
 	s.occ = mix(1.0, mix(0.62, 1.08, shingle) * mix(0.80, 1.0, lip), fade);
-	s.tint = (rnd - 0.5) * 0.30 * fade + (dome - 0.5) * 0.22 * fade;
+	s.tint = (rnd - 0.5) * 0.30 * fade + (dome - 0.5) * 0.22 * crisp;
 	// Speculars break at every plate boundary, which is what makes a lizard
-	// glitter instead of gleam.
-	s.spec = mix(1.0, mix(0.35, 1.9, dome * shingle), fade);
+	// glitter instead of gleam — and it is the term that has to survive furthest
+	// down, because an unbroken lobe on a smooth capsule is the entire brass read.
+	// Driven by the shingle rather than by the dome once the plate is at the limit:
+	// the dome is sub-pixel down there, the step between plates is not.
+	s.spec = mix(1.0, mix(0.35, 1.9, mix(shingle, dome * shingle, crisp)), fade);
 	s.extra = dome * fade;
 	return s;
 }

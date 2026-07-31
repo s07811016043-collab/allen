@@ -10,10 +10,15 @@ extends RefCounted
 ##
 ## Why a Shiba and not "a dog": at desktop-pet size the silhouette is the whole
 ## performance, and a generic dog has no silhouette. A Shiba has four shapes that
-## survive being 60 px tall — small pricked triangular ears, a thick tail curled
-## over the back, a blunt wedge muzzle under a broad skull, and a deep chest over
-## a hard tuck-up. Every one of those is something a cat does not have, which is
-## the actual brief: the dog must not read as a recoloured cat.
+## survive being 60 px tall — small pricked triangular ears, a thick tail carried
+## high off the croup, a blunt wedge muzzle under a broad skull, and a deep chest
+## over a hard tuck-up. Every one of those is something a cat does not have, which
+## is the actual brief: the dog must not read as a recoloured cat.
+##
+## The tail is the *sashio* sickle, not the *maki-o* curl, and the standard allows
+## both. The curl was drawn for four passes and measured at ship size as a second
+## head; see the tail block for the numbers and for why no amount of daylight
+## under a curl survives the downscale.
 
 const P := preload("res://core/creature/sdf_part.gd")
 const S := preload("res://core/creature/creature_spec.gd")
@@ -177,13 +182,50 @@ static func build() -> S:
 	torso.blend = 0.115
 	var chest := _part(&"chest", Vector2(0.110, -0.726), Vector2(0.245, -0.714), 0.218, 0.240, COL_COAT)
 	chest.blend = 0.115
-	# The urajiro underline: a narrow band riding about 0.02 proud of the body's
-	# own belly line, so it unions rather than hiding inside — a marking that
-	# never breaks the silhouette is a marking nobody sees. Kept thin on purpose.
-	# The first pass used radius 0.072→0.098 and the cream painted a 0.20-tall
-	# swathe up the flank, which cut the animal in half lengthways and made a
-	# deep-chested dog read as a shallow, leggy one.
-	var belly := _part(&"belly", Vector2(-0.300, -0.622), Vector2(0.175, -0.520), 0.038, 0.052, COL_CREAM)
+	# The urajiro underside, and it is a *volume* now rather than a band. This is
+	# the shared "white streak over black stipple along the belly" the review
+	# reports on all four species, and it is authored here, not in the shader.
+	#
+	# Two captures settled it, in this order, and neither could have been reasoned
+	# out. Repainting the capsule in the coat colour — no cream pigment anywhere on
+	# the underside — left the black stippled slab and its hard straight top edge
+	# completely unchanged, which rules out the pigment and every marking path.
+	# Shrinking the same capsule to radius 0.006 and leaving its colour alone made
+	# the slab vanish outright, and what was left underneath was the clean shaded
+	# gradient the underside should always have had. So the defect is the capsule's
+	# *shape*: a thin lens hung along a fat barrel.
+	#
+	# Which is exactly what the shader warns about in two separate places. The
+	# height field blends its radius toward the thicker part inside a union, and
+	# the strength of that bias runs on `(R_fat − R_thin) / (R_fat + R_thin)` — at
+	# 0.045 against the torso's 0.19 that ratio was 0.62 and it dug a groove the
+	# whole length of the animal, whose two walls are the hard lines. Then the
+	# coat's own anisotropic lobe fires along the resulting cylinder, which is the
+	# pale streak, and the `slot` occlusion under a body mass takes the flank below
+	# it down to 0.58 of key, which is the black. Three separate terms, one cause.
+	#
+	# The underline is unchanged to the pixel — both endpoints below are the old
+	# lower surface, re-expressed as centre minus radius — so the silhouette, the
+	# brisket and the tuck-up are all exactly where they were. What changed is that
+	# the underside is a real ventral half-volume, 0.080 → 0.105 against the
+	# barrel's 0.17 → 0.24, which drops the radius ratio from 0.62 to 0.36 and takes
+	# the groove with it.
+	#
+	# 0.36 is a ceiling found by capture and not a round number. The first fat pass
+	# went to 0.115 → 0.150, ratio 0.19, and the slab was gone — but a cream volume
+	# that size wins the colour blend over most of the lower flank, and since the
+	# coat's TRT specular is tinted by albedo, a large pale patch comes back as a
+	# large pale *sheen*. What that drew was a bright band cutting the animal in
+	# half lengthways, which is the same failure the first ever pass of this file
+	# reported from the opposite direction. Thin enough to keep the cream low, fat
+	# enough that the height field does not dig: that is the whole window, and it is
+	# about three tenths of the barrel.
+	#
+	# The marking is better for the change either way. A part this size classifies
+	# as a *region* rather than an object, so the cream crosses into the coat over
+	# roughly a tenth of a unit — a dozen rendered pixels at ship size — and arrives
+	# as countershading instead of as a stencil with a straight bottom edge.
+	var belly := _part(&"belly", Vector2(-0.300, -0.664), Vector2(0.175, -0.573), 0.080, 0.105, COL_CREAM)
 	belly.blend = 0.055
 	belly.coat_length = 1.25
 	# Short and thick, and set on high enough that the neck rises out of the
@@ -279,33 +321,61 @@ static func build() -> S:
 	hf_p.blend = 0.032
 	parts.append_array([ff_u, ff_l, ff_p, hf_u, hf_l, hf_p])
 
-	# --- tail ---------------------------------------------------------------
-	# Set high on the croup: up and slightly back, over the top, then forward and
-	# down so the tip finishes at x = -0.140, deep *inside* the body's own outline
-	# and clearing the loin by only 0.05.
+	# --- tail: sashio, the sickle carriage -----------------------------------
+	# The Shiba standard allows two tails, maki-o (curled) and sashio (sickle).
+	# This file drew the curl for four passes and it was measured, at the size the
+	# pet ships at, as a second head.
 	#
-	# Three things had to be true before this stopped reading as a raised hind
-	# leg, which is what it did for three passes:
-	#   * it has to cross the body it belongs to. A curl carried straight up and
-	#     hooked at the top sits outside the silhouette at exactly the height a
-	#     leg does, and the eye files it as one.
-	#   * it has to be twice a leg's thickness. At 0.062 it matched the pastern
-	#     radius almost exactly; at 0.086 it is unmistakably a different kind of
-	#     object.
-	#   * it cannot end in a small dark blunt cap, which is a paw. All three
-	#     segments are coat-coloured now, and the coat runs at 2.1x so the brush
-	#     carries a soft fringe no leg in the animal has.
-	#   * the turn has to be spread evenly — roughly 60° per segment, describing
-	#     one arc of radius 0.12. Concentrating it into a single corner between
-	#     two straight runs builds a knee, and a knee is a leg.
-	# The gap under the arc still has to survive all of that, or the curl fuses
-	# to the back and becomes a hump.
-	var tail_a := _part(&"tail_0", Vector2(-0.462, -0.876), Vector2(-0.516, -0.992), 0.086, 0.082, COL_COAT, 2)
-	var tail_b := _part(&"tail_1", Vector2(-0.516, -0.992), Vector2(-0.448, -1.090), 0.082, 0.074, COL_COAT, 2)
-	var tail_c := _part(&"tail_2", Vector2(-0.448, -1.090), Vector2(-0.236, -1.042), 0.074, 0.046, COL_COAT, 2)
+	# The measurement, off a 260 px alpha capture: the curl was a rounded island
+	# 48 px wide by 36 px tall — one and a third times as wide as it was long —
+	# with a bump on its upper left and a taper on its lower right, sitting at the
+	# opposite end of the animal from a head that measures 74 × 52. A cranium, an
+	# ear and a muzzle, at four fifths scale. The blind reviewer called it a
+	# pushmi-pullyu and the pixels agree.
+	#
+	# The gap under the arc was not the fixable part, and that is the thing worth
+	# writing down. A curl encloses a *hole*, and a hole has two edges that both
+	# grow a coat fringe inward: the tail's own runs at 2.1× the species length
+	# (0.040 rig units) and the loin's at 1.0× (0.019), so 0.059 of any authored
+	# gap is gone before antialiasing. On the last build the authored clearance
+	# was 0.064 — nine rendered pixels of geometry, and zero after the fringes
+	# met. Every extra unit of daylight has to be paid for twice, and it has to be
+	# paid on an animal that is only 146 px per rig unit at ship size.
+	#
+	# A sickle encloses nothing. The tail leaves the croup going up and back, so
+	# the space in front of it is not a hole between two edges — it is the open
+	# sky above the dog's back, which opens all the way to the frame. There is no
+	# clearance to lose, at any downscale, ever. That is the whole argument for
+	# the change, and it is why the sickle is worth the curl.
+	#
+	# Two other things carried over, because they were right:
+	#   * it must not read as a raised hind leg. It cannot here — it stands above
+	#     the topline where no leg reaches, and the tip is 0.020 where a pastern
+	#     is 0.046.
+	#   * it must be a long taper rather than a mass. 0.084 at the root down to
+	#     0.020 at the point over 0.44 of rise is a 4:1 spike; the curl was 1.33:1.
+	#
+	# The tip still hooks forward over the last segment. That is what keeps it a
+	# Shiba tail rather than a pointer's: the animal reads as carrying its tail
+	# *over* its back, but at a height where the daylight under it is a third of
+	# the body rather than a hairline.
+	var tail_a := _part(&"tail_0", Vector2(-0.446, -0.854), Vector2(-0.556, -0.996), 0.086, 0.066, COL_COAT, 2)
+	var tail_b := _part(&"tail_1", Vector2(-0.556, -0.996), Vector2(-0.596, -1.166), 0.066, 0.042, COL_COAT, 2)
+	var tail_c := _part(&"tail_2", Vector2(-0.596, -1.166), Vector2(-0.520, -1.318), 0.042, 0.015, COL_COAT, 2)
 	for t in [tail_a, tail_b, tail_c]:
 		t.blend = 0.052
-		t.coat_length = 2.10
+		# Down from 2.1. A brush fringe is what stops the tail ending in a blunt
+		# leg-like cap, but 2.1 put 0.040 of coat on every side of a capsule only
+		# 0.084 across — the plume was as wide as the tail and the two together
+		# were the blob. 1.45 still carries a visibly softer outline than anything
+		# else on the animal without inflating the silhouette by half.
+		t.coat_length = 1.45
+	# The last hand's-breadth is the exception, and it is the one place the extra
+	# fringe is worth its width: a capsule that tapers to 0.015 ends in a rounded
+	# cap two pixels across, which at ship size is a full stop. Spikes indexed
+	# along the outline break that cap into a soft point instead, and a soft point
+	# is the difference between a tail and a stick.
+	tail_c.coat_length = 1.95
 	parts.append_array([tail_a, tail_b, tail_c])
 
 	# Puppy proportions. A Shiba puppy is a different shape from a kitten, not a

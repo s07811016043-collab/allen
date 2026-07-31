@@ -36,7 +36,11 @@ const CONTACT_STRENGTH := 0.82
 ## composite is one even smudge the width of the animal — which is exactly what
 ## the standing capture has been showing, and it is the reason four separate
 ## plants read as one.
-const AMBIENT_STRENGTH := 0.30
+## Raised now that it covers the right footprint. Held low it was defending
+## against a body-wide smudge that the *shape* is the real defence against — and
+## measured against the desktop a 30% wash of a near-black tint is a four per cent
+## luminance change under the animal, which is not a shadow, it is a suggestion.
+const AMBIENT_STRENGTH := 0.42
 ## Height above the floor, as a fraction of the creature's standing height, at
 ## which a lifted paw has no contact shadow left at all.
 const LIFT_RANGE := 0.20
@@ -45,6 +49,18 @@ const LIFT_RANGE := 0.20
 ## height — a foot 2 cm off the floor still casts a dark mark, just a blurrier
 ## one.
 const LIFT_SPREAD := 2.2
+## Smallest radius a contact patch may be drawn at, in *screen* pixels.
+##
+## Everything else here is authored in rig units, which is right for a shape that
+## belongs to the animal and wrong for one whose entire job is to be seen. The
+## reptile is the case that proves it: measured at ship size the lizard is drawn at
+## 40 screen pixels to the rig unit — a third of what the mammals get, because it
+## is four units long and the frame is square — so its 0.034 paws produced patches
+## five pixels across and two pixels tall. The probe reported all four uploaded at
+## full opacity and the picture had nothing in it, which is exactly the "briefed
+## twice and still not visible" pattern. A contact mark is a real penumbra and a
+## real penumbra is wider than its occluder anyway, so a floor here is not a cheat.
+const MIN_PATCH_PX := 7.5
 
 var creature: Node2D
 
@@ -153,22 +169,40 @@ func _refresh() -> void:
 		mx = maxf(mx, maxf(p.a.x + p.radius_a, p.b.x + p.radius_b))
 	if not is_finite(mn):
 		return
-	# The tail is part of that span and casts nothing, so the ambient ellipse is
-	# sized from the *stance*, padded — a cat with its tail up must not tow a
-	# metre of shadow behind it.
-	var span := 0.0
-	var centre := 0.0
+	# What the ambient ellipse has to cover is everything the body occludes from the
+	# floor, and that is the union of two spans, not either one alone.
+	#
+	# The stance span is right for a quadruped, where the trunk lives between the
+	# feet. It is badly wrong for a biped: the bird stands on two toes tucked under
+	# its middle and its body reaches most of a body length behind them, so a shadow
+	# sized off the stance is a small smudge under the feet with the whole animal
+	# overhanging it. That is not a subtle depth error — an object whose shadow is
+	# far smaller than the object reads as hovering above it, which is precisely the
+	# "the bird floats off its own shadow" the review reported. It was never a
+	# vertical gap; measured, the patches sit within two pixels of the toes.
+	#
+	# The body span alone is not usable either, because a raised tail or an open wing
+	# is part of it and casts nothing on the floor beneath the animal. So the body's
+	# contribution is taken over its *masses* only — anything close to the thickest
+	# part — which excludes a tail and a wing tip by construction and needs no naming.
+	var thickest := 0.0
+	for p in creature.renderer.live_parts:
+		thickest = maxf(thickest, maxf(p.radius_a, p.radius_b))
+	var bmn := INF
+	var bmx := -INF
+	for p in creature.renderer.live_parts:
+		if maxf(p.radius_a, p.radius_b) < thickest * 0.45:
+			continue
+		bmn = minf(bmn, minf(p.a.x - p.radius_a, p.b.x - p.radius_b))
+		bmx = maxf(bmx, maxf(p.a.x + p.radius_a, p.b.x + p.radius_b))
+	var lo_x: float = bmn if is_finite(bmn) else mn
+	var hi_x: float = bmx if is_finite(bmx) else mx
 	if not _paw_parts.is_empty():
-		var pmn := INF
-		var pmx := -INF
 		for p in _paw_parts:
-			pmn = minf(pmn, minf(p.a.x, p.b.x))
-			pmx = maxf(pmx, maxf(p.a.x, p.b.x))
-		span = (pmx - pmn) + _body_h * 0.42
-		centre = (pmn + pmx) * 0.5
-	else:
-		span = mx - mn
-		centre = (mn + mx) * 0.5
+			lo_x = minf(lo_x, minf(p.a.x, p.b.x))
+			hi_x = maxf(hi_x, maxf(p.a.x, p.b.x))
+	var span: float = (hi_x - lo_x) + _body_h * 0.30
+	var centre: float = (lo_x + hi_x) * 0.5
 
 	var half_w: float = span * 0.5
 	# Flat: the camera is nearly level with the floor, so the ground plane is
@@ -193,6 +227,12 @@ func _refresh() -> void:
 	_mat.set_shader_parameter("ambient", Vector4(centre, _body_h * 0.03, half_w, half_d))
 	_mat.set_shader_parameter("ambient_strength", AMBIENT_STRENGTH)
 	_mat.set_shader_parameter("tint", Color(0.035, 0.035, 0.055))
+
+	# On-screen density, including whatever scale the host or the capture harness
+	# fitted the creature at. `global_transform` was copied from the creature above,
+	# so this is the real number and not the spec's nominal one.
+	var view_px: float = _ppu * maxf(sqrt(absf(global_scale.x * global_scale.y)), 1e-4)
+	var min_r: float = MIN_PATCH_PX / maxf(view_px, 1.0)
 
 	var gait = _gait()
 	for i in MAX_PAWS:
@@ -221,7 +261,11 @@ func _refresh() -> void:
 		# at ship size — most of it hides *behind* the paw — and the mark a real
 		# foot leaves on a floor is bigger than the foot anyway, because the light
 		# is an area source. 2.6x is the smallest that still reads at 260 px.
-		var r: float = maxf(p.radius_a, p.radius_b) * 2.6 * (1.0 + lift * LIFT_SPREAD)
+		#
+		# Floored in screen pixels as well, because 2.6x of a small number is still a
+		# small number: see `MIN_PATCH_PX`.
+		var r: float = maxf(maxf(p.radius_a, p.radius_b) * 2.6, min_r) \
+			* (1.0 + lift * LIFT_SPREAD)
 		# Centred on the toe end of the paw capsule, and only just below the floor
 		# line. Sinking it further made the patch easier to see and turned the
 		# read into a cat hovering over a spot — the gap between a foot and its

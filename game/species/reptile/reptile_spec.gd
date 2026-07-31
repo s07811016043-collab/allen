@@ -74,23 +74,48 @@ static func build() -> S:
 		# black-and-white chequer and the fringe, the lip and the belly all come
 		# out looking like chrome zips glued to the animal. Bone, sand and horn —
 		# every "pale" slot here is a mid value with warmth still in it.
-		Color(0.655, 0.482, 0.298),   # dorsum: warm desert ochre
-		Color(0.412, 0.298, 0.190),   # far side, dark caudal bands. Only a step
+		#
+		# Saturation is the second constraint and it was found the hard way. A blind
+		# reviewer called this animal "a brass ornament" at 260 px, and rendering the
+		# albedo on its own (`PETALIA_DEBUG_VIEW=6`) settled where that came from: the
+		# albedo pass is a soft matte orange lizard, and everything metallic about the
+		# shipped frame is added afterwards by the specular. But hue is half of what
+		# makes a specular read as *metal* rather than as sheen — a white highlight on
+		# a saturated golden-orange is the exact colour of polished brass, and the same
+		# highlight on a grey-tan is the sheen on a dry hide. So every slot below is
+		# pulled toward neutral: the dorsum went from saturation 0.55 to 0.34, which is
+		# also closer to a wild-type Pogona, whose base colour is dull sandy grey-brown
+		# and not gold. The other half of the fix is in the surface families further
+		# down.
+		Color(0.578, 0.494, 0.382),   # dorsum: dry sandy grey-tan
+		Color(0.372, 0.312, 0.244),   # far side, dark caudal bands. Only a step
 		                              # down from the dorsum — the BEHIND layer is
 		                              # already shaded as far-side, and a genuinely
 		                              # dark pigment on top of that turns the off
 		                              # limbs into holes
-		Color(0.730, 0.428, 0.198),   # rust saddle over the hips
-		Color(0.722, 0.664, 0.566),   # ventral scutes: warm sand
-		Color(0.612, 0.548, 0.448),   # keratin: nuchal row, lateral fringe
+		Color(0.442, 0.318, 0.206),   # rust saddle over the hips. The one slot
+		                              # allowed to keep real warmth, because it is
+		                              # the only large-shape *value* break the
+		                              # animal has — and it has to be a break in
+		                              # *value*, not in hue. The version this
+		                              # replaces was 0.730/0.428/0.198, which
+		                              # computes to luminance 0.486 against the
+		                              # dorsum's 0.504: two per cent apart, so the
+		                              # saddle existed only as a hue shift and a hue
+		                              # shift is worth nothing at 42 px per rig unit.
+		                              # This is 0.336, a third under the dorsum, and
+		                              # it is the only shape on the trunk a viewer
+		                              # can see at ship size
+		Color(0.694, 0.652, 0.582),   # ventral scutes: warm sand
+		Color(0.578, 0.538, 0.470),   # keratin: nuchal row, lateral fringe
 		Color(0.238, 0.200, 0.186),   # gular pouch. Smoky rather than black: a
 		                              # relaxed beard is grey and only goes to ink
 		                              # when the animal flares it
-		Color(0.648, 0.586, 0.488),   # lower lip / jaw line
-		Color(0.520, 0.386, 0.252),   # limbs
-		Color(0.548, 0.482, 0.392),   # toes, dry and bleached
+		Color(0.612, 0.576, 0.510),   # lower lip / jaw line
+		Color(0.452, 0.376, 0.290),   # limbs
+		Color(0.512, 0.466, 0.404),   # toes, dry and bleached
 		Color(0.185, 0.160, 0.140),   # claws
-		Color(0.300, 0.206, 0.124),   # caudal band. Its own slot rather than
+		Color(0.286, 0.224, 0.164),   # caudal band. Its own slot rather than
 		                              # reusing the far-side brown, because those
 		                              # two want opposite things: the far side has
 		                              # to stay light or the off limbs become holes
@@ -133,7 +158,21 @@ static func build() -> S:
 	# shader gates transmission on part radius and flatness — so keeping the
 	# species number this low means those three places are the *only* ones that
 	# glow, instead of the whole animal looking like wet resin.
-	s.translucency = 0.14
+	#
+	# Raised from 0.14 anyway, and the reason is the terminator rather than the
+	# glow. `translucency` also sets the diffuse wrap (`wrap = 0.26 + 0.44 * t`),
+	# and at 0.14 the shadow line across this animal's flank was 0.32 wide — a hard
+	# edge between a bright top and a dark underside on a surface with no texture
+	# on it, which is the value signature of turned metal. 0.30 opens the wrap to
+	# 0.39 and the light rolls round the barrel instead of breaking over it. The
+	# transmission terms it also feeds are gated on radius and flatness, so the
+	# only parts that gain any glow are still the toe tips and the beard's edge.
+	s.translucency = 0.30
+	# Unused by anything this species draws — the body shader's `roughness`
+	# uniform only reaches `pet_hair_spec`, i.e. fur. Every non-fur family picks a
+	# fixed roughness in the shader (SCALE 0.26, SKIN 0.42, CLAW 0.16), which is
+	# why the surface-family block further down is the only gloss lever a reptile
+	# actually has. Left at a sane value so nothing keys off a garbage number.
 	s.roughness = 0.30
 
 	# Reptiles grow on a geological timescale next to a kitten. 30 hours a stage
@@ -294,7 +333,18 @@ static func build() -> S:
 	# It has to bottom out below the flank — a lizard's weight sits on its gut —
 	# but only just: 0.05 proud of a trunk that is already the lowest of any
 	# species here. Push it further and the elbows have nowhere left to be.
-	var belly := _part(&"belly", Vector2(-0.88, -0.452), Vector2(0.14, -0.470), 0.140, 0.128, COL_BELLY)
+	#
+	# Fattened from 0.140 → 0.128 with its *lower* surface pinned exactly where it
+	# was, so the underline, the 0.05 of proudness and the clearance the elbows need
+	# are all unchanged. The reason is the shared "white streak over black stipple
+	# along the belly" the review reports on every species: a capture on the dog,
+	# with the same capsule shrunk to nothing, showed that the streak is not the
+	# pigment and not the marking path — it is a thin capsule hung along a fat one.
+	# The height field blends its radius toward the thicker part with a strength
+	# running on `(R_fat − R_thin)/(R_fat + R_thin)`, and above about 0.36 that digs
+	# a groove down the whole underside whose two walls light as hard lines. This
+	# capsule sat at 0.40. At 0.160 → 0.148 it sits at 0.34.
+	var belly := _part(&"belly", Vector2(-0.88, -0.472), Vector2(0.14, -0.490), 0.160, 0.148, COL_BELLY)
 	belly.blend = 0.085
 	parts.append_array([hip, torso, chest, belly])
 
@@ -528,6 +578,50 @@ static func build() -> S:
 			p.baby_radius_scale = 0.90
 		else:
 			p.baby_radius_scale = 0.96
+
+	# --- surface families: where the animal is plated and where it is hide ------
+	#
+	# The body shader picks a fixed specular roughness per surface family, and
+	# nothing in `CreatureSpec` overrides it — `spec.roughness` reaches fur only.
+	# So the family a part declares *is* its gloss, and this is the only gloss
+	# lever a species has:
+	#
+	#   CLAW  0.16 × 1.10   peak lobe ≈ 490     hard keratin, a wet glint
+	#   SCALE 0.26 × 1.10   peak lobe ≈  3.1    plate, glitters at every boundary
+	#   SKIN  0.42 × 0.55   peak lobe ≈  0.22   matte hide
+	#
+	# The belly, the beard and the jaw take hide, which is what they are: a
+	# Pogona's venter and gular skin are soft and granular, and the conspicuous
+	# keeled squamation is on the head, the nuchal row, the lateral spines, the
+	# limbs, the trunk and the caudal whorls. Fourteen times the specular between
+	# the two families is enough that they read as different materials.
+	#
+	# The trunk is *not* on the hide list, and that reversal is worth the space.
+	#
+	# The obvious reading of "reads as a brass ornament" is that the specular is
+	# too hot, so the first attempt put the whole trunk on SKIN. Rendered at 260 px
+	# it came back matte and grey — and bald. Where the shipped build had a smooth
+	# glossy barrel it now had a smooth dull one: a bar of soap instead of a cast
+	# ornament, which is a different wrong answer, not a better one.
+	#
+	# What actually removed the metal was the palette, and the mechanism is the
+	# tonemap rather than the lighting rig. A 260 px A/B of three builds side by
+	# side (`_captures/r7_rep_3way.png`) shows it in one look: on the old saturated
+	# ochre the entire dorsal surface is *clipped* by the filmic curve, and a
+	# clipped surface has no micro-contrast left — the squamation that `pet_scale`
+	# is drawing right there is erased along with everything else, leaving a smooth
+	# bright field with a hard shadow edge, which is exactly what polished metal
+	# looks like. Desaturating the hide and dropping its value by a fifth puts the
+	# lit face back inside the curve's usable range, and the plates reappear at
+	# ship size with no change to the surface code at all.
+	#
+	# So the rule this species now runs on: a scaled animal has to be authored dark
+	# enough that its lit side does not clip, because the squamation is the only
+	# thing standing between it and an ornament, and clipping is what deletes it.
+	const HIDE := [&"belly", &"dewlap", &"chin"]
+	for p in parts:
+		if p.id in HIDE:
+			p.surface = P.Surface.SKIN
 
 	# Squamation direction. `SDFPart.groom_angle` is documented as fur-only, but
 	# the body shader builds every non-fur family's local frame out of it too:

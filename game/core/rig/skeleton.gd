@@ -456,13 +456,35 @@ func _fit_limb(parts: Array[SDFPart], tags: Array, slot: int, fore: bool, far: b
 	var cursor := 0
 	var prev := parent
 	var last_distal := anchor
-	for i in members:
+	for n in members.size():
+		var i: int = members[n]
 		var seg: int = tags[i].seg
 		if seg < cursor:
 			seg = cursor
 		cursor = seg + 1
 		var p: SDFPart = parts[i]
 		var a_first: bool = p.a.distance_to(last_distal) <= p.b.distance_to(last_distal)
+		if n == 0 and members.size() > 1:
+			# The first segment is the only one with no joint behind it to chain
+			# off, and picking its proximal end by distance to the girdle anchor is
+			# wrong whenever the segment runs backwards out of the girdle — which is
+			# exactly what a femur does. Measured on the bird: the far femur runs
+			# from the hip at (0.168, −0.556) down and *back* to the knee, the
+			# fallback pelvis anchor sits behind and above both, the knee end won,
+			# and the bone was laid in backwards. The upper and lower bones then
+			# landed on the same point, `LegIK` read a first segment of length zero,
+			# and the whole leg became one rigid rod that could only reach a circle:
+			# ik error up to 0.21 and the contact patch skating 0.20 rig units — 22 px
+			# at ship size — every stride.
+			#
+			# The next segment decides instead. Consecutive capsules share an
+			# authored joint, so the end of this one that is *not* touching the next
+			# one is the proximal end, exactly and without a heuristic.
+			var nx: SDFPart = parts[members[1]]
+			var da: float = minf(p.a.distance_to(nx.a), p.a.distance_to(nx.b))
+			var db: float = minf(p.b.distance_to(nx.a), p.b.distance_to(nx.b))
+			if not is_equal_approx(da, db):
+				a_first = da > db
 		var proximal: Vector2 = p.a if a_first else p.b
 		var distal: Vector2 = p.b if a_first else p.a
 		var bone_name := RigBones.limb_bone(fore, far, wing, seg)

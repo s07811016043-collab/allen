@@ -30,7 +30,13 @@ const RigBones := preload("res://core/rig/bone_map.gd")
 const STEP := 1.0 / 120.0
 const MAX_STEPS := 16
 ## Fore-aft head lag per unit of the shoulder's vertical speed, in rig units.
-const HEAD_LEAD := 0.025
+##
+## Measured rather than guessed: at 0.025 the cat's shoulder velocity peaked at
+## about 0.44 units/s through a walk, so the muzzle led by 0.011 units — 1.2 px
+## at ship size, a term that looked deliberate in the source and arrived at the
+## picture as nothing. 0.060 puts it at 3 px, which is the smallest fore-aft
+## nose motion a 260 px frame can actually show.
+const HEAD_LEAD := 0.060
 ## Fraction of the shoulder's stride ripple the neck absorbs. Not 1.0: a head
 ## welded level is as dead a tell as a head welded to the spine.
 const HEAD_STEADY := 0.80
@@ -55,6 +61,9 @@ var gait_override := -1
 var _spec: CreatureSpec
 var _time := 0.0
 var _accum := 0.0
+## Steps between `RIGTRACE` lines, or 0 for off. See `trace_line`.
+var _trace_every := 0
+var _trace_step := 0
 var _ear_near_chain := -1
 var _ear_far_chain := -1
 var _tail_chain := -1
@@ -78,6 +87,16 @@ var _prev_chest := 0.0
 var _chest_vel := 0.0
 var _prev_speed := 0.0
 var _carrier_accel := 0.0
+## Scale on everything written into the pelvis's own angle.
+##
+## A rotation at the pelvis is levered by every bone hanging behind it, and on
+## the reptile that is three and a half rig units of tail. Measured: 0.025 rad of
+## roll and croup counter-twist — a couple of pixels on the cat — swung that tail
+## tip 0.09 units and parked the lowest point of the whole silhouette below the
+## ground plane for part of every stride. Set from the tail's own length at
+## setup, so every species whose tail is shorter than the animal is tall keeps
+## the full amount.
+var _croup_gain := 1.0
 ## Mood tail carry, kept here rather than written straight into the chain: the
 ## idle layer wants to add its own wander to the same rest angle, and whichever
 ## of the two wrote last would otherwise erase the other.
@@ -100,6 +119,9 @@ func setup(spec: CreatureSpec, bind_parts: Array[SDFPart], bind_eyes: Array,
 	_build_chains(spec)
 	_time = 0.0
 	_accum = 0.0
+	# Off unless asked for. Twelve steps is 10 Hz, dense enough to see a flick and
+	# sparse enough that a ten-second run does not scroll out of a terminal.
+	_trace_every = 12 if OS.get_environment("PETALIA_RIG_TRACE") not in ["", "0"] else 0
 
 
 func _cache_bones() -> void:
@@ -138,11 +160,17 @@ func _build_chains(spec: CreatureSpec) -> void:
 		SpringChain.Mode.ANGULAR, lerpf(15.0, 34.0, spec.energy), 0.52,
 		0.9, 2.6, 0.70)
 	if _tail_chain >= 0:
-		# ~120 ms of trail behind the hips. Now that the pelvis actually pitches
-		# and counter-rolls there is something to trail *behind*: without this the
-		# tail inherits every hip rotation on the same frame it happens and reads
-		# as a welded rod, however soft the spring under it is.
-		chains[_tail_chain].lag = 0.12
+		# ~70 ms of trail per joint, so the tip is pointing where the hips were
+		# about a fifth of a second ago and every joint in between is somewhere on
+		# the way there. Per joint rather than shared: a lag applied equally to
+		# every joint is a rigid rotation, and measured on this cat the three tail
+		# joints tracked each other to within 6% on every frame of a walk.
+		chains[_tail_chain].lag = 0.07
+		# A resting cat's tail flick starts at the root and runs out to the tip. A
+		# tenth of a second per joint is slow enough to see the wave and fast
+		# enough that the tip has caught up before the next flick starts.
+		chains[_tail_chain].bias_travel = 0.16
+		_croup_gain = clampf(1.0 / maxf(chains[_tail_chain].span(), 1.0), 0.28, 1.0)
 	_ear_near_chain = _add_chain("ear", RigBones.SIDE_NEAR, RigBones.HEAD,
 		SpringChain.Mode.ANGULAR, 210.0, 0.90, 0.0, 0.55, 0.42)
 	_ear_far_chain = _add_chain("ear", RigBones.SIDE_FAR, RigBones.HEAD,
@@ -223,6 +251,45 @@ func head_fix() -> float:
 	return _head_fix
 
 
+## One line of everything the body and the tail are doing, printed at 10 Hz when
+## `PETALIA_RIG_TRACE=1` is in the environment.
+##
+## Every body channel at once, because the failure mode this exists to catch is a
+## channel that is computed and then arrives at the picture as nothing, and you
+## cannot tell that apart from a channel that is never computed unless you look
+## at the number. And the tail joint *by joint*: a tip position cannot separate a
+## rod swinging about its base from a wave travelling down a rope, and that
+## distinction is exactly what a reviewer means by "a rigid stick".
+func trace_line() -> String:
+	var s := "RIGTRACE t=%.2f cyc=%.2f bob=%+.4f pitch=%+.4f flex=%+.4f wither=%+.4f twist=%+.4f surge=%+.4f" \
+		% [_time, gait.cycle, gait.bob, gait.pitch, gait.flex, gait.withers,
+			gait.girdle_twist, gait.surge]
+	s += " head=%+.4f chest=%+.4f fix=%+.4f" % [
+		skeleton.bones[_head].xform.origin.y if _head >= 0 else 0.0,
+		skeleton.bones[_chest].xform.origin.y if _chest >= 0 else 0.0, _head_fix]
+	if _tail_chain >= 0:
+		var c: SpringChain = chains[_tail_chain]
+		s += " tail_bias=%+.3f tail_j=[" % idle.tail_sway
+		for l in c.links:
+			s += "%+.3f " % skeleton.bones[l.bone].angle
+		var tip: Vector2 = skeleton.bone_position(RigBones.chain_tip("tail", RigBones.SIDE_NONE))
+		s += "] tip=%+.3f,%+.3f" % [tip.x, tip.y]
+	# Whether a limb can physically reach what the gait asked it for. `span` is
+	# hip-to-target and `reach` is what the bones add up to; a span outside
+	# [|l1−l2|, reach] is an unsolvable request, and the IK answers it by planting
+	# the foot as close as it can, which is a foot sliding across the floor.
+	for i in mini(legs.size(), gait.feet.size()):
+		var ch: LegIK.Chain = legs[i]
+		if not ch.valid or not gait.feet[i].present:
+			continue
+		var root: Vector2 = skeleton.bones[ch.root_bone].xform.origin
+		var tgt: Vector2 = gait.feet[i].target
+		s += "  %s span=%.3f reach=%.3f fold=%.3f root=%.2f,%.2f tgt=%.2f,%.2f" % [
+			["FN", "FF", "HN", "HF"][i], root.distance_to(tgt), ch.reach,
+			absf(ch.lengths[0] - ch.lengths[1]), root.x, root.y, tgt.x, tgt.y]
+	return s
+
+
 ## Advance by `dt` of wall time, in fixed steps.
 func advance(dt: float) -> void:
 	if skeleton == null or dt <= 0.0:
@@ -287,6 +354,11 @@ func _step(dt: float) -> void:
 	_pose_tail()
 	skeleton.update_pose()
 
+	if _trace_every > 0:
+		_trace_step += 1
+		if _trace_step % _trace_every == 0:
+			print(trace_line())
+
 
 # ---------------------------------------------------------------------------
 # Body
@@ -323,11 +395,11 @@ func _pose_body(dt: float) -> void:
 	var twist: float = gait.girdle_twist
 	if _pelvis >= 0:
 		var p := skeleton.bones[_pelvis]
-		p.angle += -twist * 0.5
+		p.angle += -twist * 0.5 * _croup_gain
 		# Roll is invisible in a strict side view, so it is expressed the way a
 		# side view actually shows it: the near half of the body rides slightly
 		# higher or lower than the far half, plus a touch of whole-body lean.
-		p.angle += gait.roll + (idle.weight_roll + bank) * 0.22
+		p.angle += (gait.roll + (idle.weight_roll + bank) * 0.22) * _croup_gain
 		p.bone_scale = squash.scale_vector()
 
 	# Spine: breathing swell, the lateral wave for sprawling gaits, the lumbar
@@ -539,7 +611,12 @@ func _pose_ears() -> void:
 ## spring still does the settling — this only moves the angle it settles toward.
 func _pose_tail() -> void:
 	if _tail_chain >= 0:
-		chains[_tail_chain].set_bias(_tail_carry * -0.30 + idle.tail_sway, 0.86)
+		# Tapered *up* toward the tip, not down. A cat's tail does its bending in
+		# the last third; a curl that is strongest at the root and fades outward is
+		# the shape a rod makes when you rotate it, which is what this looked like.
+		# With the travel delay above, the outer joints also arrive late, so the
+		# curl is a wave running out to the tip rather than a pose held all at once.
+		chains[_tail_chain].set_bias(_tail_carry * -0.30 + idle.tail_sway, 1.14)
 
 
 # ---------------------------------------------------------------------------

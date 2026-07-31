@@ -157,7 +157,14 @@ const PITCH_GAIN := 0.72
 const PITCH_MAX := 0.13
 ## Radians of counter-rotation between the girdles at full asymmetry. Small in
 ## absolute terms — it is the *opposition* that reads, not the amount.
-const TWIST_GAIN := 0.064
+##
+## Sized against the picture rather than against the number. The rig splits the
+## twist half backwards into the croup and all of it forwards along the lumbar,
+## so the two ends of the trunk end up 1.5x this apart; at 0.064 that measured
+## 0.10 rad of opposition, which over the cat's 0.45-unit half-trunk is 2.6 px at
+## ship size — right at the floor of what a 260 px frame can show. The channel
+## was doing its job and arriving as almost nothing.
+const TWIST_GAIN := 0.090
 ## Whole-body lean from the near/far load split. A strict side view can barely
 ## show a roll at all, so this stays a hint rather than a statement.
 const ROLL_GAIN := 0.022
@@ -176,7 +183,15 @@ const FLEX_GAIN := 1.75
 ## each other instead of arching.
 const FLEX_MAX := 0.42
 ## Scapula travel at full load swing, as a fraction of leg reach.
-const WITHERS_GAIN := 0.30
+##
+## The most valuable body channel there is at ship size, and the reason is the
+## frequency rather than the amplitude: it runs at twice the stride rate, so it
+## is the only thing on the trunk that is not in lockstep with the bob, and a
+## body whose every channel shares one phase is a body being carried. Measured on
+## the cat at 0.30 it delivered 5.0 px of scapula travel against 7.6 px of bob;
+## at 0.52 it delivers 8.6 px, which is a shoulder that visibly rides up the
+## ribcage twice a stride instead of a topline that only translates.
+const WITHERS_GAIN := 0.52
 
 var _spec: CreatureSpec
 var _family: int = CreatureSpec.Locomotion.QUADRUPED

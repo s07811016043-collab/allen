@@ -125,8 +125,15 @@ static func build() -> S:
 		Color(0.900, 0.855, 0.760),   # ear-covert cheek patch, warm buff
 		Color(0.105, 0.098, 0.112),   # upper mandible, near black horn
 		Color(0.330, 0.310, 0.300),   # lower mandible, pale horn
-		Color(0.360, 0.295, 0.260),   # tarsus and toes
-		Color(0.215, 0.180, 0.160),   # far tarsus
+		Color(0.470, 0.396, 0.352),   # tarsus and toes. Lightened a third, and it
+		                              # is the other half of the grounding fix: a
+		                              # dark-brown foot standing on a near-black
+		                              # contact patch has no boundary between them,
+		                              # so the eye cannot locate where the animal
+		                              # stops and the floor begins and falls back on
+		                              # the outline it *can* see, which is the leg
+		                              # ending in mid-air above a dark mark
+		Color(0.340, 0.288, 0.258),   # far tarsus
 		Color(0.960, 0.740, 0.310),   # gape flange
 	])
 
@@ -137,44 +144,53 @@ static func build() -> S:
 
 	s.coat_surface = P.Surface.FEATHER
 	s.coat_length = 0.010
-	# This number is the whole feather read, and it runs backwards from the
-	# intuition that "denser = more detail".
+	# This number is the whole feather read, and every word of the note that used
+	# to sit here was describing a shader that no longer exists. It said
+	# `pet_feather` lays barbs at `150 * coat_density` lanes per rig unit and gates
+	# them on `smoothstep(1.8, 4.2, px/pitch)`, and it worked out three densities
+	# against that formula. `pet_feather` has since been rewritten to tile discrete
+	# *feathers* first and draw barbs inside them, and now reads
 	#
-	# `pet_feather` lays barbs at a pitch of `150 * coat_density` lanes per rig
-	# unit and then multiplies the entire result — relief, occlusion, spec break-up
-	# and the iridescence weight — by `smoothstep(1.8, 4.2, px_per_unit / pitch)`,
-	# i.e. by how many screen pixels one barb gets. Raising density shrinks the
-	# barb, so it *closes* that gate. At 158 px/unit the arithmetic is:
+	#     fl   = 0.023 / density          one feather, in rig units
+	#     plume gate = smoothstep(2.2, 5.5, px_per_unit * fl)
+	#     barb  gate = smoothstep(1.7, 4.0, px_per_unit * fl / 7)
 	#
-	#   density 0.70 → 105 lanes/unit → 1.5 px per barb → gate 0.00
-	#   density 0.38 →  57 lanes/unit → 2.8 px per barb → gate 0.36
-	#   density 0.30 →  45 lanes/unit → 3.5 px per barb → gate 0.80
+	# so density moves the numbers the *other way* from what the old note claimed:
+	# raising it makes each feather smaller, which closes the plume gate rather
+	# than opening it. Tuned against the stale arithmetic, 0.38 put a 0.061-unit
+	# feather on the bird — nine screen pixels a cell at ship size, with the plume
+	# gate saturated at 1.0 and the barb gate at 0.0. Nine-pixel shingles at full
+	# strength and nothing finer inside them is not plumage, it is basket weave,
+	# and that is what a 560 px capture shows across the whole mantle.
 	#
-	# The species shipped at 0.70, which is not "fine plumage" — it is the vanes
-	# switched off entirely, leaving the mammal marking code as the only structure
-	# on the bird, and the thin-film term dead with it (`irid` is barb coverage, and
-	# coverage was zero).
+	# There is a second failure stacked on it and it is not fixable from here.
+	# `pet_feather` indexes its cells off `arc`, and `PETALIA_DEBUG_VIEW=10` bands
+	# `arc` straight to the framebuffer: on this bird the bands are not running
+	# along the body at all, they are closed concentric loops over the whole torso
+	# and shoulder. A family of closed contours *is* a fingerprint, which is
+	# precisely what the review keeps reporting. The loops come from the body being
+	# blended out of capsules whose spine directions disagree by up to 24°, so the
+	# blended `arc` has saddles and extrema in it. The egg's own capsules are
+	# straightened below, which is this file's share of the fix; the rest lives in
+	# the shader.
 	#
-	# The other end is just as wrong, and less obvious. `pet_feather` builds its
-	# lane from `arc + abs(v) * 1.6`, where `arc` is the world position projected on
-	# the groom direction but `v` is distance *through the blended field*. On a long
-	# flat part — a primary, a rectrix — the `v` term bends the lanes into barbs
-	# raking back off a rachis, which is exactly right. On a three-capsule egg it
-	# bends them into iso-distance contours of the whole body, so at gate 0.80 the
-	# torso came back as a topographic map: concentric fingerprint whorls with a
-	# 28% occlusion swing between lane and gap.
+	# What is left for density to do is decide the *size* the artifact is drawn at,
+	# and that is worth a lot: contour lines nine pixels apart are topography, and
+	# the same lines three pixels apart are grain. So this is now set from the ship
+	# frame rather than from a review one. At 1.10 the ladder runs
 	#
-	# 0.38 is where the two failures are both avoided. The vanes are real — fine
-	# enough to read as barbs, and carrying enough coverage to light the
-	# iridescence — while the contouring on the body stays a sheen rather than a
-	# relief map. Wings and tail get the good end of the same number for free,
-	# because there the contours *are* the barbs.
+	#   260 px  ppu ≈ 139   feather 2.9 px   plume gate 0.17   a faint tooth
+	#   560 px  ppu ≈ 300   feather 6.3 px   plume gate 0.82   visible plumage
+	#   head close-up       feather  20 px   plume 1.0, barbs 0.4   actual vanes
 	#
-	# The cost is that `coat_density` is one global and the scaled tarsi read it too
-	# (`pet_scale` sizes a plate at `0.030 / density`), so this trades finer scutes
-	# for a bird that actually has feathers. It puts about four plates on a 0.26-unit
-	# tarsus, which is close to what a real passerine shows anyway.
-	s.coat_density = 0.38
+	# which is the right order: the pet is nearly smooth at the size it lives at,
+	# grows plumage when a reviewer leans in, and only resolves barbs in a close-up.
+	# A photograph of a songbird 150 px tall has no visible feather edges either.
+	#
+	# The scaled tarsi read the same global (`pet_scale` sizes a plate at
+	# `0.030 / density`), and they come out better for it: 0.021 rig units is about
+	# six scutes on the exposed tarsus, which is what a passerine has.
+	s.coat_density = 1.10
 	s.translucency = 0.50
 	s.roughness = 0.46
 
@@ -257,10 +273,14 @@ static func build() -> S:
 	# those desaturate rather than just darken, which is the whole reason they
 	# exist.
 	var fl_far := _part(&"leg_hind_far_upper", Vector2(0.168, -0.556), Vector2(-0.036, -0.278), 0.072, 0.042, COL_BREAST, 0)
-	var fc_far := _part(&"leg_hind_far_lower", Vector2(-0.036, -0.278), Vector2(0.102, -0.052), 0.031, 0.024, COL_TARSUS_DARK, 0)
+	var fc_far := _part(&"leg_hind_far_lower", Vector2(-0.036, -0.278), Vector2(0.104, -0.036), 0.031, 0.026, COL_TARSUS_DARK, 0)
 	fc_far.surface = P.Surface.SCALE
 	fc_far.blend = 0.022
-	var ft_far := _part(&"leg_hind_far_toe", Vector2(0.102, -0.052), Vector2(0.244, -0.026), 0.023, 0.010, COL_TARSUS_DARK, 0)
+	# Flat on the floor like the near toe, and one hundredth *above* it: the far
+	# foot is half a step behind, so a shade of clearance is honest, but the 0.029
+	# it used to hang at was a visible hover on the one animal in the build whose
+	# grounding was already under review.
+	var ft_far := _part(&"leg_hind_far_toe", Vector2(0.104, -0.036), Vector2(0.242, -0.024), 0.024, 0.012, COL_TARSUS_DARK, 0)
 	ft_far.surface = P.Surface.CLAW
 	ft_far.blend = 0.016
 	# One far primary, sitting a hair higher than the near bundle so a sliver of
@@ -276,13 +296,30 @@ static func build() -> S:
 	# three capsules. A cat gets four with a dip behind the shoulder; a bird must
 	# get the opposite — an unbroken convex curve from vent to crown, because the
 	# absence of any waist is what makes the silhouette read as a bird at all.
-	var rump := _part(&"rump", Vector2(-0.335, -0.605), Vector2(-0.170, -0.675), 0.180, 0.240, COL_MANTLE)
+	#
+	# The three share one exact axis direction, −15.5°, and that is a shading
+	# constraint rather than a drawing one. The body shader builds `arc` — the
+	# coordinate every non-fur family and every marking is written in — as
+	# `mix(dot(p, axis), f.arc, h)` across the parts it blends, where `axis` is each
+	# capsule's own normalised spine. Two capsules with the *same* axis contribute
+	# the same linear ramp and the blend is exactly that ramp; capsules that
+	# disagree contribute ramps in different directions, and the blend of those has
+	# saddles and closed level sets. `PETALIA_DEBUG_VIEW=10` draws it: the version
+	# this replaces ran the three at −23.0°, −14.6° and −10.9° and the torso came
+	# back wearing concentric whorls, which `pet_feather` then tiled its cells
+	# along. Straightened, the same debug view is a clean fan of parallel bands over
+	# the egg.
+	#
+	# The cost is a couple of hundredths on the topline, because the authored chain
+	# was a shallow curve and this is its chord. That is a fair trade for the one
+	# artifact a blind reviewer has named twice.
+	var rump := _part(&"rump", Vector2(-0.335, -0.605), Vector2(-0.163, -0.653), 0.180, 0.240, COL_MANTLE)
 	rump.blend = 0.13
 	rump.height_scale = 1.12
-	var torso := _part(&"torso", Vector2(-0.170, -0.675), Vector2(0.060, -0.735), 0.240, 0.258, COL_MANTLE)
+	var torso := _part(&"torso", Vector2(-0.163, -0.653), Vector2(0.066, -0.716), 0.240, 0.258, COL_MANTLE)
 	torso.blend = 0.14
 	torso.height_scale = 1.14
-	var chest := _part(&"chest", Vector2(0.060, -0.735), Vector2(0.200, -0.762), 0.258, 0.212, COL_MANTLE)
+	var chest := _part(&"chest", Vector2(0.066, -0.716), Vector2(0.203, -0.754), 0.258, 0.212, COL_MANTLE)
 	chest.blend = 0.13
 	chest.height_scale = 1.12
 	# The pale/dark boundary on a real bird runs along the flank, not around the
@@ -316,15 +353,22 @@ static func build() -> S:
 	# the paint path, the flank line falls where the two fields cross, and `blend`
 	# sets how sharp that line is — which is why it drops from 0.12 to 0.035. It is
 	# the same thing the cat's belly does.
-	var belly := _part(&"belly", Vector2(-0.350, -0.565), Vector2(-0.120, -0.578), 0.150, 0.160, COL_CREAM)
+	#
+	# Both are laid on the same −15.5° axis as the egg above, for the `arc` reason
+	# given there — the belly used to run at −3.2° and was one of the four capsules
+	# putting saddles into the band coordinate along the flank, which is exactly
+	# where the whorls were densest. The radii then do the work the tilt used to:
+	# growing 0.142 → 0.180 along a rising spine holds the *underline* almost level,
+	# which is what a bird's belly actually is, while the spine agrees with the back.
+	var belly := _part(&"belly", Vector2(-0.352, -0.556), Vector2(-0.130, -0.618), 0.142, 0.180, COL_CREAM)
 	belly.blend = 0.024
-	var breast := _part(&"belly_breast", Vector2(-0.120, -0.570), Vector2(0.185, -0.650), 0.150, 0.172, COL_BREAST)
+	var breast := _part(&"belly_breast", Vector2(-0.130, -0.612), Vector2(0.164, -0.694), 0.150, 0.184, COL_BREAST)
 	breast.blend = 0.026
 	# "Nape", not "neck". A perching songbird at rest has no visible neck: the
 	# vertebrae are folded into an S inside the feathers and the head simply
 	# continues the shoulder. This capsule exists to fill that junction solid, so
 	# the blend never opens a notch under the skull.
-	var nape := _part(&"nape", Vector2(0.140, -0.815), Vector2(0.265, -0.880), 0.185, 0.162, COL_MANTLE)
+	var nape := _part(&"nape", Vector2(0.142, -0.812), Vector2(0.278, -0.850), 0.185, 0.162, COL_MANTLE)
 	nape.blend = 0.105
 	parts.append_array([rump, torso, chest, belly, breast, nape])
 
@@ -333,15 +377,20 @@ static func build() -> S:
 	# radius. A bird's skull has no muzzle to lengthen it — everything in front of
 	# the eye is beak, and that hard boundary between a round skull and a straight
 	# cone is a species cue in its own right.
-	var skull := _part(&"head", Vector2(0.286, -0.950), Vector2(0.404, -0.964), 0.194, 0.176, COL_MANTLE)
+	var skull := _part(&"head", Vector2(0.286, -0.950), Vector2(0.400, -0.982), 0.194, 0.176, COL_MANTLE)
 	skull.blend = 0.075
 	# The three face markings below all sit *inside* the skull volume, which makes
 	# the renderer treat them as paint rather than as geometry — see the marking
 	# branch in `eval_layer`. That is the only way to get a stripe onto a face
 	# built out of capsules.
-	var throat := _part(&"chin_throat", Vector2(0.305, -0.875), Vector2(0.400, -0.912), 0.055, 0.048, COL_CREAM)
+	#
+	# Skull, cheek and throat are all laid on the body's −15.5° axis for the `arc`
+	# reason given at the egg. They ran at −6.8°, −8.8° and −21.3°, and banding
+	# `arc` showed the second densest knot of closed contours on the animal sitting
+	# right over the cheek — the one place a viewer actually looks.
+	var throat := _part(&"chin_throat", Vector2(0.305, -0.875), Vector2(0.403, -0.902), 0.055, 0.048, COL_CREAM)
 	throat.blend = 0.03
-	var cheek := _part(&"cheek_patch", Vector2(0.298, -0.935), Vector2(0.408, -0.952), 0.074, 0.058, COL_CHEEK)
+	var cheek := _part(&"cheek_patch", Vector2(0.298, -0.935), Vector2(0.405, -0.965), 0.074, 0.058, COL_CHEEK)
 	cheek.blend = 0.028
 	parts.append_array([skull, throat, cheek])
 
@@ -394,17 +443,39 @@ static func build() -> S:
 	ff.blend = 0.05
 	var fl := _part(&"leg_hind_near_lower", Vector2(0.085, -0.552), Vector2(-0.125, -0.268), 0.078, 0.046, COL_BREAST)
 	fl.blend = 0.05
-	var fc := _part(&"leg_hind_near_cannon", Vector2(-0.125, -0.268), Vector2(0.010, -0.040), 0.033, 0.025, COL_TARSUS)
+	var fc := _part(&"leg_hind_near_cannon", Vector2(-0.125, -0.268), Vector2(0.012, -0.032), 0.033, 0.028, COL_TARSUS)
 	fc.surface = P.Surface.SCALE
 	fc.blend = 0.022
-	var ft := _part(&"leg_hind_near_toe", Vector2(0.010, -0.040), Vector2(0.158, -0.012), 0.025, 0.010, COL_TARSUS)
+	# The toes lie *flat*, and that is the fix for "the bird floats off its own
+	# shadow". It was never a rig fault: `--probe=1` reports `floor=-0.0000` and
+	# `sink=+0.0000` on both feet, so the lowest point of the posed animal is
+	# already exactly on the ground plane, and two previous rounds looking for a
+	# gap in the numbers found none.
+	#
+	# What the picture shows instead is a *tangency*. The toe used to run from
+	# y = −0.040 with radius 0.025 to y = −0.012 with radius 0.010, so its
+	# underside climbed from 0.015 above the floor to 0.002 — a cylinder that grazes
+	# the ground at a single point and hangs above it everywhere else. On a 260 px
+	# frame the toe's whole length is nine pixels of dark, the contact patch that
+	# `ContactShadow` puts under it is a nine-pixel ellipse centred on the *tip*,
+	# and the two of them touch at one pixel. That reads exactly like a bird hovering
+	# over a mark on the floor, which is what a blind reviewer reported.
+	#
+	# Authored with a constant clearance instead — endpoint y and radius stepping
+	# together so `y + r` stays at −0.002 along the whole capsule — the toe lies on
+	# the floor over its full 0.14 of length, twenty rendered pixels of it, and the
+	# patch sits under the middle of that rather than off its end. Contact is a
+	# *line* now, not a point, and a line is what an eye reads as standing.
+	var ft := _part(&"leg_hind_near_toe", Vector2(0.012, -0.032), Vector2(0.136, -0.020), 0.030, 0.018, COL_TARSUS)
 	ft.surface = P.Surface.CLAW
 	ft.blend = 0.016
 	# The hallux. Three toes forward and one back is what a perching foot *is*,
 	# and it costs one capsule. Deliberately named without a segment token so the
 	# limb fitter spends its one foot bone on the forward toes and binds this to
-	# them rather than fighting over which is the end effector.
-	var hal := _part(&"leg_hind_near_hallux", Vector2(0.008, -0.040), Vector2(-0.100, -0.014), 0.019, 0.007, COL_TARSUS)
+	# them rather than fighting over which is the end effector. Flat on the floor
+	# for the same reason as the forward toes, so the foot brackets the contact
+	# patch front and back instead of pointing at it.
+	var hal := _part(&"leg_hind_near_hallux", Vector2(0.010, -0.026), Vector2(-0.100, -0.016), 0.022, 0.014, COL_TARSUS)
 	hal.surface = P.Surface.CLAW
 	hal.blend = 0.014
 	parts.append_array([ff, fl, fc, ft, hal])
