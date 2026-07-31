@@ -39,7 +39,19 @@ const MAX_STEPS := 16
 const HEAD_LEAD := 0.060
 ## Fraction of the shoulder's stride ripple the neck absorbs. Not 1.0: a head
 ## welded level is as dead a tell as a head welded to the spine.
-const HEAD_STEADY := 0.80
+const HEAD_STEADY := 0.86
+## Radians the loin rounds between a full exhale and a full inhale.
+##
+## `Gait.flex` is gated on the animal actually moving, and correctly — a phase
+## frozen wherever the gait stopped, read as a pose, is a permanent deformity. But
+## that left the resting topline with *no* shape channel at all: measured over
+## twenty seconds of standing, the mid-back's sag relative to the line from croup
+## to withers changed by 0.0000 rig units. The trunk translated and it tilted, and
+## every point on the topline stayed exactly where it was relative to every other
+## point, which is the definition of the thing a blind reviewer called furniture.
+## Breathing is the resting animal's shape channel and this is the spine's share
+## of it; `IdleRig.breath_swell` already owns the ribcage's.
+const BREATH_ARC := 0.052
 
 var skeleton: RigSkeleton
 var gait := Gait.new()
@@ -120,8 +132,16 @@ func setup(spec: CreatureSpec, bind_parts: Array[SDFPart], bind_eyes: Array,
 	_time = 0.0
 	_accum = 0.0
 	# Off unless asked for. Twelve steps is 10 Hz, dense enough to see a flick and
-	# sparse enough that a ten-second run does not scroll out of a terminal.
-	_trace_every = 12 if OS.get_environment("PETALIA_RIG_TRACE") not in ["", "0"] else 0
+	# sparse enough that a ten-second run does not scroll out of a terminal — but a
+	# gallop is 3.6 Hz and 10 Hz cannot resolve the inside of one of its cycles, so
+	# the variable also takes a step count: `PETALIA_RIG_TRACE=2` is 60 Hz.
+	var trace_env := OS.get_environment("PETALIA_RIG_TRACE")
+	if trace_env in ["", "0"]:
+		_trace_every = 0
+	elif trace_env.is_valid_int() and int(trace_env) > 1:
+		_trace_every = int(trace_env)
+	else:
+		_trace_every = 12
 
 
 func _cache_bones() -> void:
@@ -336,6 +356,11 @@ func _step(dt: float) -> void:
 	# at a trot, from the same gain, because at a trot it was arriving late enough
 	# to be partly adding.
 	_stabilise_head(dt)
+	# Hand the gait the hips it actually has. The trunk is fully posed by this
+	# point and the legs have not been solved yet, so this is the one moment in the
+	# step where the limb roots are final and the gait's next tick can still use
+	# them; see `Gait.Foot.root_h0`.
+	_report_limb_roots()
 	_pose_legs()
 	# The creature crosses the desktop by moving its own node, which never touches
 	# a bone transform, so the chains cannot see it happen. Differentiate the speed
@@ -406,6 +431,12 @@ func _pose_body(dt: float) -> void:
 	# share of the girdle twist, and a bend into the turn — all distributed
 	# evenly so no single joint cranks.
 	var swell: float = idle.breath_swell()
+	# Sagittal bend of the topline, from the gait when the animal is moving and from
+	# the breath at every other moment. Summed rather than switched: an animal walks
+	# and breathes at the same time, and the two are at nothing like the same rate,
+	# which is the point — the resting topline gets a slow arch that nothing else in
+	# the rig runs at.
+	var arch: float = gait.flex + idle.breath * BREATH_ARC
 	var spine_n: float = maxf(float(_spine_bones.size()), 1.0)
 	# Lumbar flexion is weighted toward the loin — the joints just ahead of the
 	# hips, which is where a cat's back actually hinges. Spread evenly it arcs the
@@ -427,7 +458,7 @@ func _pose_body(dt: float) -> void:
 		# the sign is negative. The chest gets the whole accumulated bend taken back
 		# out below, which is what keeps this a change of shape: the topline bows
 		# while the forehand it carries stays pointing where it was.
-		b.angle += -gait.flex * flex_w[i] / maxf(flex_sum, 1e-3)
+		b.angle += -arch * flex_w[i] / maxf(flex_sum, 1e-3)
 		# Ribcage expands most in the middle of the trunk, tapering to the hips.
 		var swell_here: float = swell * (1.0 - absf(t - 0.55) * 1.2)
 		b.bone_scale *= Vector2(1.0, 1.0 + swell_here)
@@ -435,7 +466,7 @@ func _pose_body(dt: float) -> void:
 	if _chest >= 0:
 		var c := skeleton.bones[_chest]
 		c.bone_scale *= Vector2(1.0 + swell * 0.7, 1.0 + swell * 1.3)
-		c.angle += gait.flex
+		c.angle += arch
 		# The scapula riding up the ribcage under load. Written in rig space and
 		# converted into the chest's rest frame once, because that frame is tilted
 		# along the body axis on every species we ship — pushed in raw it would
@@ -534,7 +565,12 @@ func _stabilise_head(dt: float) -> void:
 	# exactly one job, and "the stride" is a different frequency at every gait;
 	# pinned at 0.45 s it sat less than an octave below a trot and tracked a third
 	# of the very ripple it was meant to ignore.
-	var tau: float = clampf(1.7 / maxf(gait.frequency, 0.5), 0.4, 2.0)
+	# Three cycles of averaging, not 1.7. A one-pole at 1.7 periods still passes
+	# about a fifth of the very ripple it is meant to slide past, and whatever
+	# reaches `_head_level` is subtracted from the correction — so the leak came
+	# straight back out as skull travel, worst at the gallop where the ripple is
+	# biggest. Measured on the cat: 18.1 px of head travel at a run.
+	var tau: float = clampf(3.0 / maxf(gait.frequency, 0.5), 0.5, 2.4)
 	_head_level = lerpf(_head_level, head_y, clampf(dt / tau, 0.0, 1.0))
 	# Faded out at a standstill. There is no stride ripple to reject when the animal
 	# is not walking, and the idle layer's postural motion — breath lifting the
@@ -542,6 +578,13 @@ func _stabilise_head(dt: float) -> void:
 	# to ride. Left running at rest the stabiliser only deletes it, which costs the
 	# idle exactly the liveness it exists to provide.
 	var gate: float = clampf(gait.frequency * 1.6, 0.0, 1.0)
+	# Instantaneous, and it has to stay that way. Making the correction a sprung
+	# response was tried and measured: at ω = 34 rad/s against a 3.6 Hz gallop the
+	# spring runs 56° late, which puts most of the correction in quadrature with
+	# the thing it is cancelling, and the cat's head travel went from 18 px to 55.
+	# A neck that answers late is not a livelier neck, it is a neck that adds. What
+	# keeps the skull from reading as a gimbal is `HEAD_STEADY` being under 1 and
+	# the neck carrying its share of the shift, not a lag.
 	_head_fix = -(head_y - _head_level) * HEAD_STEADY * gate
 	if absf(_head_fix) < 1e-6:
 		return
@@ -580,6 +623,16 @@ func _shift_bone(index: int, amount: float) -> void:
 # ---------------------------------------------------------------------------
 # Legs
 # ---------------------------------------------------------------------------
+
+## Height of each limb root above the floor with the body's bob taken back out,
+## which is what the gait's reach ceiling needs and cannot compute for itself.
+func _report_limb_roots() -> void:
+	for i in mini(legs.size(), gait.feet.size()):
+		var c: LegIK.Chain = legs[i]
+		if not c.valid:
+			continue
+		gait.feet[i].root_h0 = -skeleton.bones[c.root_bone].xform.origin.y + gait.bob
+
 
 func _pose_legs() -> void:
 	for i in legs.size():

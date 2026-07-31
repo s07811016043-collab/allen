@@ -698,6 +698,12 @@ static func build() -> S:
 	eye_far.iris_color = Color(0.17, 0.11, 0.08)
 	eye_far.limbal_color = Color(0.03, 0.02, 0.02)
 	eye_far.sclera_color = Color(0.86, 0.82, 0.77)
+	# The last of the four foreshortening terms, added when the cat and the dog got
+	# theirs. Radius, socket and sclera were already carrying the far side of a
+	# turned head; the lid was not, and a far eye held as wide open as the near one
+	# is the term that keeps a three-quarter face looking assembled rather than
+	# seen. A bird's nictitating lid rides low anyway.
+	eye_far.lid_open = 0.80
 	eye_far.socket_depth = 0.82
 	eye_far.lid_palette_index = COL_MANTLE
 

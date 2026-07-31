@@ -83,6 +83,17 @@ class Foot:
 	var contact_bind := Vector2.ZERO
 	var root_bind := Vector2.ZERO
 	var reach := 0.0
+	## Height this limb's root would ride at with `bob` zeroed, measured off the
+	## posed skeleton by the rig each step rather than derived from the bind pose.
+	##
+	## The reach constraint below is the only thing keeping a stance foot on the
+	## floor, and it was solving against a hip that does not exist. Everything the
+	## trunk does between the bind pose and the picture — pitch about the middle of
+	## the back, lumbar flexion, the scapula riding up the ribcage, impact squash,
+	## the idle layer's weight rock — moves the real hip and none of it was visible
+	## here. Measured on the cat's gallop: a forefoot in stance hovering 0.21 units
+	## short of its own target, which is a stance foot 34 px off the ground.
+	var root_h0 := 0.0
 	## True on the frame the foot touched down — drives impact squash and audio.
 	var just_landed := false
 	var landing_force := 0.0
@@ -192,6 +203,55 @@ const FLEX_MAX := 0.42
 ## at 0.52 it delivers 8.6 px, which is a shoulder that visibly rides up the
 ## ribcage twice a stride instead of a topline that only translates.
 const WITHERS_GAIN := 0.52
+## Extra scapula travel per unit of bob deviation.
+##
+## The other half of what a shoulder blade does, and the half that only exists
+## because a cat has no clavicle: the ribcage is slung between the blades, so when
+## the trunk sinks the blades stay with the humerus and appear to *rise* out of
+## the back. Load and sink are different phases of the same stride — the load term
+## above peaks at mid-stance, this peaks at the bottom of the bob — and having
+## both is what stops the withers being a rectified copy of one signal.
+const WITHERS_BOB := 0.55
+## Ceiling on total scapula travel, as a fraction of leg reach.
+const WITHERS_MAX := 0.20
+## Radians of topline rounding per unit of bob deviation.
+##
+## The back is what carries the body's weight between the girdles, so when the
+## trunk drops the topline flattens and when it lifts the loin rounds under it.
+## Small next to `FLEX_GAIN`, deliberately: the gather term owns the gallop and
+## this one exists so a *walk*, which barely gathers at all, still has a topline
+## that changes shape instead of a plank that translates.
+const FLEX_BOB := 1.30
+## Trunk-shape spring: natural frequency in rad/s and damping ratio.
+##
+## These were one-pole followers, and a one-pole cannot overshoot — it can only
+## arrive late. A back and a shoulder are muscle and bone with mass on the end of
+## them: they load, they pass the target, and they settle back. Q here is 1/(2ζ)
+## = 0.77, below 1, so there is no resonant peak to find at any cadence we ship;
+## what the spring buys is the small overshoot after each footfall, which is the
+## difference between a shape that is *driven* and a shape that *responds*.
+## Chosen against the *phase*, not the amplitude. A one-pole at the 22/s these
+## used to run at is 45° late against a 3.6 Hz gallop, and a spring slow enough to
+## overshoot prettily is later still — the head stabiliser next door was measured
+## losing two thirds of its effect to exactly that. At 42 rad/s the spring is 41°
+## late at a gallop and 22° at a walk, which is *less* lag than the follower it
+## replaces while still passing the mark and settling back.
+const TRUNK_OMEGA := 42.0
+const TRUNK_ZETA := 0.62
+## Downward acceleration of a trunk with no foot under it, rig units/s².
+##
+## A quadruped in flight is a projectile and nothing else. This used to hold the
+## last support-derived height for the whole suspension, which measured as a flat
+## line — the hopping bird's bob sat at exactly −0.047 for four consecutive frames
+## of an eight-frame sheet, 58% of its cycle, and the cat's gallop held +0.006
+## across the whole of its. A body that translates up, holds, and translates down
+## is furniture being carried; a parabola is a body being thrown.
+##
+## 1.0 rig unit is adult shoulder height and this pet is drawn at roughly a
+## quarter of a metre of it, so 9.81 m/s² lands near 38 rig units/s². One number
+## for every species because the conversion is a property of the *scale the pet is
+## drawn at*, not of the animal standing at it.
+const GRAVITY := 38.0
 
 var _spec: CreatureSpec
 var _family: int = CreatureSpec.Locomotion.QUADRUPED
@@ -206,15 +266,6 @@ var _bob_gain := 1.0
 var _body_len := 0.5
 ## Mean support height over the reference cycle; bob oscillates around it.
 var _support_ref := 0.5
-## The highest that mean ever gets over the reference cycle. Stands in for it
-## during a suspension, when no foot is carrying anything: the trunk is ballistic
-## and the honest statement is "as high as this animal's legs ever put it", scaled
-## by the pattern's `lift`. Leg reach used to stand in here, which is a length
-## rather than a height above the floor — the two agreed closely enough by
-## accident to look right, until the support height started counting the ankle,
-## and then a galloping cat buried a quarter of a unit of itself in the floor
-## every suspension.
-var _support_hi := 0.5
 ## Mean leg reach. Sets the flexion reserve the body bobs into.
 var _reach_ref := 0.5
 ## Constant downward offset that buys the legs their flexion reserve.
@@ -228,8 +279,23 @@ var _span_ref := 0.5
 ## deviation by construction, so a gait whose duty factor gives the pair a high
 ## average load does not park the shoulder permanently raised.
 var _fore_load_mean := 0.0
+## The same trick for the bob, so the channels that ride it are deviations too and
+## a crouched walk does not park the shoulder and the topline somewhere new.
+var _bob_mean := 0.0
 ## Extra flexion carried once the animal is actually moving, faded in with speed.
 var _move_crouch := 0.0
+## Trunk vertical velocity while airborne, rig units/s, positive downward, plus
+## the height the body left the ground at so the arc has something to close onto.
+var _bob_vel := 0.0
+var _airborne := false
+var _liftoff_bob := 0.0
+## Fraction of the current pattern's cycle with no foot on the ground. Sampled
+## from the phase table rather than declared, so it stays right if the table
+## changes and it is automatically zero for a species missing a limb pair.
+var _air_frac := 0.0
+## Spring velocities for the two trunk-shape channels.
+var _flex_vel := 0.0
+var _withers_vel := 0.0
 
 
 func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
@@ -249,6 +315,7 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 			f.root_bind = c.root_bind
 			f.reach = maxf(c.reach, 1e-3)
 		f.target = f.bind
+		f.root_h0 = -f.root_bind.y
 		var bind_dx: float = f.bind.x - f.root_bind.x
 		f.support_ref = -f.bind.y \
 			+ sqrt(maxf(f.reach * f.reach - bind_dx * bind_dx, 0.0))
@@ -288,6 +355,7 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 	_stride_ref = maxf(spec.stride * body_scale, 0.02)
 	_bob_gain = 1.0
 	_bob_gain = _calibrate_bob(spec)
+	_air_frac = _suspension_fraction()
 	settle()
 
 
@@ -333,16 +401,18 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 			var ankle: Vector2 = contact - f.contact_arm.rotated(_stance_pitch(st))
 			var dx: float = ankle.x - f.root_bind.x
 			var support: float = -ankle.y + sqrt(maxf(f.reach * f.reach - dx * dx, 0.0))
-			h_sum += support
+			# The *differential*, exactly as `_solve_body` now averages it. Raw
+			# heights make the bob a report on which girdle happens to be carrying
+			# rather than on how the body is moving; see the note there.
+			h_sum += support - f.support_ref
 			ceil_max = maxf(ceil_max, -f.root_bind.y - support)
-		var mean: float = (h_sum / w_sum) if w_sum > 0.0 else _reach_ref
+		var mean: float = (h_sum / w_sum) if w_sum > 0.0 else 0.0
 		lo = minf(lo, mean)
 		hi = maxf(hi, mean)
 	var span: float = hi - lo
 	if not is_finite(span) or span < 1e-5:
 		return 1.0
 	_support_ref = (lo + hi) * 0.5
-	_support_hi = hi
 	# A foot planted ahead of the hip needs more leg than one straight under it.
 	# If the body does not lower to pay for that, the reach constraint in
 	# `_solve_body` shears the top off every bob and the authored amplitude never
@@ -364,6 +434,12 @@ func settle() -> void:
 	flex = 0.0
 	withers = 0.0
 	_fore_load_mean = 0.0
+	_bob_mean = 0.0
+	_bob_vel = 0.0
+	_airborne = false
+	_liftoff_bob = 0.0
+	_flex_vel = 0.0
+	_withers_vel = 0.0
 	surge = 0.0
 	undulation = 0.0
 	for f in feet:
@@ -384,6 +460,34 @@ func set_kind(k: int) -> void:
 		return
 	kind = k
 	duty = float(_pattern()["duty"])
+	_air_frac = _suspension_fraction()
+
+
+## Fraction of one cycle this pattern spends with nothing on the ground.
+##
+## Sampled off the phase table rather than declared next to it, for the same
+## reason `_calibrate_bob` samples instead of assuming: the number has to stay
+## true when the table is edited, when a species is missing a limb pair, and when
+## a biped borrows the quadruped walk. A walk comes out at 0, a trot at 0.05, the
+## rotary gallop at 0.19 and the bird's hop at 0.58 — which is why the hop is
+## where a held height reads worst.
+func _suspension_fraction() -> float:
+	const SAMPLES := 192
+	var pat := _pattern()
+	var d := float(pat["duty"])
+	var air := 0
+	for s in SAMPLES:
+		var c := float(s) / float(SAMPLES)
+		var down := false
+		for i in FOOT_COUNT:
+			if not feet[i].present:
+				continue
+			if fposmod(c + float(pat["phase"][i]), 1.0) < d:
+				down = true
+				break
+		if not down:
+			air += 1
+	return float(air) / float(SAMPLES)
 
 
 func pattern_name() -> StringName:
@@ -557,11 +661,17 @@ func _support_height(f: Foot) -> float:
 ##
 ## Bob comes from the feet that are actually carrying weight, and from nothing
 ## else: a leg in the air holds up no part of the animal. When *no* foot is down
-## the body is in a suspension, and the only height still meaningful is the one
-## a gathered leg could reach — the top of the range — so the trunk floats up
-## through the flight phase and drops again the instant a foot lands. Pitch and
-## roll do still hear the swing legs, quietly, because they are about where the
-## mass is leaning rather than about what is holding it up.
+## the body is not being held up at all and the solver hands over to `_fly`, which
+## integrates it as the projectile it is. Pitch and roll do still hear the swing
+## legs, quietly, because they are about where the mass is leaning rather than
+## about what is holding it up.
+##
+## Everything the stance branch averages is a *differential* against the bind
+## pose — how much higher than its resting height each leg is currently letting
+## its girdle sit — because a quadruped's fore and hind legs are different lengths
+## and the raw heights report that difference as vertical body motion. Which
+## girdle happens to be carrying is a fact about the gait pattern, not about how
+## the body is moving, and `pitch` already owns it.
 func _solve_body(dt: float) -> void:
 	var w_sum := 0.0
 	var stance_w := 0.0
@@ -591,17 +701,27 @@ func _solve_body(dt: float) -> void:
 			load[i] = sin(PI * clampf(f.phase / maxf(duty, 1e-3), 0.0, 1.0))
 		var w: float = 1.0 if f.stance else 0.16
 		w_sum += w
-		if f.stance:
-			stance_w += 1.0
-			stance_h += f.support
-			# The hip rides −root_bind.y − bob above the floor and may not out-climb
-			# what this leg permits, so bob has a hard lower bound.
-			ceiling = maxf(ceiling, -f.root_bind.y - f.support)
 		# Attitude is a differential: how much higher than its *resting* height this
 		# leg is currently letting its girdle sit. Feeding in the raw heights makes
 		# an animal with unequal fore and hind legs — which is every quadruped we
 		# ship — walk permanently nose-down.
 		var lift_h: float = f.support - f.support_ref
+		if f.stance:
+			stance_w += 1.0
+			# The differential, not the raw height, and it is the same lesson the
+			# attitude channels learned. A cat's forelegs are shorter than its hind
+			# ones, so the raw mean drops the moment the forehand takes the weight on
+			# its own — and the bob gain, calibrated on a walk where two or three
+			# mixed legs are always down, multiplies that leg-length difference into
+			# the largest single term in the whole channel. Measured on the gallop:
+			# bob sat at −0.03 through hind stance and slammed to +0.16 the instant
+			# the forefeet landed, a 25 px plunge at ship size that is nothing but the
+			# cat's own proportions being reported twice — once here and once,
+			# correctly, as pitch.
+			stance_h += lift_h
+			# The hip rides `root_h0 − bob` above the floor and may not out-climb what
+			# this leg permits, so bob has a hard lower bound.
+			ceiling = maxf(ceiling, f.root_h0 - f.support)
 		if i == FORE_NEAR or i == FORE_FAR:
 			fore_h += lift_h * w
 			fore_w += w
@@ -617,7 +737,6 @@ func _solve_body(dt: float) -> void:
 	if w_sum <= 0.0:
 		return
 
-	var mean: float = (stance_h / stance_w) if stance_w > 0.0 else _support_hi
 	# `lift` finally does what the pattern table says it does. The pendulum's
 	# geometry is nearly the same at every speed — a cat's legs are long next to
 	# its stride, so the support height only ever varies by a couple of
@@ -628,31 +747,41 @@ func _solve_body(dt: float) -> void:
 	var ride: float = _crouch + _move_crouch \
 		* clampf(speed / maxf(_spec.walk_speed, 1e-3), 0.0, 1.0)
 	var lift: float = float(_pattern()["lift"])
-	var target_bob: float = ride + (_support_ref - mean) * _bob_gain * lift
-	# `lift` is a budget as well as a gain. At a gallop the animal is often on a
-	# single leg, and one pendulum swings far wider than the average of four does,
-	# so the raw geometry overshot the declared amplitude by well over double — a
-	# quarter of the cat's own height of vertical travel per stride.
-	#
-	# Compressed rather than clipped, and only above budget. A hard clip engaged
-	# for two thirds of a gallop cycle and turned the curve into two flat plateaux,
-	# which reads more mechanical than the overshoot it was fixing; this leaves an
-	# ordinary stride untouched and only reins in the single-leg outliers.
 	var budget: float = _spec.bob * _body_height * lift
-	var excess: float = target_bob - ride
-	var over: float = absf(excess) / maxf(budget, 1e-5)
-	if over > 1.0:
-		target_bob = ride + signf(excess) * budget * (2.0 - 1.0 / over)
-	if is_finite(ceiling):
-		target_bob = maxf(target_bob, ceiling)
-	# One pole of smoothing: the body has mass and cannot follow a discontinuity in
-	# support the instant a foot lands. The rate scales with cadence, because the
-	# discontinuity *is* a footfall and footfalls arrive faster as the animal speeds
-	# up. Held fixed, the corner sits below the stride at anything past a stroll,
-	# which quietly halves the bob and drags what is left a sixth of a stride behind
-	# the feet that are meant to be causing it — which is what "the bob is out of
-	# phase with the footfalls" looks like from the outside.
-	bob = lerpf(bob, target_bob, clampf(dt * maxf(26.0, frequency * 40.0), 0.0, 1.0))
+	if stance_w <= 0.0:
+		_fly(dt, budget)
+	else:
+		_airborne = false
+		var mean: float = stance_h / stance_w
+		var target_bob: float = ride + (_support_ref - mean) * _bob_gain * lift
+		# `lift` is a budget as well as a gain. At a gallop the animal is often on a
+		# single leg, and one pendulum swings far wider than the average of four
+		# does, so the raw geometry overshot the declared amplitude by well over
+		# double — a quarter of the cat's own height of vertical travel per stride.
+		#
+		# Compressed rather than clipped, and only above budget. A hard clip engaged
+		# for two thirds of a gallop cycle and turned the curve into two flat
+		# plateaux, which reads more mechanical than the overshoot it was fixing;
+		# this leaves an ordinary stride untouched and only reins in the outliers.
+		var excess: float = target_bob - ride
+		var over: float = absf(excess) / maxf(budget, 1e-5)
+		if over > 1.0:
+			target_bob = ride + signf(excess) * budget * (2.0 - 1.0 / over)
+		if is_finite(ceiling):
+			target_bob = maxf(target_bob, ceiling)
+		# One pole of smoothing: the body has mass and cannot follow a discontinuity
+		# in support the instant a foot lands. The rate scales with cadence, because
+		# the discontinuity *is* a footfall and footfalls arrive faster as the animal
+		# speeds up. Held fixed, the corner sits below the stride at anything past a
+		# stroll, which quietly halves the bob and drags what is left a sixth of a
+		# stride behind the feet that are meant to be causing it — which is what
+		# "the bob is out of phase with the footfalls" looks like from the outside.
+		bob = lerpf(bob, target_bob,
+			clampf(dt * maxf(26.0, frequency * 40.0), 0.0, 1.0))
+	# Slow-followed centre of the bob, so the channels that ride it below are
+	# deviations rather than copies of the crouch the animal happens to be at.
+	_bob_mean = lerpf(_bob_mean, bob, clampf(dt * 1.6, 0.0, 1.0))
+	var bob_dev: float = bob - _bob_mean
 
 	# Phase-driven trunk attitude, gated on the animal actually walking. At rest
 	# the foot phases are frozen wherever the gait stopped, and reading them then
@@ -723,19 +852,50 @@ func _solve_body(dt: float) -> void:
 		# A sprawling animal's trunk already carries all its motion laterally
 		# through `undulation`; adding a sagittal arch on top only lifts the middle
 		# of a lizard off the floor.
+		# The topline answers the bob as well as the gather. At the bottom of the
+		# stride the trunk hangs between loaded limbs and the back is at its
+		# flattest; at the top it is gathered and the loin rounds under it. The
+		# gather term owns the gallop, where the girdles genuinely close on each
+		# other, and this owns the walk, where they barely move at all and without
+		# it the topline is a plank that only translates.
+		flex_to -= bob_dev * FLEX_BOB
+		# A sprawling animal's trunk already carries all its motion laterally
+		# through `undulation`; adding a sagittal arch on top only lifts the middle
+		# of a lizard off the floor — and drives the far end of a metre of tail
+		# through it, which is what it measured. Applied to the whole channel, the
+		# bob term included: it was added after this scale for one round and put
+		# 8 px of reptile tail under the ground plane.
 		if _family == CreatureSpec.Locomotion.SPRAWLING:
 			flex_to *= 0.25
 		var fore_load: float = _pair_load(load, FORE_NEAR, FORE_FAR)
 		_fore_load_mean = lerpf(_fore_load_mean, fore_load, clampf(dt * 1.4, 0.0, 1.0))
 		withers_to = (fore_load - _fore_load_mean) * WITHERS_GAIN * _reach_ref
+		# The ribcage is slung between the shoulder blades, so when the trunk sinks
+		# the blades stay with the humerus and ride up out of the back. Same channel,
+		# a different phase of the same stride: the load term above peaks at
+		# mid-stance and this at the bottom of the bob, and having both is what keeps
+		# the withers from being a rectified copy of one signal.
+		withers_to += bob_dev * WITHERS_BOB
+		# A scapula slides on the ribcage; it does not come off it. Measured on the
+		# cat's gallop the two terms summed to 48.7 px of travel at ship size,
+		# against about 24 for a real galloping cat, and every pixel of it is
+		# subtracted from what the foreleg below has left to reach the ground with.
+		# Soft, not clipped, for the same reason as everywhere else in this file.
+		withers_to = _soft_clip(withers_to, WITHERS_MAX * _reach_ref)
 	else:
 		_fore_load_mean = lerpf(_fore_load_mean, 0.0, clampf(dt * 1.4, 0.0, 1.0))
-	# Faster followers than the attitude channels above. Both of these are shape
-	# changes driven by a limb taking load, and a limb takes load in about a tenth
-	# of a second; smoothed at the trunk's rate they arrive after the footfall that
-	# caused them, which reads as the body sagging rather than bracing.
-	flex = lerpf(flex, flex_to, clampf(dt * 22.0, 0.0, 1.0))
-	withers = lerpf(withers, withers_to, clampf(dt * 26.0, 0.0, 1.0))
+	# Springs, not followers. Both of these are shape changes driven by a limb
+	# taking load, and a limb takes load in about a tenth of a second — but a one-
+	# pole can only ever arrive late, never past, and a back and a shoulder are
+	# muscle with mass on the end of them. The overshoot after each footfall is the
+	# whole difference between a shape that is driven and a shape that responds.
+	var h: float = clampf(dt, 0.0, 0.02)
+	var k_t: float = TRUNK_OMEGA * TRUNK_OMEGA
+	var c_t: float = 2.0 * TRUNK_ZETA * TRUNK_OMEGA
+	_flex_vel += (-(flex - flex_to) * k_t - _flex_vel * c_t) * h
+	flex += _flex_vel * h
+	_withers_vel += (-(withers - withers_to) * k_t - _withers_vel * c_t) * h
+	withers += _withers_vel * h
 
 	# Fore-aft surge: the body decelerates against each braking forelimb and is
 	# pushed on by each hind. Small, but its absence is why naive walk cycles
@@ -757,6 +917,43 @@ func _solve_body(dt: float) -> void:
 		undulation = sin(TAU * cycle) * (0.10 + 0.16 * exertion)
 	else:
 		undulation = 0.0
+
+
+## The suspension: no foot on the ground, so nothing is holding the body up.
+##
+## Everywhere else in this file the trunk height is *solved* — read off whichever
+## legs are carrying weight. In flight there are none, and the honest answer is
+## that the body is a projectile. It used to hold the last support-derived height
+## instead, which on the bird's hop meant 58% of every cycle spent at exactly the
+## same altitude: four consecutive frames of an eight-frame contact sheet with the
+## bird translated bodily upward and not otherwise changed. That is the literal
+## definition of furniture being carried.
+##
+## The push-off is derived rather than measured. A projectile that leaves the
+## ground at v and returns to the same height after T seconds needs v = gT/2, and
+## a real animal's push-off satisfies exactly that condition or it would land
+## early and stumble — so taking it as given is not a shortcut, it is the
+## constraint. It also makes the arc close by construction: the body arrives back
+## at the height it left at, on the frame the next foot touches down, moving
+## downward at the speed it left at. Nothing to clamp, nothing to plateau, and the
+## landing compression starts from real downward momentum instead of from rest.
+##
+## The amplitude follows from the flight time and needs no tuning: gT²/8 is 0.2 px
+## for a trot's flicker of a suspension, 2 px for the cat's gallop and 17 px for
+## the bird's hop, which is the correct ordering and the correct spread.
+func _fly(dt: float, budget: float) -> void:
+	if not _airborne:
+		_airborne = true
+		_liftoff_bob = bob
+		_bob_vel = -GRAVITY * (_air_frac / maxf(frequency, 0.25)) * 0.5
+	_bob_vel += GRAVITY * dt
+	bob += _bob_vel * dt
+	# A guard rail, not a shaper: the arc above closes on its own, and this only
+	# catches a pattern table edited into a suspension long enough for free fall to
+	# bury the animal. If it ever engages, the table is wrong.
+	if bob > _liftoff_bob + budget:
+		bob = _liftoff_bob + budget
+		_bob_vel = 0.0
 
 
 ## Fore-aft gap between the two girdles' feet, right now. Measured off the live

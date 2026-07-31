@@ -151,12 +151,25 @@ static func build() -> S:
 	# how close it comes to the nearest FRONT part, so a far leg tucked directly
 	# behind a near one is crushed to a featureless dark disc and reads as the
 	# near leg's shadow. Prising them apart is what makes a viewer count four.
+	#
+	# The two far paws are gone and their slots bought the carpus on both
+	# forelegs. Each was a 0.047 knob in the coat-shadow colour tucked directly
+	# behind a near paw that is 0.050 in cream: at 260 px it is four pixels of the
+	# same brown the shank above it already is, against a near paw that has a
+	# hard white sock to hold the eye. The cat cut its far paws two rounds ago on
+	# the same test and nothing was lost — a leg lying in the body's shadow needs
+	# to *end*, and a shank running to its own cap on the floor does that.
 	var ff_far_u := _part(&"leg_fore_far_upper", Vector2(0.150, -0.700), Vector2(0.204, -0.470), 0.080, 0.054, COL_COAT_DARK, 0)
-	var ff_far_l := _part(&"leg_fore_far_lower", Vector2(0.204, -0.470), Vector2(0.196, -0.145), 0.054, 0.044, COL_COAT_DARK, 0)
-	var ff_far_p := _part(&"paw_fore_far", Vector2(0.196, -0.145), Vector2(0.240, -0.047), 0.044, 0.047, COL_COAT_DARK, 0)
+	var ff_far_l := _part(&"leg_fore_far_lower", Vector2(0.204, -0.470), Vector2(0.180, -0.182), 0.056, 0.044, COL_COAT_DARK, 0)
+	# The far side gets the carpus too, and it is an IK constraint rather than a
+	# drawing one. Naming a third segment `pastern` classifies it `Seg.CANNON`,
+	# which promotes the chain from `LegIK.solve_two` to `solve_three`; a fore pair
+	# where one leg has a wrist that folds under load and the other does not runs
+	# the two legs on different solvers at the same phase of the same stride, and
+	# that is a thing a viewer sees in motion even when they cannot say what it is.
+	var ff_far_c := _part(&"leg_fore_far_pastern", Vector2(0.180, -0.182), Vector2(0.208, -0.042), 0.046, 0.042, COL_COAT_DARK, 0)
 	var hf_far_u := _part(&"leg_hind_far_upper", Vector2(-0.360, -0.772), Vector2(-0.462, -0.348), 0.132, 0.060, COL_COAT_DARK, 0)
-	var hf_far_l := _part(&"leg_hind_far_lower", Vector2(-0.462, -0.348), Vector2(-0.420, -0.130), 0.056, 0.044, COL_COAT_DARK, 0)
-	var hf_far_p := _part(&"paw_hind_far", Vector2(-0.420, -0.130), Vector2(-0.380, -0.047), 0.044, 0.047, COL_COAT_DARK, 0)
+	var hf_far_l := _part(&"leg_hind_far_lower", Vector2(-0.462, -0.348), Vector2(-0.404, -0.046), 0.056, 0.046, COL_COAT_DARK, 0)
 	# The off ear needs real daylight between it and the near one — 0.094 of axis
 	# separation — and the coat colour rather than the shadow colour. The BEHIND
 	# layer already gets up to 0.58 cast shadow plus 0.28 occlusion from whatever
@@ -168,7 +181,7 @@ static func build() -> S:
 	# with a real cross-section, and it has to survive being seen edge-on.
 	ear_far.height_scale = 0.44
 	ear_far.blend = 0.032
-	parts.append_array([ff_far_u, ff_far_l, ff_far_p, hf_far_u, hf_far_l, hf_far_p, ear_far])
+	parts.append_array([ff_far_u, ff_far_l, ff_far_c, hf_far_u, hf_far_l, ear_far])
 
 	# --- torso --------------------------------------------------------------
 	# Three capsules whose radii grow forward: 0.140 at the croup to 0.240 at the
@@ -221,12 +234,44 @@ static func build() -> S:
 	# enough that the height field does not dig: that is the whole window, and it is
 	# about three tenths of the barrel.
 	#
-	# The marking is better for the change either way. A part this size classifies
-	# as a *region* rather than an object, so the cream crosses into the coat over
-	# roughly a tenth of a unit — a dozen rendered pixels at ship size — and arrives
-	# as countershading instead of as a stencil with a straight bottom edge.
-	var belly := _part(&"belly", Vector2(-0.300, -0.664), Vector2(0.175, -0.573), 0.080, 0.105, COL_CREAM)
-	belly.blend = 0.055
+	# The marking classification is the second half, and the last pass got it
+	# backwards. It reasoned that a part this size classifies as a *region* rather
+	# than an object, so the cream would cross into the coat over roughly a tenth
+	# of a unit and arrive as countershading rather than as a stencil. That is the
+	# right instinct and it overshot by a factor of two, which is the "ventral
+	# airbrush smear" the review now names: a soft pale cloud on the lower flank
+	# with no edge anywhere on it and no coat texture inside it.
+	#
+	# The arithmetic is in the shader and it is worth writing down, because this is
+	# a cliff and not a slope. The colour feather is
+	#
+	#     region  = smoothstep(0.024, 0.048, pr / body_h)
+	#             * smoothstep(2.2, 4.5, length / pr)
+	#     feather = max(blend, pr * mix(0.10, 1.55, region))
+	#
+	# The old capsule was 0.484 long on a 0.105 radius — 4.61 aspect, past the top
+	# of that second ramp — and 0.077 of body height, past the top of the first. So
+	# `region` was pinned at 1.0, `feather` came out at 0.163 of a rig unit, and at
+	# 146 px per unit that is a 24-pixel colour ramp at ship size and a 90-pixel one
+	# at review zoom. Nothing with a 90-pixel gradient across it has an edge.
+	#
+	# Shortened to 0.311 the aspect is 2.99, `region` lands at 0.28, and the ramp
+	# the classifier asks for drops to 0.052 — under the blend, which then sets the
+	# feather outright. That is the useful part: below the cliff the *blend* is the
+	# authoring lever on the pigment boundary, in rig units, and it can be dialled.
+	# 0.082 is 12 rendered pixels: a countershading ramp you can see is a ramp,
+	# rather than either a stencil or a fog bank.
+	#
+	# What the capsule gives up is the front third, which is no loss. Urajiro on a
+	# Shiba runs cheek, throat, chest, belly and inner leg as *separate* patches
+	# with coat between them; the cheek and chin already carry the face pair, and
+	# stopping the belly behind the elbow is what puts a band of red coat between
+	# the two rather than one continuous pale underside from jaw to groin.
+	#
+	# The underline is unchanged to the pixel over the run that remains: both
+	# endpoints are the old lower surface re-expressed as centre minus radius.
+	var belly := _part(&"belly", Vector2(-0.230, -0.659), Vector2(0.075, -0.596), 0.092, 0.104, COL_CREAM)
+	belly.blend = 0.082
 	belly.coat_length = 1.25
 	# Short and thick, and set on high enough that the neck rises out of the
 	# withers instead of leaving them. Base radius 0.170 against the cat's 0.128.
@@ -289,17 +334,47 @@ static func build() -> S:
 	parts.append_array([ear_near, ear_inner])
 
 	# --- near limbs ---------------------------------------------------------
-	# Foreleg: a heavy column. Shoulder to elbow leans forward, then the forearm
-	# drops within 0.010 of plumb over 0.330 of length. Straight front legs under
-	# a deep chest are a dog; a cat's forelegs are lighter and set further back.
-	# The upper is deliberately slim. It is a FRONT-layer part crossing a BODY-layer
-	# chest, so whatever of it lies inside the chest's outline still shades as a
-	# raised lobe — at 0.086 it read as a bicep strapped to the ribs.
-	var ff_u := _part(&"leg_fore_near_upper", Vector2(0.238, -0.706), Vector2(0.296, -0.462), 0.062, 0.054, COL_COAT, 2)
-	ff_u.blend = 0.100
-	var ff_l := _part(&"leg_fore_near_lower", Vector2(0.296, -0.462), Vector2(0.286, -0.138), 0.058, 0.046, COL_COAT, 2)
-	ff_l.blend = 0.050
-	var ff_p := _part(&"paw_fore_near", Vector2(0.286, -0.138), Vector2(0.334, -0.050), 0.046, 0.050, COL_CREAM, 2)
+	# Foreleg: a heavy column, and it now has two joints in it instead of none.
+	#
+	# The review read the forelegs as smooth featureless sticks, and they were: one
+	# humerus and one forearm, both tapering the same way, met at a 0.050 blend
+	# that closed the 0.004 of radius step between them into nothing. A dog's
+	# foreleg has two landmarks a viewer can name — the point of the elbow under
+	# the chest, and the carpus a hand above the foot — and both of them are read
+	# as *breaks* rather than as bumps.
+	#
+	# The elbow is a direction break. The humerus used to lean 0.058 *forward* from
+	# shoulder to elbow, which is what a foreleg does on nothing; on a real dog the
+	# shoulder joint is the forwardmost point of the assembly and the elbow hangs
+	# behind it, under the deepest part of the chest. Reversed to lean 0.028 back,
+	# the elbow now sits behind the point of shoulder and the forearm has to come
+	# forward again to reach the ground — so the limb has a shallow zigzag where it
+	# had a straight line, and the outline changes direction twice.
+	#
+	# The 0.006 of radius step at each joint is the second half and it costs
+	# nothing. A capsule's radius is linear along its spine, so a segment that
+	# *starts* fatter than the one above it ends leaves a small overhang, and the
+	# smooth union at a tight blend turns that overhang into a crease. That is the
+	# olecranon at the elbow and the accessory carpal at the wrist, and it is why
+	# the blends drop to 0.042 and 0.030 here where the shoulder's stays at 0.095.
+	var ff_u := _part(&"leg_fore_near_upper", Vector2(0.268, -0.712), Vector2(0.240, -0.470), 0.064, 0.058, COL_COAT, 2)
+	ff_u.blend = 0.095
+	var ff_l := _part(&"leg_fore_near_lower", Vector2(0.240, -0.470), Vector2(0.268, -0.186), 0.064, 0.044, COL_COAT, 2)
+	ff_l.blend = 0.042
+	# The pastern, and it is a real segment rather than a decoration. A dog is
+	# digitigrade: the metacarpus is a bone that stands nearly upright and carries
+	# a visible slope of ten to fifteen degrees off plumb, and it *flexes* — which
+	# is the part that matters here, because naming it `pastern` classifies it
+	# `Seg.CANNON` and promotes the whole chain from `LegIK.solve_two` to
+	# `solve_three`. The three-bone solver couples the fold at this joint to how
+	# compressed the leg is, so the wrist now gives a few degrees under load at
+	# each footfall instead of the leg being one rigid rod from elbow to toe.
+	# Measured off the bind pose the rest fold is 168°, so nothing about the
+	# standing silhouette changes; what changes is that the stride has a joint in
+	# it below the elbow.
+	var ff_c := _part(&"leg_fore_near_pastern", Vector2(0.268, -0.186), Vector2(0.296, -0.104), 0.050, 0.042, COL_COAT, 2)
+	ff_c.blend = 0.030
+	var ff_p := _part(&"paw_fore_near", Vector2(0.296, -0.104), Vector2(0.336, -0.050), 0.046, 0.050, COL_CREAM, 2)
 	ff_p.blend = 0.032
 	# Hind leg: one muscled haunch from hip to hock, then a rear pastern.
 	#
@@ -319,7 +394,7 @@ static func build() -> S:
 	hf_l.blend = 0.050
 	var hf_p := _part(&"paw_hind_near", Vector2(-0.478, -0.130), Vector2(-0.436, -0.050), 0.046, 0.050, COL_CREAM, 2)
 	hf_p.blend = 0.032
-	parts.append_array([ff_u, ff_l, ff_p, hf_u, hf_l, hf_p])
+	parts.append_array([ff_u, ff_l, ff_c, ff_p, hf_u, hf_l, hf_p])
 
 	# --- tail: sashio, the sickle carriage -----------------------------------
 	# The Shiba standard allows two tails, maki-o (curled) and sashio (sickle).
@@ -450,18 +525,25 @@ static func build() -> S:
 	eye_near.baby_radius_scale = 1.62
 	eye_near.baby_pupil_scale = 1.35
 
+	# Foreshortened rather than merely small, the same four terms as the cat's. A
+	# three-quarter head shows the far eye as a sliver behind the bridge of the
+	# nose: less ball, more lid over it, a deeper socket, and no catchlight,
+	# because the far cornea is not facing the key. Two eyes of the same shape at
+	# different sizes is the tell that says a face was assembled rather than seen.
 	var eye_far: E = E.new()
 	eye_far.id = &"eye_far"
 	eye_far.bone = &"head"
 	eye_far.center = Vector2(0.524, -1.086)
-	eye_far.radius = 0.024
-	eye_far.tilt = -0.36
+	eye_far.radius = 0.0196
+	eye_far.tilt = -0.48
 	eye_far.iris_ratio = 0.80
 	eye_far.pupil_ratio = 0.52
 	eye_far.pupil_slit = 0.0
-	eye_far.iris_color = Color(0.23, 0.13, 0.07)
-	eye_far.limbal_color = Color(0.04, 0.03, 0.02)
-	eye_far.socket_depth = 0.48
+	eye_far.iris_color = Color(0.19, 0.11, 0.06)
+	eye_far.limbal_color = Color(0.03, 0.02, 0.02)
+	eye_far.sclera_color = Color(0.72, 0.70, 0.68)
+	eye_far.lid_open = 0.76
+	eye_far.socket_depth = 0.70
 	eye_far.lid_palette_index = COL_COAT
 	eye_far.baby_radius_scale = 1.62
 	eye_far.baby_pupil_scale = 1.35

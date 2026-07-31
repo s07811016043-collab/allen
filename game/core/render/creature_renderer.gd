@@ -50,6 +50,9 @@ var _palette := PackedColorArray()
 var _bounds_min := Vector2.ZERO
 var _bounds_max := Vector2.ONE
 var _pixels_per_unit := 180.0
+## Depth separation between adjacent part layers, rig units. Measured off the
+## body mass every frame; see `_recompute_bounds`.
+var _layer_gap := 0.16
 
 ## Shading state driven by gameplay; see `set_shading_state`.
 var growth: float = 3.0
@@ -154,6 +157,8 @@ func _upload_static() -> void:
 	_mat.set_shader_parameter("coat_density", spec.coat_density)
 	_mat.set_shader_parameter("translucency", spec.translucency)
 	_mat.set_shader_parameter("roughness", spec.roughness)
+	_mat.set_shader_parameter("coat_density_family", _family_density())
+	_mat.set_shader_parameter("roughness_hard", _hard_roughness())
 	# Lashes are a mammal feature. A bird with eyelashes reads as a cartoon, and
 	# a gecko with them reads as a mistake.
 	var mammal: bool = spec.coat_surface == SDFPart.Surface.FUR
@@ -170,6 +175,49 @@ func _upload_static() -> void:
 	# invented on top, so the mammal one is switched off for them entirely rather
 	# than merely turned down.
 	_mat.set_shader_parameter("marking_strength", 1.0 if mammal else 0.0)
+
+
+## Per-family multiplier on `spec.coat_density`, packed (fur, feather, scale,
+## skin) for the body shader.
+##
+## One density serving four families is a contract gap, not a tuning miss: a
+## guard hair and a gecko's tubercle are an order of magnitude apart in pitch, so
+## the number that makes a coat read as fur asks bare skin for a pebble a fifth
+## of a pixel wide. The shader now floors the skin pitch in screen space so it can
+## never vanish outright, and this is the authoring lever on top of that.
+##
+## Read off the spec when it offers one, so the species files can take ownership
+## without this file changing again. `CreatureSpec` does not declare
+## `family_density: Vector4` yet; until it does, every species gets the house
+## default of "as authored". The type is checked rather than assumed, because a
+## field added later with a different shape should degrade to the default rather
+## than take the renderer down.
+func _family_density() -> Vector4:
+	if "family_density" in spec and typeof(spec.family_density) == TYPE_VECTOR4:
+		return spec.family_density
+	return Vector4.ONE
+
+
+## Absolute specular roughness for the two families lit as microfacet surfaces
+## rather than as fibres: (scale, skin).
+##
+## `spec.roughness` reaches fur and feather, both of which go through the hair
+## lobe. Scale and skin had their roughness written into the shader branch as a
+## literal, so a scaled or leathery species had no gloss lever at all — and the
+## reptile, whose problem *is* a specular problem, was reduced to moving parts
+## between surface families to change how shiny they are.
+##
+## Deliberately not a fraction of `spec.roughness`. A species that could not use
+## that number set it to whatever seemed harmless, so scaling by it would change
+## every non-fur surface in the project the moment this landed — the reptile's
+## 0.30 would have made the animal that already reads as brass 45% glossier.
+##
+## `CreatureSpec` does not declare `family_roughness: Vector2` yet; the type is
+## checked so a field added later with a different shape degrades to the default.
+func _hard_roughness() -> Vector2:
+	if "family_roughness" in spec and typeof(spec.family_roughness) == TYPE_VECTOR2:
+		return spec.family_roughness
+	return Vector2(0.26, 0.42)
 
 
 func _process(_delta: float) -> void:
@@ -189,10 +237,32 @@ func _process(_delta: float) -> void:
 func _recompute_bounds() -> void:
 	var mn := Vector2(INF, INF)
 	var mx := Vector2(-INF, -INF)
+	# The thickest body mass, folded into this loop rather than given a fourth
+	# pass over the parts. It sets `layer_gap`; see `_upload_dynamic`.
+	var core_r := 0.0
 	for p in live_parts:
 		var r: float = maxf(p.radius_a, p.radius_b) + p.blend
 		mn = mn.min(p.a - Vector2(r, r)).min(p.b - Vector2(r, r))
 		mx = mx.max(p.a + Vector2(r, r)).max(p.b + Vector2(r, r))
+		if p.layer == SDFPart.Layer.BODY:
+			core_r = maxf(core_r, maxf(p.radius_a, p.radius_b))
+	# How far apart the depth layers sit *toward the viewer*, which the cast-shadow
+	# trace in the body shader needs as a real distance and everything else here
+	# only ever needed as a sort order. A near foreleg rides on the front of the
+	# barrel, so it is genuinely proud of it — and with no separation at all it is
+	# a 0.05-unit tube trying to throw a shadow onto a 0.20-unit mass, which it
+	# cannot, so the highest-value read in the project silently does not exist.
+	#
+	# Half a radius, and the number is load-bearing rather than a guess, because
+	# the gap *is* the throw: a shadow leaving an occluder `g` above the surface it
+	# lands on is displaced by `g * |L.xy| / L.z` across the picture. At a full
+	# radius that put the near foreleg's mark a fifth of a body below and behind
+	# the leg, out on the low belly where the light had already gone, caught only
+	# by the widest tap at the weakest weight — measured against the previous
+	# build, the whole cast-shadow pass moved fewer than five levels of 255. Half a
+	# radius puts the mark tight against the limb that threw it, which is both
+	# where a photograph puts it and where it reads.
+	_layer_gap = maxf(core_r * 0.55, 0.02)
 	if not is_finite(mn.x):
 		mn = Vector2.ZERO
 		mx = Vector2.ONE
@@ -442,6 +512,7 @@ func _upload_dynamic() -> void:
 	_mat.set_shader_parameter("whisker_pad", _whisker_pad)
 	_mat.set_shader_parameter("bounds_min", _bounds_min)
 	_mat.set_shader_parameter("bounds_max", _bounds_max)
+	_mat.set_shader_parameter("layer_gap", _layer_gap)
 	_mat.set_shader_parameter("growth", growth)
 	_mat.set_shader_parameter("wetness", wetness)
 	_mat.set_shader_parameter("fluff", fluff)

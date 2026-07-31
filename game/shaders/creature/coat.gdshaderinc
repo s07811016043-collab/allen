@@ -259,7 +259,15 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// Three per cent is a hairless Sphynx, which is exactly what the blind reviewer
 	// called it. The floor now backs the contrast off by a third at the limit
 	// instead of by four fifths.
-	float amp = mix(0.62, 1.0, crisp);
+	// These three floors are how much contrast an UNDER-RESOLVED rung is still
+	// allowed to contribute. They were raised to 0.62 / 0.70 / 0.30 to make the
+	// coat carry further at ship size, and it backfired: a blind reviewer picked
+	// the previous build over that one at 260 px, because contrast in a rung
+	// finer than the pixel grid does not read as hair, it beats against the grid
+	// and reads as grain. Keep them low. If the coat needs to carry at ship size,
+	// it has to come from a COARSER rung, not from turning up a rung nobody can
+	// resolve.
+	float amp = mix(0.22, 1.0, crisp);
 	// How much of the fibre structure is allowed to *show*, which is a different
 	// question from how much of it is present, and the one that actually decides
 	// the ship-size read.
@@ -284,7 +292,7 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// it is fixed where it is made, in the dash length above. What is left here is
 	// the honest mip trade: a barely-resolved rung keeps most of its energy and
 	// loses a little of its bite.
-	float show = res * mix(0.70, 1.0, smoothstep(0.06, 0.46, crisp));
+	float show = res * mix(0.18, 1.0, smoothstep(0.06, 0.46, crisp));
 	// The specular break-up gets its own, lower weight, and the asymmetry is the
 	// point. Occlusion is a bounded multiply on albedo, so an unresolved fibre
 	// averages honestly to the mean and the coat simply gets smoother. A specular is
@@ -346,7 +354,7 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// several strands at the sampling limit is a broad stripe. Raised only as far as
 	// the strands under it can now justify — with real tooth beneath it the lock
 	// reads as the coat parting rather than as banding.
-	float lock_amp = mix(0.30, 1.0, crisp);
+	float lock_amp = mix(0.14, 1.0, crisp);
 	float part = mix(1.0 - 0.34 * lock_amp, 1.0, lock);
 
 	Coat c;
@@ -769,7 +777,19 @@ Surf pet_scale(float arc, float v, vec2 parallax, float density, float px) {
 // always the smallest skin volume on the animal.
 Surf pet_skin(vec2 p, float density, float px, float wet) {
 	Surf s;
-	float pitch = 210.0 * density;
+	// Floored in *screen* pitch, exactly the way `pet_scale` and `pet_feather`
+	// already floor theirs, and skin was the one family missing it.
+	//
+	// That omission was arithmetic, not taste. The fade below wants two to five
+	// screen pixels per pebble; at the density a coat needs to read as fur — the
+	// same number both families are handed — a pebble is a fifth of a pixel at
+	// every size this pet is ever drawn, so `fade` is identically zero and the
+	// whole function returns "no surface at all". A reptile's hide could not
+	// resolve its pebbling at any zoom, and no amount of species authoring could
+	// have reached it. The floor costs the pebbles being scale-locked rather than
+	// rig-locked at the small end, which is the same trade the other two families
+	// make and the cheaper of the two errors by a wide margin.
+	float pitch = min(210.0 * density, px / 5.0);
 	float fade = smoothstep(2.0, 5.0, px / pitch);
 
 	vec2 w1 = pet_worley(p * pitch);

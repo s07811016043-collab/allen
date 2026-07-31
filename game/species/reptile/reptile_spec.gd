@@ -129,12 +129,15 @@ static func build() -> S:
 	])
 
 	s.adult_height = 1.0
-	# The lowest of any species we ship, and it has to be. This animal is 5.6
-	# units long where the cat is 1.9, so matching the cat's 190 px/unit would
-	# draw a pet 1070 px wide. 118 puts it at ~665 px long and 118 px tall — the
-	# widest footprint on the desktop, which is honest for a lizard, without
-	# being a piece of furniture.
-	s.pixels_per_unit = 118.0
+	# The lowest of any species we ship, and it has to be. This animal is 4.6 units
+	# long where the cat is 1.9, so matching the cat's 190 px/unit would draw a pet
+	# 875 px wide. 132 puts it at ~605 px long and 132 px tall — the widest
+	# footprint on the desktop, which is honest for a lizard, without being a piece
+	# of furniture. Up from 118 because the tail is 1.6 units shorter than it was
+	# and the *width* was the binding constraint, not the height: the old animal was
+	# 665 px wide and 118 tall, which is why every feature on it was too small to
+	# read at the size the pet ships at.
+	s.pixels_per_unit = 132.0
 
 	s.coat_surface = P.Surface.SCALE
 	# Zero, not "small". A scale is not a fibre standing off the body; it is the
@@ -190,17 +193,32 @@ static func build() -> S:
 
 	s.locomotion = S.Locomotion.SPRAWLING
 	# On-screen speed, not real-world speed, is what a desktop pet is judged on:
-	# 1.30 × 118 px is 153 px/s, within a whisker of the cat's 162. The difference
-	# the player sees is in the *step*, not the pace — 1.30/0.52 is 2.5 Hz against
-	# the cat's 2.0, so the dragon scuttles where the cat flows.
+	# 1.30 × 132 px is 172 px/s, a little over the cat's 162. The difference the
+	# player sees is in the *step*, not the pace — 1.30/0.52 is 2.5 Hz against the
+	# cat's 2.0, so the dragon scuttles where the cat flows.
+	#
+	# `run_speed` is down from 4.60 and it is not a speed decision, it is the
+	# undulation amplitude. `Gait` writes the lateral wave as
+	#
+	#     undulation = sin(TAU * cycle) * (0.10 + 0.16 * exertion)
+	#     exertion   = current speed / run_speed
+	#
+	# so the *ratio* of the two speeds is what decides how hard a walking lizard
+	# writhes. At 1.30 over 4.60 a walk ran at 0.28 exertion and 0.145 rad of wave;
+	# at 1.30 over 3.30 it runs at 0.39 and 0.163. On screen the sprint barely
+	# changes — 3.30 × 132 is 436 px/s against the old 4.60 × 118 = 543 — and the
+	# walk, which is what the pet does almost all of the time, gains 12% of wave on
+	# top of the 22% the shorter tail buys in frame scale.
 	s.walk_speed = 1.30
-	s.run_speed = 4.60
+	s.run_speed = 3.30
 	s.stride = 0.52
-	# A third of the cat's. A sprawling animal carries its weight on splayed limbs
-	# and pays for it by keeping the trunk almost dead level; the motion that
-	# should read is the lateral wave `Gait` writes into `undulation`, and any
-	# vertical bob competing with it makes the walk look mammalian.
-	s.bob = 0.022
+	# Half the cat's. A sprawling animal carries its weight on splayed limbs and
+	# pays for it by keeping the trunk nearly level; the motion that should read is
+	# the lateral wave, and a vertical bob competing with it makes the walk look
+	# mammalian. Raised from 0.022 all the same — at that value the trunk was
+	# rigid to within two rendered pixels a stride, and a completely level trunk
+	# does not read as restraint, it reads as a prop being slid along the floor.
+	s.bob = 0.034
 	# It climbs by hooking claws into a texture, not by leaping — which is exactly
 	# what `can_climb` without `jump_height` describes.
 	s.jump_height = 0.90
@@ -292,15 +310,21 @@ static func build() -> S:
 	# fore behind near fore, far hind behind near hind. Mirroring them exactly is
 	# the obvious thing and it hides two of the four legs completely; offsetting
 	# them is what lets a viewer count to four without effort.
+	#
+	# Both far feet are gone and their slots bought the eye its lids. The wrist was
+	# argued for above on IK grounds and the *foot* was never part of that argument:
+	# `LegIK` only ever solves UPPER, LOWER and CANNON, so a far foot is geometry
+	# and nothing else, and at 260 px it is four pixels of coat-shadow brown lying
+	# under a body that is already casting coat-shadow brown onto it. Dropping it
+	# also matches the two chains — near and far both resolve to a two-bone solve —
+	# where before the near pair carried a FOOT bone the far pair did not.
 	var ff_u := _part(&"leg_fore_far_upper", Vector2(0.42, -0.545), Vector2(0.62, -0.335), 0.070, 0.054, COL_HIDE_DARK, 0)
-	var ff_l := _part(&"leg_fore_far_lower", Vector2(0.62, -0.335), Vector2(0.28, -0.150), 0.054, 0.042, COL_HIDE_DARK, 0)
-	var ff_f := _part(&"leg_fore_far_foot", Vector2(0.28, -0.150), Vector2(0.46, -0.058), 0.042, 0.030, COL_HIDE_DARK, 0)
+	var ff_l := _part(&"leg_fore_far_lower", Vector2(0.62, -0.335), Vector2(0.33, -0.042), 0.054, 0.042, COL_HIDE_DARK, 0)
 	var hf_u := _part(&"leg_hind_far_upper", Vector2(-1.24, -0.545), Vector2(-1.64, -0.378), 0.084, 0.062, COL_HIDE_DARK, 0)
-	var hf_l := _part(&"leg_hind_far_lower", Vector2(-1.64, -0.378), Vector2(-1.36, -0.168), 0.062, 0.048, COL_HIDE_DARK, 0)
-	var hf_f := _part(&"leg_hind_far_foot", Vector2(-1.36, -0.168), Vector2(-1.14, -0.062), 0.048, 0.034, COL_HIDE_DARK, 0)
-	for p in [ff_u, ff_l, ff_f, hf_u, hf_l, hf_f]:
+	var hf_l := _part(&"leg_hind_far_lower", Vector2(-1.64, -0.378), Vector2(-1.22, -0.044), 0.062, 0.044, COL_HIDE_DARK, 0)
+	for p in [ff_u, ff_l, hf_u, hf_l]:
 		p.blend = 0.036
-	parts.append_array([ff_u, ff_l, ff_f, hf_u, hf_l, hf_f])
+	parts.append_array([ff_u, ff_l, hf_u, hf_l])
 
 	# --- trunk --------------------------------------------------------------
 	# Three capsules on one nearly flat axis. A cat's back dips behind the
@@ -389,7 +413,35 @@ static func build() -> S:
 	var chin := _part(&"chin", Vector2(0.80, -0.700), Vector2(1.30, -0.745), 0.118, 0.060, COL_LIP)
 	chin.blend = 0.020
 	chin.height_scale = 1.02
-	parts.append_array([skull, cheek, muzzle, chin])
+	# --- the orbit ------------------------------------------------------------
+	# The review asked for "an eye with an actual lid", and the previous eye did
+	# have one — `lid_open` at 0.84 draws a real upper margin over the ball. What
+	# it did not have was a *socket*: the disc sat on a smooth cheek with nothing
+	# around it, which is a bead pressed into clay rather than an eye in a head.
+	#
+	# On a beardie the orbit is the loudest thing on the face. The supraorbital
+	# scales stand up into a hard brow with a straight top edge, the lower lid is a
+	# thick granular fold, and both are markedly darker than the cheek — which is
+	# how the animal gets the flat, hooded, faintly disapproving expression it is
+	# kept for.
+	#
+	# Both capsules are authored to be *engulfed* rather than to union: buried
+	# inside the skull by 0.054, which is three times the shader's burial gate for
+	# a part this size, so they take the marking path and paint with a one-blend
+	# edge instead of adding a lump. That also means the colour has to be far
+	# enough from the hide's to clear `distinct` — 0.31 of RGB distance against a
+	# 0.06 floor — which is why they carry the far-side brown and not the keratin
+	# slot the rest of the head furniture uses.
+	#
+	# `height_scale` keeps a little relief on the brow and less on the lid: the
+	# ridge is a real ridge and the lid is a fold of skin.
+	var brow := _part(&"eye_brow_near", Vector2(0.772, -0.908), Vector2(0.918, -0.898), 0.028, 0.020, COL_HIDE_DARK)
+	brow.blend = 0.014
+	brow.height_scale = 0.82
+	var lid := _part(&"eye_lid_near", Vector2(0.788, -0.792), Vector2(0.908, -0.800), 0.026, 0.018, COL_HIDE_DARK)
+	lid.blend = 0.014
+	lid.height_scale = 0.66
+	parts.append_array([skull, cheek, muzzle, chin, brow, lid])
 
 	# --- gular pouch --------------------------------------------------------
 	# The beard. Kept in the BODY layer and overlapped into the throat so it
@@ -467,12 +519,36 @@ static func build() -> S:
 	# Landmark steering again: the first joint sits at -2.10 rather than further
 	# back so its root falls inside the hind leg's cluster. Past about -2.20 it
 	# claims a landmark slot of its own and a scapula dome lands on the tail.
-	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.10, -0.556), 0.250, 0.168, COL_HIDE)
+	#
+	# The tail is 1.62 units of x shorter than it was, and it is the single change
+	# with the most effect on this species, because it is not really about the tail.
+	# The harness fits the settled pose to the frame, so the *longest* dimension
+	# decides the scale of everything else. At a 5.60-unit span the animal was drawn
+	# at 43.6 px per rig unit on a 260 px frame — a 43 px-tall lizard in the middle
+	# of a square, with two thirds of the picture spent on a taper. Everything the
+	# review asks for on this animal is a thing you have to be able to see: the
+	# undulation, the squamation, the eye. All three are bought with the same
+	# number.
+	#
+	# The length is not thrown away, it is *carried differently*. A Pogona's tail is
+	# about as long as its snout-vent, and this one still is — 2.35 units of arc
+	# against a 3.29 SVL — but it now rises through the last two segments instead of
+	# trailing dead flat, so the arc spends part of itself on y where the frame has
+	# room. A resting beardie carries the last third of its tail clear of the
+	# ground anyway; flat on the floor is the sleeping pose, not the standing one.
+	# Span goes 5.60 → 4.58, which is 53 px per unit at ship size, a 22% gain on
+	# every feature the animal has.
+	#
+	# Landmark steering is unchanged and it is the constraint that fixes the first
+	# joint: at -2.02 the tail's root still falls inside the hind leg's cluster, and
+	# past about -2.20 it claims a landmark slot of its own and the renderer stamps
+	# a scapula dome on the tail.
+	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.02, -0.598), 0.250, 0.170, COL_HIDE)
 	tail_0.blend = 0.070
 	tail_0.height_scale = 1.02
-	var tail_1 := _part(&"tail_1", Vector2(-2.10, -0.556), Vector2(-3.06, -0.360), 0.168, 0.076, COL_TAILBAND)
+	var tail_1 := _part(&"tail_1", Vector2(-2.02, -0.598), Vector2(-2.66, -0.486), 0.170, 0.084, COL_TAILBAND)
 	tail_1.blend = 0.048
-	var tail_2 := _part(&"tail_2", Vector2(-3.06, -0.360), Vector2(-4.16, -0.108), 0.076, 0.020, COL_HIDE)
+	var tail_2 := _part(&"tail_2", Vector2(-2.66, -0.486), Vector2(-3.16, -0.288), 0.084, 0.020, COL_HIDE)
 	tail_2.blend = 0.026
 	parts.append_array([tail_0, tail_1, tail_2])
 

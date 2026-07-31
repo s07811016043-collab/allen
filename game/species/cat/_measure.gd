@@ -27,11 +27,20 @@ const FORE_IDS := [&"leg_fl_upper", &"leg_fl_lower", &"paw_fl"]
 const HIND_IDS := [&"leg_bl_upper", &"leg_bl_lower", &"leg_bl_hock", &"paw_bl"]
 const TRUNK_IDS := [&"hip", &"torso", &"chest", &"belly", &"brisket"]
 
-## Distal part of each limb, near then far. The far pair has no paw of its own —
-## its shank runs to the floor — so "where does this leg touch down" cannot be
-## asked by part name alone.
-const FEET := [&"paw_fl", &"leg_fl_far_lower", &"paw_bl", &"leg_bl_far_hock"]
+## Distal part of each limb, near then far. Neither far limb has a paw or a
+## cannon of its own — each is two capsules and the second runs to the floor —
+## so "where does this leg touch down" cannot be asked by part name alone.
+const FEET := [&"paw_fl", &"leg_fl_far_lower", &"paw_bl", &"leg_bl_far_lower"]
 const FEET_LABELS := ["FN", "FF", "HN", "HF"]
+
+## The ratio the height field digs a groove at, and the ceiling found by capture
+## on the dog: a thin capsule unioned along a fat one has its radius biased
+## toward the fat one with a strength running on `(R_fat − R_thin)/(R_fat +
+## R_thin)`, and past about 0.36 the bias carves a channel whose two walls light
+## as the white streak and the black stipple the review reported on all four
+## species. Printed per stage because `Growth` scales the two radii by different
+## per-part curves and the ratio is not stage-invariant.
+const RATIO_CEILING := 0.36
 
 ## Pixels per rig unit on the shipped 260 px frame. Measured, not assumed: the
 ## harness fits the settled pose to the frame, so an adult cat's 1.391 units of
@@ -120,6 +129,39 @@ func _report(spec: CreatureSpec, g: float) -> void:
 		_paw_x(by, FEET[2]) - _paw_x(by, FEET[3])])
 	_report_gaps(live, withers)
 	_report_front(live, withers)
+	_report_belly(by)
+
+
+## The belly capsule against the trunk it hangs from, at both of its ends. The
+## number that has to stay under `RATIO_CEILING` at every stage.
+func _report_belly(by: Dictionary) -> void:
+	var belly: SDFPart = by.get(&"belly")
+	if belly == null:
+		return
+	var line := "       belly ratio:"
+	var worst := 0.0
+	for end_a in [true, false]:
+		var pt: Vector2 = belly.a if end_a else belly.b
+		var thin: float = belly.radius_a if end_a else belly.radius_b
+		# The trunk capsule directly above this end, found by sampling rather than
+		# named, so the probe keeps working when the trunk is re-cut.
+		var fat := 0.0
+		for id in [&"hip", &"torso", &"chest"]:
+			var t: SDFPart = by.get(id)
+			if t == null:
+				continue
+			for i in 17:
+				var u: float = float(i) / 16.0
+				var c: Vector2 = t.a.lerp(t.b, u)
+				if absf(c.x - pt.x) > 0.02:
+					continue
+				fat = maxf(fat, lerpf(t.radius_a, t.radius_b, u))
+		if fat <= 0.0:
+			continue
+		var ratio: float = (fat - thin) / (fat + thin)
+		worst = maxf(worst, ratio)
+		line += "  %s r=%.3f vs trunk %.3f -> %.2f" % ["a" if end_a else "b", thin, fat, ratio]
+	print("%s | %s" % [line, "OK" if worst <= RATIO_CEILING else "GROOVES"])
 
 
 ## Daylight inside each leg pair, which is the whole of review item 1.
@@ -134,7 +176,7 @@ func _report_gaps(live: Array[SDFPart], withers: float) -> void:
 	var near_fore: Array[SDFPart] = _group(live, ["leg_fl_lower", "paw_fl"])
 	var far_fore: Array[SDFPart] = _group(live, ["leg_fl_far_lower"])
 	var near_hind: Array[SDFPart] = _group(live, ["leg_bl_lower", "leg_bl_hock", "paw_bl"])
-	var far_hind: Array[SDFPart] = _group(live, ["leg_bl_far_lower", "leg_bl_far_hock"])
+	var far_hind: Array[SDFPart] = _group(live, ["leg_bl_far_lower"])
 	# The far fore sits behind the near fore and the far hind ahead of the near
 	# hind, so each pair is asked the question that way round.
 	_print_gap("fore", near_fore, far_fore, true, withers)

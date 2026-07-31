@@ -44,11 +44,56 @@ uniform vec2 bounds_max = vec2(1.0);
 // density and not the spec's nominal value.
 uniform float px_per_unit = 180.0;
 
+// How far apart, toward the viewer, two adjacent depth layers sit — in rig
+// units, uploaded by `CreatureRenderer` from the thickest body mass.
+//
+// The three layers are a sort order everywhere else in this file, which is all
+// the compositor needs. The cast-shadow trace needs a real number: a near
+// foreleg standing on the same plane as the chest is only 0.05 units tall and
+// could never throw anything onto a 0.20-unit barrel, so with no separation the
+// one shadow the reviewer ranks highest simply does not exist. Hung off the body
+// mass because that is physically what it is — the near limb rides on the front
+// of the barrel — and the size of it is set by how far the shadow then throws;
+// see where `CreatureRenderer` computes it.
+uniform float layer_gap = 0.16;
+
 uniform int coat_surface = 0;
 uniform float coat_length : hint_range(0.0, 0.2) = 0.02;
 uniform float coat_density : hint_range(0.1, 8.0) = 1.0;
 uniform float translucency : hint_range(0.0, 1.0) = 0.35;
 uniform float roughness : hint_range(0.02, 1.0) = 0.55;
+
+// Per-family micro-surface pitch, as a multiplier on `coat_density`, packed
+// (fur, feather, scale, skin).
+//
+// One density cannot serve four families whose natural pitches are an order of
+// magnitude apart. A guard hair is a tenth of a millimetre and a gecko's
+// tubercle is a whole one, so a species that sets `coat_density` to make its fur
+// read has thereby set its bare skin to a pitch nothing can resolve — not a
+// tuning miss but arithmetic: `pet_skin` wants two to five screen pixels per
+// pebble and at fur density it asks for a fifth of a pixel at every size this pet
+// is ever drawn. `pet_skin` now floors its own pitch in screen space, the way
+// `pet_scale` and `pet_feather` always did, so the failure cannot recur silently;
+// this is the authoring lever on top of that.
+uniform vec4 coat_density_family = vec4(1.0, 1.0, 1.0, 1.0);
+
+// Specular roughness for the two families that are not lit as fibres, absolute
+// rather than as a multiplier: (scale, skin).
+//
+// `roughness` above reaches the fur *and* feather lobes, because both go through
+// `pet_hair_spec`. Scale and skin went through the microfacet branch below with
+// their roughness written into the branch as a literal, so a scaled or leathery
+// species had no gloss lever at all — and on the reptile, whose whole "reads as
+// brass" problem is a specular problem, the only lever left was which family each
+// part declared.
+//
+// Absolute and not a fraction of `roughness`, which matters: species that could
+// not use `roughness` set it to whatever looked harmless — the reptile's is 0.30,
+// noted in its own file as "left at a sane value so nothing keys off a garbage
+// number" — so scaling by it would have made exactly the animal that reads as
+// metal 45% glossier. The defaults are the literals this branch used to carry, so
+// every shipped species renders unchanged until it says otherwise.
+uniform vec2 roughness_hard = vec2(0.26, 0.42);
 
 // Coat markings. A wild-type mammal coat is never one flat colour, and the
 // second pigment is already in every species palette — it is the shade the
@@ -126,6 +171,8 @@ uniform bool defer_tonemap = false;
 //     channel: which term drew the line   17 `region`, `decal_w`, decal dome
 //  15 coat `res`, `crisp`, `px_groom`      18 fwidth of the gradient and of the
 //                                             normal: where the field is lying
+//  19 part-to-part cast shadow, flat  21 the two heights the near shadow tap
+//  20 which depth layer is receiving      compares: terrain red, receiver green
 uniform int debug_view = 0;
 
 const int MAT_FUR = 0;
@@ -557,6 +604,86 @@ float layer_occlude(Field occ, float reach, float depth) {
 }
 
 // ---------------------------------------------------------------------------
+// Cast shadow, part onto part
+//
+// The height field this shader already lifts is a real surface, so the shadow one
+// part throws onto another is a heightfield march toward the key and nothing more
+// exotic. It buys the three reads nothing else here can reach — the foreleg on
+// the chest, the jaw on the throat, the head on the shoulder — because none of
+// them is a crease (so `f.crease` never sees them) and none of them is purely
+// between depth layers (so `layer_shadow` never saw them either). It is the one
+// term that says two parts are at different distances from the light rather than
+// merely at different distances from the viewer.
+//
+// Cost is why it is shaped the way it is, and this ships on integrated GPUs:
+//
+//   * The terrain along the ray does not depend on which layer is *receiving*,
+//     so the march runs once per pixel in `fragment()` and all three layers read
+//     the same three numbers. That is a third of the obvious cost straight away.
+//   * The taps are the inner loop, so everything per-part — the uniform fetches,
+//     the spine vector, its inverse length — is hoisted out of them.
+//   * The terrain is a hard max of the parts' own cross-sections rather than the
+//     smooth union. A blend only ever *adds* material, so the max is never taller
+//     than the truth, and a shadow is the one consumer that does not care about
+//     the seam a hard max leaves.
+//
+// What lands is one extra pass over the part array per pixel, against the three
+// heavy passes `eval_layer` already makes.
+// ---------------------------------------------------------------------------
+
+// Where the three taps sit along the ray, as fractions of the trace's reach.
+// Geometric rather than even: a contact shadow is decided almost entirely in the
+// first tenth of the march, and the far tap is only there to catch a whole limb.
+const float SHADOW_T0 = 0.13;
+const float SHADOW_T1 = 0.42;
+const float SHADOW_T2 = 1.0;
+
+// Top of one tapered capsule at `q`, in the trace's layer-separated depth.
+//
+// The cross-section is `r*r - dist*dist`, which falls out of `-d*(2r+d)` and so
+// needs no second distance-to-spine. It is negative outside the capsule, and
+// *that* case has to return "no surface here" rather than "a surface of zero
+// height" — the two are the same number only when the layer base is zero.
+//
+// Getting it wrong is instructive enough to keep the note. Returning `lz` for an
+// empty sample laid a flat slab at the front layer's depth across the whole
+// frame, so every pixel on the animal came back fully shadowed by an ear it was
+// nowhere near, and the cast shadow covered the entire cat. Rendering the two
+// compared heights in separate channels showed it in one capture: the terrain
+// channel was uniformly bright *off* the body as well as on it, which no
+// arrangement of real capsules can produce.
+float part_top(vec2 q, vec2 a, vec2 ba, float ibb, vec2 rr, float hs, float lz) {
+	vec2 pa = q - a;
+	float t = clamp(dot(pa, ba) * ibb, 0.0, 1.0);
+	float r = mix(rr.x, rr.y, t);
+	float d = length(pa - ba * t) - r;
+	float h2 = -d * (2.0 * r + d);
+	return h2 > 0.0 ? lz + sqrt(h2) * hs : -1e3;
+}
+
+// Terrain height at the three tap points, in the layer-separated depth the trace
+// works in. `dxy` is the full-reach step in the plane.
+vec3 trace_heights(vec2 p, vec2 dxy) {
+	vec2 q0 = p + dxy * SHADOW_T0;
+	vec2 q1 = p + dxy * SHADOW_T1;
+	vec2 q2 = p + dxy * SHADOW_T2;
+	vec3 h = vec3(-1e3);
+	for (int i = 0; i < MAX_PARTS; i++) {
+		if (i >= part_count) { break; }
+		vec4 g0 = parts[i * 3 + 0];
+		vec4 g1 = parts[i * 3 + 1];
+		float lz = (floor(parts[i * 3 + 2].x / 16.0) - 1.0) * layer_gap;
+		vec2 a = g0.xy;
+		vec2 ba = g0.zw - a;
+		float ibb = 1.0 / max(dot(ba, ba), 1e-7);
+		h.x = max(h.x, part_top(q0, a, ba, ibb, g1.xy, g1.w, lz));
+		h.y = max(h.y, part_top(q1, a, ba, ibb, g1.xy, g1.w, lz));
+		h.z = max(h.z, part_top(q2, a, ba, ibb, g1.xy, g1.w, lz));
+	}
+	return h;
+}
+
+// ---------------------------------------------------------------------------
 // Shading
 // ---------------------------------------------------------------------------
 
@@ -568,6 +695,14 @@ struct LayerCtx {
 	float soften;   // antialias width multiplier, for depth softening
 	float detail;   // 0 = defocused, 1 = crisp: scales micro-surface and fringe
 	float body_h;   // creature height in rig units, for scale-free falloffs
+	// Terrain height at the three cast-shadow taps, shared by all three layers,
+	// and where this layer's own surface sits in that depth. See `trace_heights`.
+	vec3  occ_h;
+	float layer_z;
+	// Ray geometry for the same trace: the height the ray gains over the full
+	// reach, and the reach itself, both in rig units.
+	float ray_rise;
+	float ray_reach;
 };
 
 vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
@@ -754,7 +889,8 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		// A receded layer gets its individual hairs taken away, not just blurred:
 		// you cannot resolve a strand on the far side of an animal, and leaving
 		// the fringe crisp back there is a depth cue pointing the wrong way.
-		float spikes = pet_fur_fringe(p, f.grad, groom_s, coat_density,
+		float spikes = pet_fur_fringe(p, f.grad, groom_s,
+			coat_density * coat_density_family.x,
 			px_per_unit, ctx.detail, cover);
 		// How far in from the outline the fringe is allowed to disturb the field.
 		// Budgeted against the part's own radius as well as the coat length,
@@ -805,6 +941,45 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	float u_res = 1.0 - 1.0 / max(R * px_per_unit, 2.0);
 	float su_min = sqrt(max(1.0 - u_res * u_res, 1e-4));
 	float su = sqrt(max(1.0 - u * u, 0.0));
+
+	// --- cast shadow --------------------------------------------------------
+	// Where this pixel's surface sits in the trace's depth, plus a bias along it.
+	// The bias is doing one specific job: a convex body self-occludes at first
+	// order at exactly the point `n·L` changes sign, so an unbiased march
+	// re-draws the terminator the wrapped diffuse has already been tuned to
+	// soften, and the animal comes back wearing a hard line down the middle of
+	// every limb. A hundredth of a body keeps the trace out of the terminator and
+	// still catches a jaw a tenth of a body above a throat.
+	float z0 = ctx.layer_z + R * su * f.height_scale + ctx.body_h * 0.012;
+	// Penumbra half-width, opening along the ray. A shadow edge is sharp against
+	// its own occluder and soft a body-part away from it, and having that
+	// gradient is most of what separates a cast shadow from a painted patch.
+	vec3 pen = ctx.body_h * vec3(0.013, 0.040, 0.090);
+	vec3 dz = ctx.occ_h
+		- (z0 + ctx.ray_rise * vec3(SHADOW_T0, SHADOW_T1, SHADOW_T2));
+	// Hardest occluder wins rather than the sum: three taps that all land on the
+	// same limb are one shadow, and adding them makes a limb three times as
+	// opaque as a jaw. The near tap counts for most, which is contact hardening.
+	float cast_occ = max(max(smoothstep(-pen.x, pen.x, dz.x),
+		smoothstep(-pen.y, pen.y, dz.y) * 0.82),
+		smoothstep(-pen.z, pen.z, dz.z) * 0.58);
+	// Backed off on a receded layer. A far limb already carries two occlusion
+	// terms and a haze pivot, and the whole budget back there is about a third of
+	// the light — stacking a full cast shadow on it is how it becomes a cut-out.
+	float cast_sh = 1.0 - cast_occ * 0.76 * (1.0 - ctx.atmos * 0.45);
+	// Flat greyscale on purpose. This term's failure mode is "covers the whole
+	// animal", and a second channel next to it is exactly what made that hard to
+	// see the first time: an orange body reads as an orange body, not as red one
+	// plus green a half.
+	if (debug_view == 19) { dbg = vec3(cast_occ); }
+	if (debug_view == 20) { dbg = vec3(ctx.layer_z / max(layer_gap, 1e-4) * 0.5 + 0.5); }
+	// The two heights the near tap compares, one per channel, on a common scale.
+	// Red taller than green is a shadow; the pair says *why* rather than *that*.
+	if (debug_view == 21) {
+		float sc = 1.0 / max(ctx.body_h * 0.30, 1e-4);
+		dbg = vec3(max(ctx.occ_h.x, 0.0) * sc,
+			(R * su * f.height_scale) * sc, ctx.ray_rise * SHADOW_T0 * sc);
+	}
 	// Scaled by the field's own gradient length, which is the whole of the shared
 	// belly seam and of the starbursts radiating from every capsule cap.
 	//
@@ -1054,10 +1229,11 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 			// authored pitch so the lanes are legible at review zoom. If these run
 			// parallel from nose to tail the coat is wood grain; if they sweep down
 			// the ribs and turn at the shoulder it is a pelt.
-			float lanes = step(0.5, fract(t.y * 48.0 * coat_density * 0.25));
+			float lanes = step(0.5, fract(t.y * 48.0
+				* coat_density * coat_density_family.x * 0.25));
 			dbg = vec3(lanes);
 		}
-		Coat c = pet_fur(t, across_s, coat_density, px_groom,
+		Coat c = pet_fur(t, across_s, coat_density * coat_density_family.x, px_groom,
 			fluff * (1.0 - wetness * 0.7));
 		nxy += c.slope * ctx.detail * frame_ok;
 		micro_occ = mix(1.0, c.occ, ctx.detail * frame_ok);
@@ -1072,7 +1248,8 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		coat_crisp = c.crisp * frame_ok;
 		if (debug_view == 15) { dbg = vec3(c.res, c.crisp, px_groom / 600.0); }
 	} else if (mat == MAT_FEATHER) {
-		Surf s = pet_feather(arc, row_s, u, coat_density, px_per_unit);
+		Surf s = pet_feather(arc, row_s, u,
+			coat_density * coat_density_family.y, px_per_unit);
 		// Gated on `band_ok` for the same reason the fur's relief is: the barb lanes
 		// are written in `arc`, so wherever `arc` stalls they are contour lines round
 		// a stall point rather than vanes. The feather path never had this guard,
@@ -1084,7 +1261,8 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		spec_mul = mix(1.0, s.spec, band_ok);
 		irid = s.extra * band_ok;
 	} else if (mat == MAT_SCALE) {
-		Surf s = pet_scale(arc, row_s, nxy, coat_density, px_per_unit);
+		Surf s = pet_scale(arc, row_s, nxy,
+			coat_density * coat_density_family.z, px_per_unit);
 		// Same guard: squamation rows are indexed off `arc` too, and a lizard with
 		// its plates spiralling round a stall point reads as a machined thread.
 		nxy += (s.slope.x * across + s.slope.y * f.grad) * band_ok;
@@ -1095,7 +1273,7 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		// A nose is always the smallest bare volume on the animal, and it is the
 		// only one that is wet; paw pads and bellies are matte leather.
 		float nose = 1.0 - smoothstep(0.014, 0.045, R);
-		Surf s = pet_skin(p, coat_density, px_per_unit,
+		Surf s = pet_skin(p, coat_density * coat_density_family.w, px_per_unit,
 			max(wetness, nose * 0.9));
 		nxy += s.slope;
 		micro_occ = s.occ;
@@ -1431,7 +1609,12 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	// past three, and a species whose underside is one big downward-facing capsule,
 	// like the dog, comes out with a black plate bolted under it — a different
 	// wrong answer from a pale slab, not a better one.
-	float key_occ = ctx.shadow * mix(1.0, 0.58, slot);
+	// `min`, never a product. Both terms answer the same question — how much key
+	// reaches here — and the layer terms above are a coarse standing estimate of
+	// what the trace now measures properly, so multiplying them counts the same
+	// occluder twice and takes a far leg past the black the depth pass spent a
+	// whole round climbing back out of.
+	float key_occ = min(ctx.shadow, cast_sh) * mix(1.0, 0.58, slot);
 	float sky_occ = ao * ground_ao * mix(1.0, 0.46, slot);
 
 	// --- lighting -----------------------------------------------------------
@@ -1582,8 +1765,14 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 			spec += sheen * pow(1.0 - ang, 2.4) * irid * 0.55;
 		}
 	} else {
-		float rough = mat == MAT_CLAW ? 0.16 : (mat == MAT_SCALE ? 0.26 : 0.42);
-		rough = mix(rough, 0.09, wet_film);
+		// Keratin is keratin on every animal, so a claw keeps a house constant;
+		// scale and skin gloss are species decisions and now come in as uniforms.
+		// A lizard that wants to stop reading as cast brass can say so directly
+		// instead of having to move parts between surface families to do it.
+		const float ROUGH_CLAW = 0.16;
+		float rough = mat == MAT_CLAW ? ROUGH_CLAW
+			: (mat == MAT_SCALE ? roughness_hard.x : roughness_hard.y);
+		rough = clamp(mix(rough, 0.09, wet_film), 0.02, 1.0);
 		vec3 h = normalize(L + V);
 		float a = max(rough * rough, 1e-3);
 		float ndh = max(dot(n, h), 0.0);
@@ -1663,6 +1852,33 @@ void fragment() {
 	vec2 lxy = pet_key_dir().xy;
 	float reach = body_h * 0.085;
 
+	// The cast-shadow march, once for the whole pixel. Reach is a third of a body
+	// height: past that the occluder is a different part of the animal entirely
+	// and the penumbra has opened so wide there is nothing left to read.
+	//
+	// The ray is the key, *flattened* toward the picture plane, and that number is
+	// the one this term lives or dies on. Measured on the dog before it existed,
+	// the whole cast-shadow pass moved fewer than five levels out of 255 anywhere
+	// on the body, and the arithmetic says why: the house key sits at z = 0.64, so
+	// it climbs 0.83 units of height for every unit it travels across the picture,
+	// while the animal's own height field only spans about 0.2 from belly to
+	// spine. A ray that outruns the terrain that fast clears everything, so
+	// nothing is ever behind anything. It is the same statement as "a light beside
+	// the camera casts no shadows you can see", and it is true — but this height
+	// field is a 2.5D fiction standing in for a solid animal, and in the solid
+	// animal the head really is in front of the shoulder along that ray.
+	//
+	// So the trace uses a light laid down toward the plane while everything that
+	// shades the surface keeps the real one. That is the same deliberate overdrive
+	// the layer separation below is built on, made for the same reason: a
+	// physically honest separation between two things five centimetres apart is
+	// invisible, and the brief is that a viewer must be able to read the form.
+	const float SHADOW_FLATTEN = 0.34;
+	vec3 kd = normalize(vec3(pet_key_dir().xy, pet_key_dir().z * SHADOW_FLATTEN));
+	float cast_reach = body_h * 0.30;
+	vec3 occ_h = trace_heights(p, kd.xy * cast_reach);
+	float ray_rise = kd.z * cast_reach;
+
 	// The far side of the animal. Everything here is deliberately overdriven
 	// compared with a physical estimate, because the layers are only a few
 	// centimetres apart in world terms and a physically honest separation at
@@ -1712,6 +1928,10 @@ void fragment() {
 	// the near coat is enough to say "hair" and not enough to compete with it.
 	c0.detail = 0.66;
 	c0.body_h = body_h;
+	c0.occ_h = occ_h;
+	c0.layer_z = -layer_gap;
+	c0.ray_rise = ray_rise;
+	c0.ray_reach = cast_reach;
 
 	LayerCtx c1;
 	c1.shadow = layer_shadow(f2, lxy, reach, 0.42);
@@ -1722,6 +1942,10 @@ void fragment() {
 	c1.soften = 1.0;
 	c1.detail = 1.0;
 	c1.body_h = body_h;
+	c1.occ_h = occ_h;
+	c1.layer_z = 0.0;
+	c1.ray_rise = ray_rise;
+	c1.ray_reach = cast_reach;
 
 	LayerCtx c2;
 	c2.shadow = 1.0;
@@ -1731,6 +1955,10 @@ void fragment() {
 	c2.soften = 0.95;
 	c2.detail = 1.0;
 	c2.body_h = body_h;
+	c2.occ_h = occ_h;
+	c2.layer_z = layer_gap;
+	c2.ray_rise = ray_rise;
+	c2.ray_reach = cast_reach;
 
 	// Back to front so a far leg is occluded by the torso.
 	vec4 acc = vec4(0.0);

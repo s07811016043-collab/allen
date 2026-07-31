@@ -61,6 +61,33 @@ const LIFT_SPREAD := 2.2
 ## twice and still not visible" pattern. A contact mark is a real penumbra and a
 ## real penumbra is wider than its occluder anyway, so a floor here is not a cheat.
 const MIN_PATCH_PX := 7.5
+## Opacity of the hard contact core — the small, almost solid mark right at the
+## sole, sitting inside the penumbra above.
+##
+## The penumbra is what a foot's shadow *looks* like; the core is what makes it
+## read as touching. Everything else here is a gradient, and a composite made
+## only of gradients has no value anywhere near its nominal opacity except at one
+## infinitesimal point, so at ship size the four plants averaged out into the
+## ambient pool they were meant to be punched into. The measurement: on the bird
+## at 260 px the darkest pixel under a planted toe was 46 against a 187
+## background, and it was two pixels wide.
+const CORE_STRENGTH := 0.95
+## Smallest the core may be drawn, in *screen* pixels, for the same reason
+## `MIN_PATCH_PX` exists — and it bit harder here. The old patch already had an
+## inner plateau, at 30% of a radius that was itself floored at 7.5 px and then
+## squashed to 0.45 of its width: a core two pixels across and one tall. A
+## one-pixel core is not a core, it is a dark pixel.
+const MIN_CORE_PX := 4.0
+## How flat the core is drawn, against 0.45 for the penumbra. The ground is seen
+## nearly edge on, so everything down here is squashed — but the core is the part
+## the eye is being asked to find, and squashing it to a line is how it was lost.
+const CORE_FLAT := 0.62
+## How fast the core dies as the paw leaves the floor, as a multiple of the
+## penumbra's `LIFT_RANGE`. Contact is very nearly binary: the penumbra blooms
+## and fades over a couple of centimetres, the hard core is gone the moment the
+## sole is not on the floor. It *shrinks* rather than fading, which is what a real
+## umbra does when the occluder pulls away.
+const CORE_LIFT_RATE := 3.2
 
 var creature: Node2D
 
@@ -226,6 +253,8 @@ func _refresh() -> void:
 	# behind the animal.
 	_mat.set_shader_parameter("ambient", Vector4(centre, _body_h * 0.03, half_w, half_d))
 	_mat.set_shader_parameter("ambient_strength", AMBIENT_STRENGTH)
+	_mat.set_shader_parameter("core_strength", CORE_STRENGTH)
+	_mat.set_shader_parameter("core_flat", CORE_FLAT)
 	_mat.set_shader_parameter("tint", Color(0.035, 0.035, 0.055))
 
 	# On-screen density, including whatever scale the host or the capture harness
@@ -233,8 +262,10 @@ func _refresh() -> void:
 	# so this is the real number and not the spec's nominal one.
 	var view_px: float = _ppu * maxf(sqrt(absf(global_scale.x * global_scale.y)), 1e-4)
 	var min_r: float = MIN_PATCH_PX / maxf(view_px, 1.0)
+	var min_core: float = MIN_CORE_PX / maxf(view_px, 1.0)
 
 	var gait = _gait()
+	var cores := Vector4.ZERO
 	for i in MAX_PAWS:
 		_mat.set_shader_parameter("paw_%d" % i, Vector4.ZERO)
 	for i in _paw_parts.size():
@@ -266,13 +297,58 @@ func _refresh() -> void:
 		# small number: see `MIN_PATCH_PX`.
 		var r: float = maxf(maxf(p.radius_a, p.radius_b) * 2.6, min_r) \
 			* (1.0 + lift * LIFT_SPREAD)
-		# Centred on the toe end of the paw capsule, and only just below the floor
-		# line. Sinking it further made the patch easier to see and turned the
-		# read into a cat hovering over a spot — the gap between a foot and its
-		# own contact mark is the exact thing that says "not touching".
-		var cx: float = p.b.x + (p.b.x - p.a.x) * 0.08
+		# Centred on the middle of the span this part actually rests on, and only
+		# just below the floor line. Sinking it further made the patch easier to
+		# see and turned the read into a cat hovering over a spot — the gap between
+		# a foot and its own contact mark is the exact thing that says "not
+		# touching".
+		#
+		# This used to be the toe *tip*, `b.x` plus a nudge, which is right only
+		# for a foot that meets the floor at a point. The bird's toe now lies flat
+		# over 0.12 rig units, so the patch landed past the front of the foot —
+		# measured on the ship-size frame, the two patches sat at x = 164 and 178
+		# with the toes spanning 114 to 186, about ten rendered pixels of offset on
+		# an animal 200 px long. A mark that is not under the foot is not a contact
+		# mark, and it is a large part of why the bird reads as floating.
+		var cx: float = lerpf(p.a.x, p.b.x, _contact_t(p))
 		_mat.set_shader_parameter("paw_%d" % slot,
 			Vector4(cx, _body_h * 0.012, r, strength))
+		# The hard core: a small near-opaque umbra inside that penumbra. Only for a
+		# foot that is genuinely down — a swing foot casts a soft mark and no core
+		# at all, which is the whole distinction the term exists to draw.
+		if stance:
+			var core_lift: float = clampf(1.0 - lift * CORE_LIFT_RATE, 0.0, 1.0)
+			var core_r: float = maxf(maxf(p.radius_a, p.radius_b) * 0.80, min_core) \
+				* core_lift
+			match slot:
+				0: cores.x = core_r
+				1: cores.y = core_r
+				2: cores.z = core_r
+				_: cores.w = core_r
+	_mat.set_shader_parameter("paw_core", cores)
+
+
+## Where along `p`'s spine its ground-contact span is centred, as a 0..1
+## parameter.
+##
+## Both the spine and the radius vary linearly along a tapered capsule, so the
+## height of its underside does too — which makes this exact rather than a
+## search. If one end hangs lower the contact is a short arc near that end; if
+## the underside is level the whole segment is on the floor and the answer is the
+## midpoint. A bird's toe is the second case and a cat's paw is close to the
+## first, and the same expression covers both.
+##
+## `tol` is how far the sole may rise and still count as touching. Taken off the
+## part's own radius because that is what sets the size of the flat a rounded
+## foot presses into the floor.
+func _contact_t(p) -> float:
+	var s_a: float = p.a.y + p.radius_a
+	var s_b: float = p.b.y + p.radius_b
+	var drop: float = absf(s_a - s_b)
+	var low_a: bool = s_a >= s_b
+	var tol: float = maxf((p.radius_a if low_a else p.radius_b) * 0.55, _body_h * 0.004)
+	var frac: float = clampf(tol / maxf(drop, 1e-5), 0.0, 1.0)
+	return frac * 0.5 if low_a else 1.0 - frac * 0.5
 
 
 func _gait():
@@ -299,6 +375,10 @@ uniform vec4 paw_0;
 uniform vec4 paw_1;
 uniform vec4 paw_2;
 uniform vec4 paw_3;
+// Hard-core radius per paw, same slot order. Zero means the foot is not down.
+uniform vec4 paw_core;
+uniform float core_strength;
+uniform float core_flat;
 uniform vec4 tint : source_color;
 
 float ellipse(vec2 p, vec2 c, vec2 r) {
@@ -313,12 +393,25 @@ float ellipse(vec2 p, vec2 c, vec2 r) {
 // anywhere near its nominal opacity except at one point, and against the ambient
 // ellipse underneath it that is invisible at 260 px. What says "touching" is a
 // small flat dark centre with the penumbra outside it.
-float patch(vec2 p, vec4 q) {
+float patch(vec2 p, vec4 q, float core_r) {
 	if (q.w <= 0.0) return 0.0;
 	float d = ellipse(p, q.xy, vec2(q.z, q.z * 0.45));
 	float core = smoothstep(0.62, 0.30, d);
 	float penumbra = smoothstep(1.0, 0.45, d);
-	return (0.30 * penumbra + 0.70 * core) * q.w;
+	float soft = (0.30 * penumbra + 0.70 * core) * q.w;
+	// The umbra proper. Sized and squashed on its own terms rather than as a
+	// fraction of the penumbra, because a fraction of a soft mark is a soft mark:
+	// the old inner plateau was 30% of a radius already floored at 7.5 px and then
+	// flattened to 0.45, which is two rendered pixels by one, and two pixels by one
+	// is not what tells an eye that a foot is on a floor.
+	float hard = 0.0;
+	if (core_r > 0.0) {
+		float dc = ellipse(p, q.xy, vec2(core_r, core_r * core_flat));
+		hard = smoothstep(1.0, 0.35, dc) * core_strength;
+	}
+	// Transmittance again, so the core sits *inside* the penumbra rather than
+	// adding to it and clipping.
+	return 1.0 - (1.0 - soft) * (1.0 - hard);
 }
 
 void fragment() {
@@ -334,10 +427,10 @@ void fragment() {
 	// Composited as transmittance, not added: four overlapping patches under a
 	// gathered gallop must not stack into a black hole.
 	float t = 1.0 - clamp(a, 0.0, 1.0);
-	t *= 1.0 - patch(p, paw_0);
-	t *= 1.0 - patch(p, paw_1);
-	t *= 1.0 - patch(p, paw_2);
-	t *= 1.0 - patch(p, paw_3);
+	t *= 1.0 - patch(p, paw_0, paw_core.x);
+	t *= 1.0 - patch(p, paw_1, paw_core.y);
+	t *= 1.0 - patch(p, paw_2, paw_core.z);
+	t *= 1.0 - patch(p, paw_3, paw_core.w);
 	COLOR = vec4(tint.rgb, clamp(1.0 - t, 0.0, 1.0));
 }
 """

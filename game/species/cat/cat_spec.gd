@@ -83,7 +83,14 @@ static func build() -> S:
 	s.palette = PackedColorArray([
 		Color(0.52, 0.42, 0.34),   # coat
 		Color(0.33, 0.25, 0.20),   # coat shadow / tabby stripes
-		Color(0.88, 0.83, 0.76),   # belly, chest, chin
+		# Belly, chest bib and chin. Pulled down from 0.88/0.83/0.76, and the
+		# reason is the belly capsule below rather than taste: fattening it to
+		# clear the height-field groove also lets the cream win the colour blend
+		# further up the flank, and at the old value that arrived as a bright bar
+		# across the middle of the animal — the same failure the dog's belly block
+		# describes from the other direction. Countershading on a real cat is about
+		# two stops, not five.
+		Color(0.78, 0.72, 0.65),   # belly, chest bib, chin
 		Color(0.93, 0.89, 0.83),   # muzzle
 		Color(0.86, 0.60, 0.60),   # inner ear
 		Color(0.79, 0.53, 0.53),   # paw pads
@@ -190,46 +197,95 @@ static func build() -> S:
 	# test, failed — and their two slots pay for the hock below. Each far shank
 	# now runs to the floor and ends on its own cap, which is all a leg lying in
 	# the body's shadow needs in order to read as ending in a foot.
-	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.190, -0.648), Vector2(0.128, -0.466), 0.072, 0.050, COL_COAT_DARK, 0)
-	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.128, -0.466), Vector2(0.104, -0.040), 0.050, 0.042, COL_COAT_DARK, 0)
-	# The far hind gets the same three-segment Z as the near one; a hind pair
-	# where one leg zigzags and the other is a straight post reads as a break,
-	# not as depth. Its metatarsus doubles as its foot for the reason above.
 	#
-	# The whole far hind limb has moved 0.09 forward of where it was, and its
-	# femur is raked over to something like the 35° a real one carries rather
-	# than the 18° it had. The pair used to fuse from 20% of the animal's height
-	# upward — one 31 px column where four 12 px legs were wanted — because both
-	# femurs are thick and both converged on the same x under the hip. Forward is
-	# the only direction that opens it without thinning a haunch that carries a
-	# cat's entire sprint, and raking the femur is what carries the opening up
-	# past the stifle instead of leaving it to start below.
-	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.470, -0.658), Vector2(-0.322, -0.454), 0.092, 0.060, COL_COAT_DARK, 0)
-	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.322, -0.454), Vector2(-0.432, -0.254), 0.060, 0.042, COL_COAT_DARK, 0)
-	var bl_far_h := _part(&"leg_bl_far_hock", Vector2(-0.432, -0.254), Vector2(-0.334, -0.036), 0.040, 0.040, COL_COAT_DARK, 0)
+	# Both far uppers are authored with their girdle end *closer to the trunk's
+	# radius-weighted centroid* than their free end, and that is a hard contract
+	# rather than a style note. `Growth._relink_chains` decides which way a limb
+	# runs by exactly that comparison and then slides every distal segment onto the
+	# previous one's far tip; get it backwards and the whole leg is dragged up to
+	# the hip. It cost a capture to find: moving the brisket forward in this pass
+	# shifted the centroid 0.023 and flipped the far hind femur, whose two ends had
+	# been 0.006 apart on that test, and `_measure` came back with the far hind foot
+	# 0.208 units — 24 rendered pixels — in the air, in the *posed* frame as well as
+	# the bind pose. The femurs below now carry a margin of 0.04 rather than 0.006,
+	# so a future change to the trunk cannot silently amputate a leg.
+	var fl_far_u := _part(&"leg_fl_far_upper", Vector2(0.190, -0.648), Vector2(0.140, -0.440), 0.072, 0.050, COL_COAT_DARK, 0)
+	var fl_far_l := _part(&"leg_fl_far_lower", Vector2(0.140, -0.440), Vector2(0.104, -0.040), 0.050, 0.042, COL_COAT_DARK, 0)
+	# The far hind's third segment is gone, and it paid for the chin. The Z was
+	# authored on both hind legs on the argument that a pair where one zigzags and
+	# the other is a straight post reads as a break — which is true at review zoom
+	# and false at 260 px, where the whole far hind is one dark shape in the near
+	# leg's shadow and its hock is three pixels of rearward travel that nothing
+	# lights. That is the "if you cannot see it, it is not earning its slot" test,
+	# and the slot buys a jaw on the face instead.
+	#
+	# Straightening it also opens the pair. The probe had the hind gap at −0.002 —
+	# near and far fused into one silhouette run below the stifle — because the far
+	# hock swung *back* toward the near tibia at exactly the height the near tibia
+	# was raking back to meet it. A plumb shank from the stifle to the floor holds
+	# the far foot 0.094 ahead of the near paw instead.
+	#
+	# The whole far hind limb sits 0.09 forward of where it was, and its femur is
+	# raked over to something like the 35° a real one carries rather than the 18°
+	# it had. The pair used to fuse from 20% of the animal's height upward — one
+	# 31 px column where four 12 px legs were wanted — because both femurs are
+	# thick and both converged on the same x under the hip. Forward is the only
+	# direction that opens it without thinning a haunch that carries a cat's entire
+	# sprint, and raking the femur is what carries the opening up past the stifle
+	# instead of leaving it to start below.
+	var bl_far_u := _part(&"leg_bl_far_upper", Vector2(-0.430, -0.664), Vector2(-0.318, -0.446), 0.092, 0.060, COL_COAT_DARK, 0)
+	var bl_far_l := _part(&"leg_bl_far_lower", Vector2(-0.318, -0.446), Vector2(-0.364, -0.040), 0.060, 0.042, COL_COAT_DARK, 0)
 	var ear_far := _part(&"ear_far", Vector2(0.570, -1.066), Vector2(0.532, -1.266), 0.072, 0.017, COL_COAT_DARK, 0)
 	ear_far.height_scale = 0.30
 	ear_far.blend = 0.03
-	parts.append_array([fl_far_u, fl_far_l, bl_far_u, bl_far_l, bl_far_h, ear_far])
+	parts.append_array([fl_far_u, fl_far_l, bl_far_u, bl_far_l, ear_far])
 
 	# --- torso --------------------------------------------------------------
 	# The back is not a tube: it rises over the hips, dips through a short loin,
 	# and rises again into the withers, and that double curve is most of what
-	# reads as "cat" in silhouette. So the loin is 0.158 against 0.198 at the
-	# croup and 0.202 at the ribcage — a real waist — and it sits 0.058 higher
-	# along the top. It is also the shortest of the three runs; a long lumbar
-	# span is precisely what turns a cat into a dachshund, and the old spec spent
-	# 0.46 units on it against 0.29 here.
+	# reads as "cat" in silhouette. So the loin runs 0.166 → 0.142 against 0.194 at
+	# the croup and 0.212 at the ribcage — a real waist. It is also the shortest of
+	# the three runs; a long lumbar span is precisely what turns a cat into a
+	# dachshund, and the old spec spent 0.46 units on it against 0.27 here.
 	#
 	# Blends drop from 0.12 to 0.075 for the same reason: a 0.12 smooth-union
 	# erases a 0.06 dip, which is how the previous build ended up with a topline
 	# you could set a ruler against.
-	var rump := _part(&"hip", Vector2(-0.610, -0.715), Vector2(-0.415, -0.748), 0.188, 0.198, COL_COAT)
+	#
+	# The step from rib to flank is the third thing, and it is what a blind
+	# reviewer was reading when they called this animal an Oriental rather than a
+	# housecat. An Oriental *is* a smooth tube; a domestic shorthair is a barrel
+	# with a hard rear edge to it, because the last rib is bone and the flank
+	# behind it is not.
+	#
+	# The first attempt at it was made the way the file has always made shape —
+	# taper the front cap of the loin down and tighten the blend — and it was
+	# measured on a 260 px alpha capture and found to be worth 2.9 rendered pixels
+	# against 8.5 of authored step. That is the coat-fringe rule again and it is
+	# harsher here than anywhere else on the animal: a smooth union cannot hold a
+	# concave notch narrower than its own blend, and the fringe then fills another
+	# 3.6 px on top. Steepening the taper made it *worse*, because a step is a
+	# corner and a corner is exactly what the two of them round off.
+	#
+	# What survives is a waist with *length*. The loin is held near-uniformly thin
+	# over its whole 0.27-unit run — 0.166 down to 0.142 — between a 0.194 croup and
+	# a 0.212 ribcage, so the concavity is 32 rendered pixels wide instead of four
+	# and neither the blend nor the fringe can reach across it. Measured the same
+	# way afterwards: the ribcage's topline stands 9 px above the loin's at ship
+	# size, against 7 before, and the loin now sits below the croup as well as below
+	# the ribs, which is the double curve the block above is describing.
+	#
+	# The crease is the other half and it costs nothing. `f.crease` is the volume
+	# the smooth-min adds, and the shader turns it straight into occlusion, so the
+	# 0.028 join between two capsules 0.07 apart in radius draws a dark line down
+	# the flank for free. That line is the last rib, it lives inside the silhouette,
+	# and it is the one part of this feature the fringe cannot touch.
+	var rump := _part(&"hip", Vector2(-0.610, -0.715), Vector2(-0.420, -0.744), 0.188, 0.194, COL_COAT)
 	rump.blend = 0.085
-	var torso := _part(&"torso", Vector2(-0.415, -0.748), Vector2(-0.130, -0.730), 0.198, 0.158, COL_COAT)
-	torso.blend = 0.075
-	var chest := _part(&"chest", Vector2(-0.130, -0.730), Vector2(0.155, -0.742), 0.158, 0.202, COL_COAT)
-	chest.blend = 0.075
+	var torso := _part(&"torso", Vector2(-0.420, -0.740), Vector2(-0.150, -0.734), 0.166, 0.142, COL_COAT)
+	torso.blend = 0.070
+	var chest := _part(&"chest", Vector2(-0.150, -0.758), Vector2(0.150, -0.758), 0.204, 0.212, COL_COAT)
+	chest.blend = 0.028
 	# Shoulder blade *and* brisket in one capsule, because the budget affords one
 	# and the animal needs both. It runs from the withers down and forward to the
 	# sternum: the top cap stands 0.04 proud of the ribcage, which is the blade
@@ -249,15 +305,43 @@ static func build() -> S:
 	# 13 px of swell over 28 px of height, and an overhang of 0.117 in front of
 	# the elbow. That is the number the eye is actually reading — not how far the
 	# chest reaches, but how much it moves between the throat and the leg.
-	var brisket := _part(&"brisket", Vector2(0.100, -0.860), Vector2(0.306, -0.604), 0.126, 0.134, COL_COAT)
-	# Blended wider than the parts it joins, and standing less proud than it did.
-	# Pushed forward at 0.10 blend and 1.12 height it stopped being a chest and
-	# became a ball: a sphere with its own highlight and a hard crease ringing it
-	# where the neck and the humerus arrived. What the eye wants at the point of
+	#
+	# It is a near-horizontal capsule now, and that is a *shading* decision rather
+	# than an anatomical one — the anatomy comes out the same either way, and the
+	# shading does not. The version this replaces ran from the withers down and
+	# forward at +51°, crossing a chest at −2° and a neck at −43°, so three
+	# capsules whose axes disagreed by up to 94° all smooth-unioned inside one
+	# 0.125 blend at the point of shoulder.
+	#
+	# What that costs is legible in `PETALIA_DEBUG_VIEW=3`, the coat's lane
+	# coordinate: over the whole neck and shoulder the lanes open into wide closed
+	# loops instead of running back along the body, and a lane that wide has no
+	# strand detail in it at all. The shader has two separate guards that fire
+	# there — `frame_ok` clamps the coat relief wherever `fwidth(f.axis)` says the
+	# blended frame is spinning, and `band_ok` fades the bands out wherever the
+	# blended `arc` stalls at an extremum — and between them they shave the region
+	# bald, which is exactly the "large smooth glossy patch with no coat direction
+	# in it" the review reports. It is the same mechanism the bird's egg block
+	# describes: capsules that disagree about which way is "along the body" blend
+	# into a field with saddles in it.
+	#
+	# So the sternum now runs forward at +12° against the ribcage's 0°, and the
+	# withers it used to carry are the ribcage's own top surface, which is 0.02
+	# higher than the old brisket cap reached anyway.
+	var brisket := _part(&"brisket", Vector2(0.072, -0.630), Vector2(0.298, -0.582), 0.146, 0.154, COL_COAT)
+	# Still blended wider than the parts it joins, and standing less proud than it
+	# did. Pushed forward at 0.10 blend and 1.12 height it stopped being a chest
+	# and became a ball: a sphere with its own highlight and a hard crease ringing
+	# it where the neck and the humerus arrived. What the eye wants at the point of
 	# shoulder is a *mass* that the neck runs into and the leg comes out of, and
 	# the difference between the two is entirely in how fast the union closes.
-	brisket.blend = 0.125
-	brisket.height_scale = 1.06
+	brisket.blend = 0.095
+	# Down from 1.06. Lifted proud of the ribcage the sternum grew its own
+	# highlight and its own ring of crease where the neck and the humerus arrived,
+	# which at review zoom is a ball glued to the front of the animal. The mass is
+	# still there — it is in the radius and in how far forward the capsule reaches —
+	# it just no longer stands off the chest in the height field as well.
+	brisket.height_scale = 1.00
 	# Belly, and with it the tuck. Two things were wrong with the old one and
 	# both were measured off the rendered frame, not off these numbers.
 	#
@@ -278,7 +362,26 @@ static func build() -> S:
 	#
 	# The pale palette slot doubles as the chest bib, which is the one broad
 	# value break on the underside that survives at 260 px.
-	var belly := _part(&"belly", Vector2(-0.185, -0.612), Vector2(0.140, -0.557), 0.032, 0.082, COL_BELLY)
+	#
+	# It is also a real ventral half-volume now instead of a lens, and that is the
+	# belly-seam finding from the dog applied here. The diagnosis is written up in
+	# `dog_spec.gd` and was made with two captures that could not have been
+	# reasoned out: repainting the capsule in the coat colour left the white streak
+	# and the black stipple untouched (so it is not the pigment and not the marking
+	# path), and shrinking it to nothing made them vanish (so it is the capsule's
+	# shape). The height field biases its radius toward the thicker part of a union
+	# with a strength running on `(R_fat − R_thin) / (R_fat + R_thin)`, and past
+	# about 0.36 that digs a groove whose two walls light as hard lines.
+	#
+	# This capsule sat at 0.66 at the rear cap and 0.42 at the front — the worst
+	# ratio of any part on any species we ship, which is why the cat's seam was the
+	# loudest of the four. At 0.080 → 0.104 against a 0.150 → 0.206 trunk it is
+	# 0.30 and 0.33.
+	#
+	# The underline is unchanged to the pixel: both endpoints are the old lower
+	# surface re-expressed as centre minus radius, so the tuck, the groin and the
+	# depth of the chest against the belly are all exactly where they were.
+	var belly := _part(&"belly", Vector2(-0.210, -0.666), Vector2(0.140, -0.579), 0.079, 0.104, COL_BELLY)
 	# Sunk until its top edge barely clears the torso's underline, and blended
 	# wide. Sitting 0.10 higher it painted a hard pale stripe up the flank, and a
 	# bright band across the middle of the body at 260 px is the same plank
@@ -287,16 +390,24 @@ static func build() -> S:
 	belly.coat_length = 1.35
 	# Thinner than the skull by a quarter, and steeper than before (38° rather
 	# than 30°), which is what lifts the head off the shoulder line.
+	#
+	# The blend is the widest on the trunk and it is deliberate. The neck is the
+	# one capsule left whose axis genuinely has to disagree with the ribcage's —
+	# it is 43° off — and the shader's frame guard reads *rate*, not amount:
+	# `fwidth(f.axis)` is the disagreement divided by how many pixels the union
+	# takes to turn through it. At 118 px per rig unit the clamp starts biting
+	# below about 0.10 of blend for a 43° turn, so a *tight* throat join is what
+	# shaves the neck bald, not a soft one. This is the opposite of the rule that
+	# governs the rib step 0.4 units behind it, where the two axes agree and the
+	# tight join costs nothing but buys a crease.
 	var neck := _part(&"neck", Vector2(0.185, -0.790), Vector2(0.372, -0.962), 0.115, 0.094, COL_COAT)
-	neck.blend = 0.10
+	neck.blend = 0.112
 	parts.append_array([rump, torso, chest, brisket, belly, neck])
 
 	# --- head ---------------------------------------------------------------
 	# Short and round. The old head was 0.45 long against a 0.29 height, which is
 	# a muzzle-forward ungulate profile; a cat is 0.41 by 0.30 with the mass in
-	# the cranium. The chin capsule is gone — it was a 0.88 grey sitting against a
-	# 0.93 grey, five pixels wide at ship size, and its slot is worth more as the
-	# shoulder. The muzzle now tips down to carry the jaw itself.
+	# the cranium.
 	# 0.34 of shoulder height rather than the anatomical 0.29. At 260 px the head
 	# and ear pair is the only species cue with any pixels behind it, so it is
 	# worth the one place this animal is deliberately not to scale — and a
@@ -305,14 +416,65 @@ static func build() -> S:
 	skull.blend = 0.078
 	var cheek := _part(&"cheek", Vector2(0.552, -0.940), Vector2(0.632, -0.933), 0.114, 0.095, COL_COAT)
 	cheek.blend = 0.072
+	# The muzzle stays on FRONT, and the reason is worth a capture's worth of space
+	# because the obvious move is to put it on BODY and it is wrong.
+	#
+	# The front layer never accumulates `f.crease`, so a muzzle drawn there gets no
+	# occlusion at its root and the mask boundary is a colour edge and nothing
+	# else — which is exactly the sticker the review named, and moving the part to
+	# BODY does fix that. What it also does is hand the muzzle to the *colour*
+	# blend, and inside a smooth union the albedo goes with the field, so a 0.070
+	# capsule unioned against a 0.155 skull and a 0.114 cheek loses. Rendered, the
+	# entire pale mask vanished and the cat came back with a plain brown face and a
+	# pink smudge where its nose had been. Two captures, one at 560 and one head
+	# close-up, and both were unambiguous.
+	#
+	# So the mask boundary is broken up with coat instead — see `coat_length`
+	# below — and the crease that the front layer cannot draw is drawn by the chin
+	# underneath it, which *is* on BODY and does not need to keep a colour.
 	var muzzle := _part(&"muzzle", Vector2(0.632, -0.936), Vector2(0.702, -0.914), 0.070, 0.058, COL_MUZZLE, 2)
 	muzzle.blend = 0.045
-	muzzle.coat_length = 0.5
+	# Up from 0.5, and this is the muzzle *mask* edge rather than the muzzle. The
+	# pale patch is a marking, so its boundary is drawn by the colour blend and
+	# arrives as a clean arc — a sticker laid on the face, which is what the review
+	# named. `coat_length` scales the per-part fringe the coat stands off its own
+	# outline with, and the fringe is indexed off the outline's arc length, so
+	# raising it on the part that owns the boundary breaks that arc into strands
+	# without moving the silhouette of the head at all. It is also true of the
+	# animal: the whisker pad is the fluffiest thing on a cat's face.
+	muzzle.coat_length = 1.30
 	var nose := _part(&"nose", Vector2(0.720, -0.933), Vector2(0.728, -0.929), 0.018, 0.015, COL_NOSE, 2)
 	nose.surface = P.Surface.SKIN
 	nose.blend = 0.012
 	nose.coat_length = 0.0
-	parts.append_array([skull, cheek, muzzle, nose])
+	# The chin, and with it the mouth. It is one part doing two jobs and that is
+	# why it was worth a slot back off the far hind leg.
+	#
+	# A cat's lower jaw is not a separate lump the way a dog's is — it is a small
+	# shelf tucked under and behind the nose, and what you actually read across a
+	# room is not the shelf but the line above it. So this capsule hangs 0.039
+	# below the muzzle's lower surface at its root and converges on it toward the
+	# front, which puts a smooth-union crease exactly where a cat's mouth line
+	# runs: forward and slightly down, from under the cheek to under the nose
+	# leather. `blend` at 0.016 is what keeps that a line; at the muzzle's own 0.045
+	# the union rounded the two into one sausage and the face lost its jaw again.
+	#
+	# BODY, not FRONT, and it is the half of the muzzle problem that the front layer
+	# cannot solve. Sitting on BODY the chin unions with the cheek, so it collects
+	# a crease along its top edge and casts the layer's ambient occlusion, and the
+	# muzzle then composites *over* it. What the eye gets is the muzzle's own lower
+	# outline drawn as a hard composite edge against a shadowed jaw immediately
+	# below it — a mouth line, made of the one thing the renderer draws crisply at
+	# any size, a layer boundary.
+	#
+	# The colour is the coat's, not the belly's. On BODY the albedo goes with the
+	# field and a small capsule loses that blend anyway, so asking for a pale chin
+	# here buys nothing; what the shape has to do is be *darker* than the mask above
+	# it, and coat over cheek is already three stops down from 0.93.
+	var chin := _part(&"chin", Vector2(0.652, -0.872), Vector2(0.716, -0.884), 0.048, 0.030, COL_COAT, 1)
+	chin.blend = 0.016
+	chin.coat_length = 0.62
+	parts.append_array([skull, cheek, muzzle, nose, chin])
 
 	# --- near ear -----------------------------------------------------------
 	# Taller than before: a cat's ear is ~85% of its head height, and at 260 px
@@ -356,8 +518,11 @@ static func build() -> S:
 	# far, which is exactly what the far pair above relies on.
 	var fl_u := _part(&"leg_fl_upper", Vector2(0.240, -0.650), Vector2(0.285, -0.462), 0.080, 0.055, COL_COAT, 1)
 	# Wide enough that the humerus leaves the chest as a taper rather than as a
-	# rim: the shoulder crease is a real feature and it was drawing as a line.
-	fl_u.blend = 0.100
+	# rim: the shoulder crease is a real feature and it was drawing as a line, and
+	# then — once the sternum moved forward under it — as a closed ring round a
+	# dome, which is worse. 0.118 is the widest union on the animal and it is the
+	# right place for it: this is the one joint that is genuinely buried in muscle.
+	fl_u.blend = 0.118
 	var fl_l := _part(&"leg_fl_lower", Vector2(0.285, -0.462), Vector2(0.306, -0.140), 0.056, 0.034, COL_COAT, 1)
 	# The paw is its own short, swelling capsule — 0.044 against the 0.034 the
 	# forearm arrives at. A taper that just runs out at the floor is the noodle
@@ -434,6 +599,12 @@ static func build() -> S:
 		elif id.begins_with("ear"):
 			p.baby_radius_scale = 0.80
 			p.baby_length_scale = 0.70
+		elif id == "chin":
+			# A kitten has almost no jaw. Shrinking it rather than letting the head
+			# bias inflate it with the rest of the skull is most of why a baby face
+			# is all forehead and cheeks.
+			p.baby_radius_scale = 0.82
+			p.baby_length_scale = 0.78
 		elif id in ["head", "cheek", "muzzle", "nose"]:
 			p.baby_radius_scale = 1.06
 		elif id in ["hip", "torso", "chest", "brisket", "belly"]:
@@ -444,6 +615,16 @@ static func build() -> S:
 
 	# Grooming direction: fur flows back along the body, down the legs, and out
 	# along the tail. This is what the anisotropic coat shading reads.
+	#
+	# The forehand is the exception, and it is the other half of the bald-shoulder
+	# fix. Every trunk part used to be groomed at a flat PI, so the neck, the point
+	# of shoulder and the ribcage were one continuous field with no direction
+	# change anywhere in it — which is the literal complaint. On a real cat the
+	# coat leaves the throat pointing down and back, sweeps round the point of
+	# shoulder, and only straightens out into the flank behind the elbow. Twenty
+	# degrees of turn across three capsules is enough to put a visible sweep there
+	# and is well inside what the frame guard will carry at a 0.09-plus blend.
+	const SWEEP := {"neck": PI * 0.845, "brisket": PI * 0.895, "chest": PI * 0.955}
 	for p in parts:
 		var id := String(p.id)
 		if id.begins_with("leg") or id.begins_with("paw"):
@@ -452,6 +633,8 @@ static func build() -> S:
 			p.groom_angle = (p.b - p.a).angle()
 		elif id.begins_with("ear"):
 			p.groom_angle = -PI * 0.42
+		elif SWEEP.has(id):
+			p.groom_angle = SWEEP[id]
 		else:
 			p.groom_angle = PI
 
@@ -473,18 +656,40 @@ static func build() -> S:
 	eye_near.socket_depth = 0.30
 	eye_near.lid_palette_index = COL_COAT
 
+	# The far eye is foreshortened rather than merely small, and there are four
+	# separate terms in that because the contract has no ellipse in it.
+	#
+	# A head turned three-quarters on presents the far eye at an angle, so what a
+	# photograph shows is a *sliver*: less of the ball, more lid over it, the whole
+	# thing sunk behind the bridge of the nose, and the wet highlight killed
+	# because the cornea is no longer facing the key. Drawn as a small copy of the
+	# near eye instead — which is what 0.031 at the same lid and socket was — the
+	# face reads as having two eyes pointing the same way on a head that is
+	# pointing somewhere else, and that is uncanny in a way nobody can name.
+	#
+	#   radius 0.0255   0.59 of the near eye rather than 0.72
+	#   lid_open 0.78   the upper lid carries a third of the ball
+	#   socket 0.68     the nose bridge occludes it; the catchlight goes under
+	#   tilt −0.40      the aperture rotates with the far side of the skull
+	#
+	# The sclera goes down with it. Aerial perspective is not the reason — the two
+	# eyes are 0.1 units apart — the reason is that the far eye lies in the head's
+	# own shadow terminator, and a white that stays white through a terminator is
+	# the single loudest "this is a decal" signal a face can send.
 	var eye_far: E = E.new()
 	eye_far.id = &"eye_far"
 	eye_far.bone = &"head"
 	eye_far.center = Vector2(0.504, -0.994)
-	eye_far.radius = 0.031
-	eye_far.tilt = -0.28
+	eye_far.radius = 0.0255
+	eye_far.tilt = -0.40
 	eye_far.iris_ratio = 0.80
 	eye_far.pupil_ratio = 0.40
 	eye_far.pupil_slit = 0.85
-	eye_far.iris_color = Color(0.56, 0.68, 0.22)
-	eye_far.limbal_color = Color(0.06, 0.09, 0.04)
-	eye_far.socket_depth = 0.45
+	eye_far.iris_color = Color(0.47, 0.57, 0.19)
+	eye_far.limbal_color = Color(0.05, 0.08, 0.03)
+	eye_far.sclera_color = Color(0.74, 0.73, 0.71)
+	eye_far.lid_open = 0.78
+	eye_far.socket_depth = 0.68
 	eye_far.lid_palette_index = COL_COAT
 
 	s.eyes = [eye_far, eye_near]
