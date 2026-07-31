@@ -73,6 +73,31 @@ tools/capture.sh --species=cat --growth=3 --out=_captures/head.png  --size=720x7
    is steep. Clamp the stroke displacement by the blend-field gradient
    magnitude.
 
+## Core bugs found while authoring the bird
+
+Found by dumping *posed* geometry instead of trusting the bind pose. All three
+are in files another agent owned at the time, so they were reported rather than
+patched. They affect every species, not just the bird.
+
+10. **`marking_strength` is never set.** It is a shader uniform and
+    `CreatureRenderer` has zero occurrences of it, so the mammal tabby code runs
+    at full strength on birds and reptiles. On the bird this lightened the navy
+    wing into four hard blocks that looked exactly like a wing geometry bug and
+    were actually a palette-luminance bug.
+11. **The FEATHER path was gated off at ship scale.** `pet_feather` gates relief,
+    occlusion and iridescence on a term where *raising* density closes the gate —
+    the comment had the inequality backwards. At the shipped density the gate
+    evaluated to exactly 0.00, so the bird had no vanes and no thin-film at all.
+12. **`Slot.WING` parts are fitted twice** in `RigSkeleton.build`; the `fore`
+    loop is only skipped for `Slot.LIMB`. Duplicate bone names mean parts bind
+    against the wrong rest transform, which collapsed the wing. Worked around in
+    the bird spec by naming the parts so they classify as `SPINE`; the rig bug
+    itself is still there.
+13. **Captures shade at roughly twice ship scale.** The harness fits the pose to
+    the frame, so a 560 px shot runs at an effective 294 px per rig unit against
+    a nominal 158. Any density tuned by eye in a capture is tuned at the wrong
+    scale — another face of the ship-size problem.
+
 ## Closed
 
 - ~~The cat floats above its shadow.~~ It never did. `tests/_ground_probe.gd`
