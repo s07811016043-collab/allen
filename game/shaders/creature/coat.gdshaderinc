@@ -150,33 +150,42 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	vec2 across = vec2(-groom.y, groom.x);
 	vec2 t = vec2(dot(p, groom), dot(p, across));
 
-	// The coarsest rung is pitched so that at desktop body scale — roughly 320
-	// screen pixels to the rig unit — a lane lands near three pixels rather than
-	// near two. Two is where the profile goes sub-pixel and the coat turns to
-	// moire; three is the finest the eye can still be told a direction at.
-	float pitch0 = 104.0 * density;
+	// Four rungs, and the count is forced rather than chosen. A desktop pet is
+	// drawn anywhere from about 150 to about 1100 screen pixels to the rig unit —
+	// a taskbar-sized cat up to a head close-up — which is a range of seven, and a
+	// ladder stepping by 2.15 covers 2.15^3 ≈ 10. Three rungs cover 4.6, and the
+	// bottom of the range is exactly where they fail: at 150 px per unit a ladder
+	// anchored for body scale has no rung resolved at all, and the pet at the size
+	// it actually lives at is bare clay. That is not a subtle loss — it is the
+	// whole coat, at the one size that matters most.
+	float pitch0 = 48.0 * density;
 	float pitch1 = pitch0 * 2.15;
 	float pitch2 = pitch0 * 4.62;
+	float pitch3 = pitch0 * 9.94;
 
 	float f0 = pet_tier_fade(px / pitch0);
 	float f1 = pet_tier_fade(px / pitch1);
 	float f2 = pet_tier_fade(px / pitch2);
+	float f3 = pet_tier_fade(px / pitch3);
 	float k0 = pet_tier_crisp(px / pitch0);
 	float k1 = pet_tier_crisp(px / pitch1);
 	float k2 = pet_tier_crisp(px / pitch2);
+	float k3 = pet_tier_crisp(px / pitch3);
 
-	float d0 = 0.0, d1 = 0.0, d2 = 0.0;
-	float r0 = 0.5, r1 = 0.5, r2 = 0.5;
-	float n0 = 0.0, n1 = 0.0, n2 = 0.0;
-	float h0 = 0.0, h1 = 0.0, h2 = 0.0;
+	float d0 = 0.0, d1 = 0.0, d2 = 0.0, d3 = 0.0;
+	float r0 = 0.5, r1 = 0.5, r2 = 0.5, r3 = 0.5;
+	float n0 = 0.0, n1 = 0.0, n2 = 0.0, n3 = 0.0;
+	float h0 = 0.0, h1 = 0.0, h2 = 0.0, h3 = 0.0;
 	if (f0 > 0.002) { h0 = pet_fibre_tier(t, pitch0, 0.90, 6.0, 1.0, 1.0 - k0, d0, r0, n0); }
 	if (f1 > 0.002) { h1 = pet_fibre_tier(t, pitch1, 0.90, 6.5, 7.0, 1.0 - k1, d1, r1, n1); }
 	if (f2 > 0.002) { h2 = pet_fibre_tier(t, pitch2, 0.90, 7.0, 19.0, 1.0 - k2, d2, r2, n2); }
+	if (f3 > 0.002) { h3 = pet_fibre_tier(t, pitch3, 0.90, 7.5, 43.0, 1.0 - k3, d3, r3, n3); }
 
 	float w0 = f0 * (1.0 - 0.72 * k1);
 	float w1 = f1 * (1.0 - 0.72 * k2);
-	float w2 = f2;
-	float wsum = w0 + w1 + w2;
+	float w2 = f2 * (1.0 - 0.72 * k3);
+	float w3 = f3;
+	float wsum = w0 + w1 + w2 + w3;
 	float inv = 1.0 / max(wsum, 1e-4);
 	// How much resolvable fibre structure there is at all. Every fibre-derived
 	// term fades toward its neutral value with this, so a pet shrunk to a taskbar
@@ -186,12 +195,12 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// below is scaled by. The strands stay on screen at body scale; they stop
 	// shouting. Getting this backwards — full contrast on an unresolved rung — is
 	// the whole of the wood-grain failure.
-	float crisp = (w0 * k0 + w1 * k1 + w2 * k2) * inv;
+	float crisp = (w0 * k0 + w1 * k1 + w2 * k2 + w3 * k3) * inv;
 	float amp = mix(0.72, 1.0, crisp);
 
-	float strand = (w0 * h0 + w1 * h1 + w2 * h2) * inv;
-	float lean = (w0 * n0 + w1 * n1 + w2 * n2) * inv;
-	float rnd = (w0 * r0 + w1 * r1 + w2 * r2) * inv;
+	float strand = (w0 * h0 + w1 * h1 + w2 * h2 + w3 * h3) * inv;
+	float lean = (w0 * n0 + w1 * n1 + w2 * n2 + w3 * n3) * inv;
+	float rnd = (w0 * r0 + w1 * r1 + w2 * r2 + w3 * r3) * inv;
 
 	// The lock: ten strand widths across and stubby, four times as long as it is
 	// wide, because a lock is a stubby thing and a long one is only corduroy at a
@@ -203,7 +212,8 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// inside the tier, i.e. a screenful of NaN on the one size a desktop pet
 	// spends most of its life at.
 	float pitch_c = (wsum > 1e-3
-		? (w0 * pitch0 + w1 * pitch1 + w2 * pitch2) * inv : pitch0) * 0.10;
+		? (w0 * pitch0 + w1 * pitch1 + w2 * pitch2 + w3 * pitch3) * inv
+		: pitch0) * 0.13;
 	float fc = pet_tier_fade(px / pitch_c);
 	float dc = 0.0, rc = 0.5, nc = 0.0, lock = 0.0;
 	if (fc > 0.002) {
@@ -233,7 +243,7 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// ridge in the flesh, and given real relief it becomes a row of sausages.
 	c.slope = across * fluffy * amp * inv
 		* (0.034 * w0 * d0 / pitch0 + 0.032 * w1 * d1 / pitch1
-			+ 0.030 * w2 * d2 / pitch2)
+			+ 0.030 * w2 * d2 / pitch2 + 0.028 * w3 * d3 / pitch3)
 		+ across * fluffy * 0.009 * fc * dc / max(pitch_c, 1e-3);
 
 	// Albedo carries almost none of the coat. Real hair is one pigment: what
@@ -251,7 +261,7 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	// light is duller than one standing away from it — it never sets its scale.
 	c.glint = rnd * rnd;
 	c.spec = mix(1.0, mix(1.0 - 0.58 * amp, 1.0 + 1.30 * amp, strand), res)
-		* mix(0.76, 1.20, lock) * part;
+		* mix(0.80, 1.16, lock) * part;
 	c.tilt = lean * 0.34 * res;
 	return c;
 }
