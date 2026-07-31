@@ -2,5 +2,8 @@
 game/.godot/
 game/.import/
 _captures/
+# Pre-change snapshots for the blind A/B judge. Regenerated every review
+# round, and meaningless outside the run that produced them.
+_baseline/
 *.tmp
 _refs/
