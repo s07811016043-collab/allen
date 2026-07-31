@@ -52,6 +52,11 @@ const HEAD_STEADY := 0.86
 ## Breathing is the resting animal's shape channel and this is the spine's share
 ## of it; `IdleRig.breath_swell` already owns the ribcage's.
 const BREATH_ARC := 0.052
+## Time constant of the body's own speed against the speed the brain commands,
+## seconds. Roughly how long a cat takes to get its mass moving or stopped: long
+## enough that a scripted step becomes a real deceleration for the chains to feel,
+## short enough that it is not a second gait system.
+const CARRIER_TAU := 0.13
 
 var skeleton: RigSkeleton
 var gait := Gait.new()
@@ -97,6 +102,9 @@ var _head_fix := 0.0
 ## Vertical speed of the shoulder, which is what the muzzle leads against.
 var _prev_chest := 0.0
 var _chest_vel := 0.0
+## The speed the *body* is doing, as opposed to the speed the brain asked for.
+## See the note where it is integrated.
+var _body_speed := 0.0
 var _prev_speed := 0.0
 var _carrier_accel := 0.0
 ## Scale on everything written into the pelvis's own angle.
@@ -176,8 +184,21 @@ func _build_chains(spec: CreatureSpec) -> void:
 	# The tail is the loudest secondary motion the creature has: low stiffness so
 	# it keeps going after the hips stop, and inertia well above 1 so it reads as
 	# heavy rope rather than as a wire.
+	#
+	# Damping 0.42, not the 0.52 it ran at. A tail is the one part of the animal
+	# that is *supposed* to overshoot: at 0.52 it returned to rest almost without
+	# passing it, which is what made a stop from a trot read as a handbrake — the
+	# whole animal, tail included, simply ceased. Q here is 1.2, so the tip swings
+	# past its rest angle, comes back, and is quiet inside two swings.
+	#
+	# Not lower, and this was measured rather than guessed. At 0.34 the chain
+	# stopped trailing the hips and started ringing on its own: the tail's lag
+	# behind the pelvis fell from 125 ms to zero, and the tip swept 318 px of path
+	# per gallop cycle against 173 before. A tail that resonates is a whip, not a
+	# tail, and the tell is the lag going to zero — a chain that is answering the
+	# body arrives late, and one that is answering itself arrives whenever.
 	_tail_chain = _add_chain("tail", RigBones.SIDE_NONE, RigBones.PELVIS,
-		SpringChain.Mode.ANGULAR, lerpf(15.0, 34.0, spec.energy), 0.52,
+		SpringChain.Mode.ANGULAR, lerpf(15.0, 34.0, spec.energy), 0.42,
 		0.9, 2.6, 0.70)
 	if _tail_chain >= 0:
 		# ~70 ms of trail per joint, so the tip is pointing where the hips were
@@ -257,6 +278,12 @@ func settle() -> void:
 	_head_fix = 0.0
 	_prev_chest = skeleton.bones[_chest].xform.origin.y if _chest >= 0 else 0.0
 	_chest_vel = 0.0
+	# The carrier follower has to start on the speed the creature already has, or
+	# a pet that spawns mid-run reads its own existence as a launch and throws its
+	# tail over its head on the first frame.
+	_body_speed = speed
+	_prev_speed = speed
+	_carrier_accel = 0.0
 
 
 func time() -> float:
@@ -366,12 +393,21 @@ func _step(dt: float) -> void:
 	# a bone transform, so the chains cannot see it happen. Differentiate the speed
 	# the brain wrote and hand the result over: braking from a run is the textbook
 	# reason a tail keeps going, and until this existed it was the one event the
-	# springs were structurally unable to feel. Clamped and filtered because a
-	# scripted speed change is a step, and an undamped step here would fold a tail
-	# through the hips in a single frame.
-	_carrier_accel = lerpf(_carrier_accel,
-		clampf((speed - _prev_speed) / dt, -40.0, 40.0), clampf(dt * 20.0, 0.0, 1.0))
-	_prev_speed = speed
+	# springs were structurally unable to feel.
+	#
+	# Differentiated off a *lagged* copy of the speed rather than off the speed
+	# itself, and this is the whole difference between a tail that recoils and one
+	# that does not. A scripted stop is a step: the brain writes the trot speed one
+	# frame and zero the next, and the derivative of a step is a single frame of a
+	# very large number. Clamped to keep it sane and then run through a one-pole,
+	# that spike arrived as a brief nudge about a seventh of the deceleration it
+	# was describing — which is why a stop from a trot recoiled under two per cent.
+	# A one-pole on the *speed* instead spreads the same event over the time a body
+	# actually takes to stop and preserves its whole impulse: the area under the
+	# curve is exactly the speed that was lost, however many frames it was lost in.
+	_body_speed += (speed - _body_speed) * clampf(dt / CARRIER_TAU, 0.0, 1.0)
+	_carrier_accel = clampf((_body_speed - _prev_speed) / dt, -60.0, 60.0)
+	_prev_speed = _body_speed
 	for c in chains:
 		c.carrier_accel = Vector2(_carrier_accel, 0.0)
 		c.advance(skeleton, dt)
@@ -405,7 +441,10 @@ func _pose_body(dt: float) -> void:
 	# rotation into a see-saw — croup up as the forehand drops — which is what
 	# pitch actually looks like on an animal, and it halves the lever the neck then
 	# has to fight.
-	var attitude: float = gait.pitch + idle.weight_pitch
+	# `gait.brake` is the only attitude term that outlives the gait: it is what the
+	# animal's own mass does when the feet stop, and the feet stopping is exactly
+	# when every other channel here is gated off.
+	var attitude: float = gait.pitch + gait.brake + idle.weight_pitch
 	skeleton.root_xform = Transform2D(attitude,
 		_trunk_pivot - _trunk_pivot.rotated(attitude)
 		+ Vector2(gait.surge + idle.weight_shift.x, gait.bob + idle.weight_shift.y))

@@ -28,6 +28,13 @@ struct Coat {
 	float spec;   // per-strand multiplier on the whole hair lobe
 	float tilt;   // per-strand deflection of the strand tangent, radians
 	float tuft;   // low-frequency clump mask, hand-sized
+	// How well the *clump* field resolves, which is a different and much easier
+	// question than how well the strands do, and the reason it is reported
+	// separately. At the size a desktop pet actually lives at a lock lands near
+	// fourteen screen pixels while a strand lands near two: the strands are at the
+	// sampling limit and the lock is nowhere near it. Anything that has to carry
+	// the coat at ship size has to be hung on this number, not on `crisp`.
+	float tuft_res;
 	// How much fibre structure the frame can hold, 0..1, and how sharply it is
 	// being sampled. Reported out because the *specular* has to know: a lobe
 	// narrow enough to resolve one fibre, run over a pixel that contains thirty
@@ -239,35 +246,32 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// shouting. Getting this backwards — full contrast on an unresolved rung — is
 	// the whole of the wood-grain failure.
 	float crisp = (w0 * k0 + w1 * k1 + w2 * k2 + w3 * k3) * inv;
-	// The floor here is the single number that decides whether the ship-size pet
-	// wears hair or timber. A rung sampled at two and a bit pixels a lane cannot
-	// carry contrast: whatever value swing it is given lands on the pixel grid as
-	// a beat, and a beat between two near-equal frequencies is a long, slow,
-	// perfectly straight streak. Held at 0.72 the coat kept three quarters of its
-	// contrast at the one size where it can resolve none of its structure, which
-	// is why every review at 640 px passed a build that reads as carved wood at
-	// 260. The strokes stay — they are what stops it being clay — they just stop
-	// shouting until there are pixels to say it in.
+	// This floor, and the two below it, are how much contrast an UNDER-RESOLVED
+	// rung is still allowed to contribute — and the history here is a loop the
+	// next agent should not walk round again.
 	//
-	// Held at 0.22 it was throttling the coat a *second* time, and that is the
-	// regression. `pet_fibre_tier` has already mip-filtered this rung — wider
-	// profile, lower contrast per fibre, and now a dash two lanes long — so what
-	// arrives here is a feature the frame can hold. Multiplying an already
-	// prefiltered feature by another 0.22 is not anti-aliasing, it is deletion, and
-	// the measurement says so: at ship size `crisp` is 0.205 on this cat's torso,
-	// which took the coat's whole occlusion swing to plus or minus three per cent.
-	// Three per cent is a hairless Sphynx, which is exactly what the blind reviewer
-	// called it. The floor now backs the contrast off by a third at the limit
-	// instead of by four fifths.
-	// These three floors are how much contrast an UNDER-RESOLVED rung is still
-	// allowed to contribute. They were raised to 0.62 / 0.70 / 0.30 to make the
-	// coat carry further at ship size, and it backfired: a blind reviewer picked
-	// the previous build over that one at 260 px, because contrast in a rung
-	// finer than the pixel grid does not read as hair, it beats against the grid
-	// and reads as grain. Keep them low. If the coat needs to carry at ship size,
-	// it has to come from a COARSER rung, not from turning up a rung nobody can
-	// resolve.
-	float amp = mix(0.22, 1.0, crisp);
+	// The grain was real. A rung sampled at two and a bit pixels a lane, drawn as
+	// a dash six lanes long, beats against the pixel grid into a straight streak
+	// the length of the animal, and that is the plank. It was fixed where it is
+	// made, in the fibre tier: the dash is cut to 0.30 of its aspect at the limit
+	// (`pet_fibre_tier`), the profile widens to 0.46 of a lane, and the family
+	// tiers below floor their pitch in screen pixels. A field of stubby marks with
+	// no long axis cannot beat into a stripe whatever contrast it is given.
+	//
+	// These floors were the *first*, cruder attempt at the same problem, and once
+	// the tier prefilters properly they attenuate a second time. Measured on the
+	// ship-size cat's torso, `crisp` is about 0.2, so a floor of 0.22 leaves the
+	// coat roughly a fifth of its swing — plus or minus three per cent across the
+	// whole flank, which is a hairless Sphynx, which is what a blind reviewer
+	// called it twice. Reverting them "back to where the coat was" produced the
+	// flattest measured build in the project's history: high-frequency contrast
+	// over the torso fell to 2.26 against 3.22-3.28 for every earlier round.
+	//
+	// So: the floors carry the coat, the fibre tier keeps it from beating, and the
+	// two jobs must not be swapped. If the coat ever grains again, shorten the
+	// dash or coarsen the carrying rung. Do not reach for these numbers a second
+	// time.
+	float amp = mix(0.62, 1.0, crisp);
 	// How much of the fibre structure is allowed to *show*, which is a different
 	// question from how much of it is present, and the one that actually decides
 	// the ship-size read.
@@ -292,7 +296,7 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// it is fixed where it is made, in the dash length above. What is left here is
 	// the honest mip trade: a barely-resolved rung keeps most of its energy and
 	// loses a little of its bite.
-	float show = res * mix(0.18, 1.0, smoothstep(0.06, 0.46, crisp));
+	float show = res * mix(0.70, 1.0, smoothstep(0.06, 0.46, crisp));
 	// The specular break-up gets its own, lower weight, and the asymmetry is the
 	// point. Occlusion is a bounded multiply on albedo, so an unresolved fibre
 	// averages honestly to the mean and the coat simply gets smoother. A specular is
@@ -300,7 +304,15 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// highlight does not average to the mean, it averages to a smear — and run at
 	// the occlusion's weight the dog's flank came back wearing a bright greasy lens
 	// where it should have had a coat. Half is what a lobe can carry at the limit.
-	float show_spec = res * mix(0.42, 1.0, smoothstep(0.06, 0.46, crisp));
+	//
+	// It is a *ratio* to the occlusion floor above, not an absolute, and the round
+	// that reverted occlusion to 0.18 while leaving this at 0.42 inverted it: the
+	// specular then ran at 2.3x the occlusion, so the only coat signal that
+	// survived was the smear, which is precisely the pale greasy patch a blind
+	// reviewer found on the shoulder. Kept a touch under half of `show` now, so
+	// that whatever the coat says at the sampling limit it says mostly in shadow
+	// between the fibres rather than in highlight along them.
+	float show_spec = res * mix(0.30, 1.0, smoothstep(0.06, 0.46, crisp));
 	// The normal perturbation gets a harder gate again, because it is the term
 	// that aliases worst. A tint of a few per cent at sub-pixel pitch averages
 	// away; a six-degree tilt of the normal under a directional key does not — it
@@ -335,10 +347,21 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 		? (w0 * pitch0 + w1 * pitch1 + w2 * pitch2 + w3 * pitch3) * inv
 		: pitch0) * 0.13, pitch0 * 0.26);
 	float fc = pet_tier_fade(px / pitch_c);
+	float ck = pet_tier_crisp(px / pitch_c);
 	float dc = 0.0, rc = 0.5, nc = 0.0, lock = 0.0;
 	if (fc > 0.002) {
-		lock = pet_fibre_tier(t, pitch_c, 0.75, 4.0, 31.0,
-			1.0 - pet_tier_crisp(px / pitch_c), dc, rc, nc);
+		// Aspect measured in rendered pixels rather than argued about, because the
+		// rig-unit number was defensible and the picture was not. At ship size the
+		// groom frame reports 174 px per rig unit and `pitch_c` floors at 12.5 lanes
+		// per unit, so one lock lane is fourteen screen pixels. At the old aspect of
+		// four the dash ran four lanes — 0.32 rig units, about fifty pixels — on a
+		// cat whose barrel is a hundred and fifty pixels long. A third of the torso
+		// in one straight mark is not a lock; it is the plank, arriving through the
+		// one tier that resolves well enough to draw it clearly. Just under two
+		// lanes puts the clump at twenty pixels: coarse enough to survive the
+		// ship-size downsample, short enough that a field of them cannot line up
+		// into a stripe.
+		lock = pet_fibre_tier(t, pitch_c, 0.75, 1.9, 31.0, 1.0 - ck, dc, rc, nc);
 	}
 	// The coat parts along the locks, so the strands thin out where a lock edge
 	// runs. Modulating *coverage* is what gives the coat its second scale of
@@ -354,11 +377,12 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// several strands at the sampling limit is a broad stripe. Raised only as far as
 	// the strands under it can now justify — with real tooth beneath it the lock
 	// reads as the coat parting rather than as banding.
-	float lock_amp = mix(0.14, 1.0, crisp);
+	float lock_amp = mix(0.30, 1.0, crisp);
 	float part = mix(1.0 - 0.34 * lock_amp, 1.0, lock);
 
 	Coat c;
 	c.tuft = lock;
+	c.tuft_res = fc * ck;
 	c.res = res;
 	c.crisp = crisp;
 
@@ -370,6 +394,30 @@ Coat pet_fur(vec2 t, vec2 across_s, float density, float px, float fluffy) {
 	// be re-tuned around a coat.
 	c.occ = mix(1.0, mix(1.0 - 0.17 * amp, 1.0 + 0.24 * amp, strand * part),
 		fluffy * show);
+	// The clump is deliberately NOT given an occlusion term of its own, and the
+	// reason is a measured negative result worth keeping, because the argument for
+	// giving it one is a good argument.
+	//
+	// It goes: at ship size a strand lane is two screen pixels and a lock lane is
+	// fourteen, so the strands are at the sampling limit and the clump is nowhere
+	// near it; a feature that has to survive the downsample must therefore be hung
+	// on the clump. That reasoning is correct and it is why the sheen is broken by
+	// the clump in `creature_body.gdshader`. Multiplying `c.occ` by the same field,
+	// balanced about its measured mean so the animal's lightness did not move,
+	// raised high-frequency contrast on the torso from 3.57 to 4.98 — the best
+	// number this metric has ever reported here — and the picture was corduroy. A
+	// screenful of long bright combed strokes down the flank, which is the plank
+	// under a new name.
+	//
+	// What the number missed is that a lock is a *dash along the groom*, so a field
+	// of them lines up end to end whatever their length, and contrast laid straight
+	// onto albedo has nothing to break that alignment. The sheen survives the same
+	// field because it is multiplying a broad lobe that is already falling away in
+	// its own direction, and the two falloffs cross. So: the clump may shape
+	// something that has a shape of its own. It may not *be* the shape.
+	//
+	// Keep this the next time high-frequency contrast is the metric. It measures
+	// how much the coat says and not one thing about whether what it says is hair.
 
 	// Slopes are divided by their own pitch so a fine rung does not tilt the
 	// normal harder than a coarse one just for being denser. The lock gets a

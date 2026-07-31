@@ -276,20 +276,32 @@ static func build() -> S:
 	var fc_far := _part(&"leg_hind_far_lower", Vector2(-0.036, -0.278), Vector2(0.104, -0.036), 0.031, 0.026, COL_TARSUS_DARK, 0)
 	fc_far.surface = P.Surface.SCALE
 	fc_far.blend = 0.022
-	# Flat on the floor like the near toe, and one hundredth *above* it: the far
-	# foot is half a step behind, so a shade of clearance is honest, but the 0.029
-	# it used to hang at was a visible hover on the one animal in the build whose
-	# grounding was already under review.
-	var ft_far := _part(&"leg_hind_far_toe", Vector2(0.104, -0.036), Vector2(0.242, -0.024), 0.024, 0.012, COL_TARSUS_DARK, 0)
-	ft_far.surface = P.Surface.CLAW
-	ft_far.blend = 0.016
+	# The far toe is gone and its slot bought the second primary on the near wing.
+	#
+	# It is the same test the cat and the dog both applied to their far paws, and it
+	# fails the same way: at ship size the far toe was four pixels of
+	# `COL_TARSUS_DARK` lying directly behind a near toe of the same length in the
+	# same family, inside the contact shadow, on the far side of a leg the BEHIND
+	# layer has already darkened and desaturated. Cropped out of a 260 px frame and
+	# magnified, the near foot and the far foot are one shape. The far tarsus now
+	# runs to its own cap at y = -0.036 with radius 0.026, so its underside sits
+	# 0.010 off the floor — a leg lying behind the body needs to *end*, and a cap on
+	# the ground line does that.
+	#
+	# What the slot buys is on the wing, which is the one part of this animal the
+	# review says outright is not working: "the folded wing wants distinct flight
+	# feathers rather than a smooth mass." A second primary is the cheapest thing
+	# that can answer it, because a feather is only legible against another feather.
+	# One capsule tapering to a point is a fin however it is shaded; two capsules
+	# with staggered tips are a wing, and the stagger is a *silhouette* feature,
+	# which is the only class of feature that survives the downsample intact.
 	# One far primary, sitting a hair higher than the near bundle so a sliver of
 	# it shows past the near wing tip. That sliver is the entire depth read on a
 	# bird held in profile — without it the folded wing is a flat decal.
 	var wing_far := _part(&"flank_far_primary", Vector2(-0.260, -0.782), Vector2(-0.535, -0.748), 0.058, 0.020, COL_FLIGHT_DARK, 0)
 	wing_far.height_scale = 0.34
 	wing_far.blend = 0.022
-	parts.append_array([fl_far, fc_far, ft_far, wing_far])
+	parts.append_array([fl_far, fc_far, wing_far])
 
 	# --- the egg ------------------------------------------------------------
 	# Three capsules on one rising axis, blended hard enough that they stop being
@@ -481,19 +493,36 @@ static func build() -> S:
 	parts.append_array([ff, fl, fc, ft, hal])
 
 	# --- folded wing --------------------------------------------------------
-	# Named `flank_*` and not `wing_*`, and that is load-bearing rather than
-	# cosmetic. `RigBoneMap` routes any id containing `wing`, `covert`, `primary` or
-	# `secondary` to `Slot.WING`, and `RigSkeleton.build` then fits it as an
-	# articulated limb — twice, because the `fore` loop it sits inside is only
-	# skipped for `Slot.LIMB`, so both passes add the same bone names and parts end
-	# up bound against duplicated rest transforms. The measured result was the wing
-	# collapsing: the secondary's root snapped onto the covert's root and the primary
-	# tip was dragged from x = -0.59 to -0.30, which is why the folded wing was
-	# unreadable no matter how it was coloured. Classified on `flank` it becomes a
-	# SPINE part, rides the torso rigidly, and holds the shape authored here to
-	# within a hundredth of a unit. A perched songbird's folded wing does not
-	# articulate anyway. See the hand-off: this wants fixing in the rig, and until it
-	# is, a species that names a wing `wing` gets a broken one.
+	# Named `flank_*` and not `wing_*`, and as of this round that is a *choice*
+	# rather than a workaround. The history matters because the comment that used to
+	# sit here said the opposite, and a stale "you have no option" is the most
+	# expensive kind of comment to leave lying about.
+	#
+	# `RigBoneMap` routes any id containing `wing`, `covert`, `primary` or
+	# `secondary` to `Slot.WING`, and `RigSkeleton.build` used to fit that slot
+	# *twice*, because the `fore`/`hind` loop it sat inside was only skipped for
+	# `Slot.LIMB`. Both passes added the same bone names; the name table kept the
+	# second copy and `_bind_parts_to_bones` matched the first, so the wing was
+	# skinned to a duplicate nothing ever posed. It collapsed — the secondary's root
+	# snapped onto the covert's root and the primary tip was dragged from x = -0.59
+	# to -0.30. `skeleton.gd` now fits wings once per side, outside that loop, and
+	# the rig agent has confirmed it.
+	#
+	# So the wing could be called `wing_*` today and would articulate. It stays
+	# `flank_*`, deliberately, for two reasons. A perched songbird's folded wing
+	# does not articulate — it is pressed against the flank and moves with the
+	# ribcage, which is exactly what a SPINE part does and exactly what an
+	# articulated chain would have to be constrained back into. And the three
+	# capsules below carry no segment tokens, so `_fit_limb` would have to guess
+	# which of them is the root; the near leg's block above records what that costs
+	# when it guesses wrong.
+	#
+	# What renaming would genuinely buy is a wing that opens, and that is a flight
+	# pose this build does not have yet. When it does, the honest version is
+	# `wing_upper_covert` / `wing_lower_secondary` / `wing_foot_primary` — the
+	# anatomy in the id and the segment stated rather than inferred — and the
+	# capsules re-authored around a folded rest pose that an IK solve can open. That
+	# is a round's work on its own, not a rename.
 	#
 	# In BODY, not FRONT. A folded wing is not held away from the flank; it is
 	# pressed flat against it, so the honest model is a patch on the body rather than
@@ -533,10 +562,16 @@ static func build() -> S:
 	var w_cov := _part(&"flank_covert", Vector2(0.168, -0.834), Vector2(-0.050, -0.790), 0.078, 0.096, COL_FLIGHT)
 	w_cov.height_scale = 0.86
 	w_cov.blend = 0.016
-	var w_sec := _part(&"flank_secondary", Vector2(-0.050, -0.790), Vector2(-0.278, -0.752), 0.096, 0.062, COL_FLIGHT_DARK)
+	# The secondary starts 0.008 fatter than the covert row ends, and the step is
+	# the same trick the primaries use on each other: a capsule that begins wider
+	# than the one it meets leaves an overhang, and a tight union turns the overhang
+	# into a crease. That crease is the lower margin of the greater coverts — the
+	# one line on a folded wing that a viewer can actually name — and it costs a
+	# thousandth of a rig unit rather than a uniform slot.
+	var w_sec := _part(&"flank_secondary", Vector2(-0.050, -0.790), Vector2(-0.278, -0.752), 0.104, 0.062, COL_FLIGHT_DARK)
 	w_sec.surface = P.Surface.CLAW
 	w_sec.height_scale = 0.44
-	w_sec.blend = 0.014
+	w_sec.blend = 0.012
 	# The primaries carry the one piece of the wing that is allowed to be geometry
 	# rather than paint. Everything forward of here is buried in the flank and can
 	# only ever be a painted patch, but past the rump the body has run out and the
@@ -546,11 +581,70 @@ static func build() -> S:
 	# part: a shape that breaks the outline is read as a separate object for free,
 	# and wing tips crossing over the base of the tail is exactly how a perched
 	# passerine folds.
-	var w_pri := _part(&"flank_primary", Vector2(-0.276, -0.754), Vector2(-0.590, -0.748), 0.062, 0.024, COL_FLIGHT_DARK)
+	#
+	var w_pri := _part(&"flank_primary", Vector2(-0.272, -0.762), Vector2(-0.594, -0.756), 0.058, 0.020, COL_FLIGHT_DARK)
 	w_pri.surface = P.Surface.CLAW
 	w_pri.height_scale = 0.30
-	w_pri.blend = 0.014
-	parts.append_array([w_cov, w_sec, w_pri])
+	w_pri.blend = 0.012
+	# The tertial, and it is the answer to "the folded wing wants distinct flight
+	# feathers rather than a smooth mass". It took two attempts and the first one is
+	# worth recording, because it was the obvious move and the pixels refused it.
+	#
+	# Attempt one was a second primary with its tip staggered 0.096 short of the
+	# first, on the reasoning that a notch in the *outline* is the only class of
+	# detail a 260 px downsample cannot erase. Rendered and cropped at 4x, the notch
+	# was there and it was worth almost nothing, and the geometry says why: over the
+	# run where the tips fall, the wing is sandwiched between the body's back at
+	# y = -0.826 and the tail's upper surface at y = -0.74. That is 0.086 of vertical
+	# room, 13 rendered pixels, for two feather edges *and* the daylight between
+	# them — and the inner tip landed at -0.722 against a tail top of -0.7405, so it
+	# was inside the tail. The outline it was cut into was the tail's, not the sky's.
+	#
+	# What that region has instead of room is a contrast problem: everything behind
+	# x = -0.35 is dark navy against dark navy, because the pale underparts have
+	# ended and the marking gate caps how far the wing may sit from the mantle. So
+	# the second feather is drawn where the contrast is, at the *front* of the wing,
+	# and it is drawn in the one way the palette cannot veto — as a pale edge.
+	#
+	# A tertial fringe is not a stylisation. The innermost secondaries on a
+	# passerine carry a conspicuous pale margin, and along with the covert bar it is
+	# the field mark that makes a folded wing read as a folded wing rather than as a
+	# dark patch. Buff rather than cream, and thin rather than broad: `takes` for
+	# luminance 0.86 is 0.014, so this slot is immune to the mackerel mix that would
+	# otherwise pull it 88% toward slot 1, and it is 0.95 of RGB distance from the
+	# mantle, which clears `distinct` with an order of magnitude to spare.
+	#
+	# Which line it lies on was measured off the frame rather than derived, and the
+	# two do not agree. The covert capsule's own upper surface runs at y = -0.886 at
+	# x = -0.05, but a buried part only paints where `engulf` lets it, so the
+	# *visible* wing boundary sits well inside the capsule that draws it — measured
+	# on a 4x crop of the 260 px frame, at y ≈ -0.856. The first pass put the fringe
+	# on the authored surface and it came back floating on the mantle above the wing,
+	# which is a badge, not an edge. These endpoints are on the measured line.
+	#
+	# The taper runs the other way from every other capsule in this block, and that
+	# is the difference between a feather margin and a dash. A fringe has to *start*
+	# somewhere without announcing it: pointed at the front, where it emerges from
+	# under the shoulder, and fattest at the rear where the rump swallows it. The
+	# first pass had it 0.017 at the front and 0.011 at the back, so it began with a
+	# blunt cap two thirds of its own width across and ended with another one, and at
+	# 260 px that is a white rectangle lying on a bird. Nothing about the colour
+	# changed to fix it.
+	#
+	# Buff rather than cream, and the palette has no room for a dimmer one — of the
+	# three pale slots this species owns, `COL_CHEEK` is the darkest, and every
+	# mid-tone in the table is below the marking gate and would be mixed 88% back to
+	# the mantle. So the weight of this feature is controlled by its width and its
+	# shape alone, and that took one more pass: at 0.015 of radius the fringe was
+	# 4.5 rendered pixels wide and it was the brightest thing on the animal, which is
+	# not what a feather margin is for. At 0.011 it is three pixels tapering to one,
+	# and it reads as the edge of something rather than as a mark laid on top of it.
+	# Dropped 0.006 with it so it sits just under the covert boundary rather than
+	# beside it — a fringe is the last of the feather, not a line drawn near one.
+	var w_ter := _part(&"flank_tertial", Vector2(-0.046, -0.860), Vector2(-0.284, -0.788), 0.005, 0.011, COL_CHEEK)
+	w_ter.height_scale = 0.40
+	w_ter.blend = 0.010
+	parts.append_array([w_cov, w_sec, w_pri, w_ter])
 
 	# --- beak ---------------------------------------------------------------
 	# Hard keratin, so CLAW rather than SKIN: the claw model pipes light along the

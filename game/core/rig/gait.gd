@@ -44,17 +44,33 @@ const HIND_NEAR := 2
 const HIND_FAR := 3
 const FOOT_COUNT := 4
 
-## Footfall phase per slot, then duty factor, then `lift` — how much further the
-## body travels, up and down and through the feet, than it does at a walk.
+## Footfall phase per slot, then duty factor, then two amplitudes: `lift` is how
+## high the *feet* swing, `rise` is how far the *body* travels vertically, both as
+## a multiple of what a walk does.
 ## Phase order: fore-near, fore-far, hind-near, hind-far.
+##
+## These were one number for four rounds, and that is why the walk had no body.
+## A walking cat lifts its paws barely at all — it is the least athletic thing it
+## does with its feet — and still drops its chest at every footfall and pushes it
+## back up, because the vertical budget of a walk is spent in the *legs flexing*,
+## not in the feet leaving the ground. Tied together, the only way to give the
+## trunk a stride was to make the animal prance, so the trunk never got one: the
+## walk's body budget sat at 1.00 by definition and delivered 11 px of trunk
+## height at ship size against the gallop's 30, and the legs, which only bend as
+## much as the body above them moves, stayed the four straight sticks a reviewer
+## named. Split, the walk can have a real vertical without its feet leaving the
+## floor. `rise` for the faster patterns is trimmed a little below the `lift` it
+## used to share, because the spring below hands them back what the old follower
+## was shearing off every landing.
 const PATTERNS := {
-	Kind.WALK: {"phase": [0.62, 0.12, 0.00, 0.50], "duty": 0.62, "lift": 1.00},
-	Kind.TROT: {"phase": [0.50, 0.00, 0.00, 0.50], "duty": 0.45, "lift": 1.35},
-	Kind.RUN: {"phase": [0.40, 0.49, 0.09, 0.00], "duty": 0.32, "lift": 1.75},
-	Kind.HOP: {"phase": [0.00, 0.00, 0.00, 0.00], "duty": 0.42, "lift": 2.10},
+	Kind.WALK: {"phase": [0.62, 0.12, 0.00, 0.50], "duty": 0.62, "lift": 1.00, "rise": 1.60},
+	Kind.TROT: {"phase": [0.50, 0.00, 0.00, 0.50], "duty": 0.45, "lift": 1.35, "rise": 1.18},
+	Kind.RUN: {"phase": [0.40, 0.49, 0.09, 0.00], "duty": 0.32, "lift": 1.75, "rise": 1.55},
+	Kind.HOP: {"phase": [0.00, 0.00, 0.00, 0.00], "duty": 0.42, "lift": 2.10, "rise": 1.85},
 }
 ## A biped walks its two legs in antiphase; the fore slots stay unused.
-const BIPED_WALK := {"phase": [0.0, 0.0, 0.00, 0.50], "duty": 0.60, "lift": 1.15}
+const BIPED_WALK := {"phase": [0.0, 0.0, 0.00, 0.50], "duty": 0.60, "lift": 1.15,
+	"rise": 1.60}
 
 
 class Foot:
@@ -131,6 +147,14 @@ var flex := 0.0
 ## stride rate, so it is also the only body channel that is not in lockstep with
 ## the bob — which is what stops the whole animal reading as one oscillator.
 var withers := 0.0
+## Trunk pitch from the animal's own fore-aft acceleration, radians, positive
+## nose-down. Separate from `pitch` and deliberately **not** gated on the gait
+## running, because the whole event it exists for happens after the gait has
+## stopped: a cat braking out of a trot rocks onto its forehand, hangs there, and
+## rides back. Measured before this existed, post-brake pitch was exactly 0.0000
+## — the animal halted like a parked vehicle, which is the last thing a body with
+## mass does.
+var brake := 0.0
 var surge := 0.0
 ## Lateral body wave for sprawling locomotion, sampled per spine bone.
 var undulation := 0.0
@@ -222,6 +246,89 @@ const WITHERS_MAX := 0.20
 ## this one exists so a *walk*, which barely gathers at all, still has a topline
 ## that changes shape instead of a plank that translates.
 const FLEX_BOB := 1.30
+## Share of the trunk's vertical that comes from the *support force* rather than
+## from leg geometry, measured as a fraction of the geometric term's own swing
+## over the reference cycle.
+##
+## This is the term the walk was missing, and it is worth spelling out why,
+## because the diagnosis took longer than the fix. Bob was derived purely from
+## kinematics: average the height each stance leg permits its girdle to sit at,
+## and follow it. At a gallop one leg is down at a time, so that average *is* one
+## leg's pendulum and the curve has the shape of a stride. At a walk two or three
+## legs are down at every instant and the average is dominated by *which* legs are
+## currently in it — measured on the cat, the mean stepped as the count went
+## 3-2-3-2 and came out as a single slow hump per stride, 0.027 units of it, with
+## no footfall visible anywhere in the curve. One rock per stride is a boat, not a
+## walk, and it is exactly what a reviewer means by a crate on four sticks.
+##
+## The signal that was thrown away is the one the body actually rides on: the
+## total vertical support, which `load` already computes for the attitude channels
+## and which the height solver never looked at. Its frequency content is correct
+## for every pattern in the table without a single per-gait constant, because it
+## falls out of the phase offsets: the walk's four feet sit at offsets 0.00, 0.12,
+## 0.50 and 0.62, which is two antiphase pairs, and a pair in antiphase has no odd
+## harmonics — so the walk and the trot both bounce **twice** per stride, and the
+## gallop, whose offsets are all clustered, bounces once. That is the real
+## difference between the gaits, and no table encodes it.
+##
+## Normalised against the geometric term's own swing rather than given an
+## absolute size, so it means the same thing on a lizard and a whippet and so the
+## authored `spec.bob` still decides the amplitude.
+const BOUNCE_SHARE := 1.25
+## Trunk vertical spring: natural frequency in rad/s and damping ratio.
+##
+## Bob was the last channel in this file still driven by a one-pole follower, and
+## a one-pole cannot overshoot — it can only arrive late. At a gallop that did not
+## show, because `_fly` supplies the overshoot for free: the body is a projectile
+## and comes down with real momentum. At a walk nothing leaves the ground, so the
+## trunk sat exactly on the height its legs implied, filtered, at every instant of
+## every stride. A body with no mass is furniture by definition.
+##
+## Fast and only lightly underdamped, for the reason the trunk-shape spring next
+## door already documents: the drive is at twice the stride rate wherever the
+## couplets are in antiphase — 4 Hz at the cat's walk, 8 Hz at the dog's trot —
+## and a spring slow enough to wallow prettily is a spring that arrives after the
+## footfall that caused it. At 80 rad/s the lag against a walk's bounce is 26°
+## where the follower it replaces sat at 17°, and the step overshoot is 8%: a
+## landing that dips past its mark and comes back, which is the whole of what mass
+## looks like from outside.
+##
+## `_bob_vel` is shared with the suspension, so a body that leaves the ground and
+## lands arrives in stance still carrying its downward momentum instead of being
+## snapped to rest by the first frame of support.
+const BOB_OMEGA := 80.0
+const BOB_ZETA := 0.62
+## Radians of nose-down trunk rock per rig unit/s of speed the animal sheds, and
+## the spring that carries it back.
+##
+## Fed as an **impulse** rather than as an acceleration, which is the only
+## formulation that survives how speed actually arrives here. A scripted stop is
+## a step — the brain writes 1.79 one frame and 0.0 the next — and the derivative
+## of a step is one frame of a very large number, which any filter downstream
+## turns into a shrug. Accumulating the *change* instead means the rock is sized
+## by how much speed was lost and not by how many frames it took to lose it, so
+## the same brake reads the same whether the pet eased to a halt or was told to
+## stop dead.
+##
+## Slow and lightly damped, unlike everything else in this file: it is not
+## tracking a footfall, it is one event with a long tail. 9.5 rad/s is a rock that
+## takes about two thirds of a second to come back, and at ζ 0.34 it comes back
+## past level and settles on the second swing — which is what a cat stopping
+## actually does, and what "post-brake pitch is exactly 0.00" was the absence of.
+const BRAKE_PITCH := 1.15
+const BRAKE_OMEGA := 9.5
+const BRAKE_ZETA := 0.34
+## Ceiling on the rock, radians. Soft, like every other attitude limit here.
+const BRAKE_MAX := 0.26
+## What a sprawling animal keeps of a declared body rise.
+##
+## A lizard is a lateral undulator: the belly stays low and close to level and
+## everything the trunk does is a wave in plan view, which `undulation` already
+## carries. `pitch` and `flex` are already scaled down for the family here for
+## the same reason; the height channel was the one that was not, and on a body
+## that walks with its belly a fifth of a unit off the floor the extra sink goes
+## straight through the ground plane.
+const SPRAWL_RISE := 0.72
 ## Trunk-shape spring: natural frequency in rad/s and damping ratio.
 ##
 ## These were one-pole followers, and a one-pole cannot overshoot — it can only
@@ -263,6 +370,14 @@ var _family: int = CreatureSpec.Locomotion.QUADRUPED
 var _body_height := 1.0
 var _stride_ref := 0.4
 var _bob_gain := 1.0
+## Rig units of trunk lift per unit of normalised support-force deviation, sized
+## against the geometric term over the reference cycle so `BOUNCE_SHARE` reads as
+## a ratio rather than as a magic length.
+var _bounce_gain := 0.0
+## Limbs this species actually authored. The support-force reference is a sum
+## over them, and reading a missing forehand as a permanently unloaded pair would
+## make a biped walk permanently light on its feet.
+var _feet_present := 0
 var _body_len := 0.5
 ## Mean support height over the reference cycle; bob oscillates around it.
 var _support_ref := 0.5
@@ -296,6 +411,11 @@ var _air_frac := 0.0
 ## Spring velocities for the two trunk-shape channels.
 var _flex_vel := 0.0
 var _withers_vel := 0.0
+## Brake-rock spring state, the unlimited angle it integrates, and the speed it
+## is differenced against.
+var _brake_vel := 0.0
+var _brake_rock := 0.0
+var _prev_speed := 0.0
 
 
 func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
@@ -338,6 +458,7 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 		support_n += 1
 		min_x = minf(min_x, f.root_bind.x)
 		max_x = maxf(max_x, f.root_bind.x)
+	_feet_present = support_n
 	_reach_ref = reach_sum / float(maxi(support_n, 1))
 	_crouch = _reach_ref * (1.0 - STANCE_COMPRESSION)
 	_body_len = maxf(max_x - min_x, 0.2) if support_n > 1 else 0.5
@@ -359,7 +480,8 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 	settle()
 
 
-## Find the gain that makes the geometric bob match the authored `spec.bob`.
+## Find the gain that makes the bob match the authored `spec.bob`, and the gain
+## that sizes the support-force term against the geometric one.
 ##
 ## The raw inverted-pendulum drop is always an overestimate — legs flex under
 ## load — and averaging four out-of-phase legs damps it much further, by an
@@ -367,12 +489,20 @@ func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 ## proportions. Rather than guess a constant, sample one reference walk cycle
 ## and measure the peak-to-peak directly. Cheap (it runs once per rebuild) and
 ## it means a long-legged dog and a squat lizard both land on their authored bob.
+##
+## Two channels now, sampled in the same sweep: the leg geometry, and the total
+## support force the feet are putting into the ground. The second is sized off
+## the first (see `BOUNCE_SHARE`) and then the sum is scaled to the authored
+## amplitude, so adding it changes the *shape* of the walk and not its budget —
+## which is the point, because the shape was what was wrong.
 func _calibrate_bob(spec: CreatureSpec) -> float:
 	const SAMPLES := 96
 	var pat: Dictionary = BIPED_WALK if _family == CreatureSpec.Locomotion.BIPED_HOP \
 		else PATTERNS[Kind.WALK]
 	var d := float(pat["duty"])
 	var sweep: float = _stride_ref * d
+	var geo := PackedFloat32Array()
+	var bounce := PackedFloat32Array()
 	var lo := INF
 	var hi := -INF
 	## Deepest the reach constraint will ever push the body during this cycle.
@@ -381,6 +511,7 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 		var c := float(s) / float(SAMPLES)
 		var w_sum := 0.0
 		var h_sum := 0.0
+		var load_sum := 0.0
 		for i in FOOT_COUNT:
 			var f: Foot = feet[i]
 			if not f.present:
@@ -394,9 +525,10 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 			if not stance:
 				continue
 			w_sum += 1.0
+			var st: float = ph / d
+			load_sum += sin(PI * st)
 			# Stance sweeps the contact back linearly under the body; the ankle is
 			# then read off it through the roll, exactly as `_ankle_for` does.
-			var st: float = ph / d
 			var contact := Vector2(f.contact_bind.x + sweep * (0.5 - st), 0.0)
 			var ankle: Vector2 = contact - f.contact_arm.rotated(_stance_pitch(st))
 			var dx: float = ankle.x - f.root_bind.x
@@ -407,10 +539,12 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 			h_sum += support - f.support_ref
 			ceil_max = maxf(ceil_max, -f.root_bind.y - support)
 		var mean: float = (h_sum / w_sum) if w_sum > 0.0 else 0.0
+		geo.append(mean)
+		bounce.append(_bounce_of(load_sum, d))
 		lo = minf(lo, mean)
 		hi = maxf(hi, mean)
-	var span: float = hi - lo
-	if not is_finite(span) or span < 1e-5:
+	var geo_span: float = hi - lo
+	if not is_finite(geo_span) or geo_span < 1e-5:
 		return 1.0
 	_support_ref = (lo + hi) * 0.5
 	# A foot planted ahead of the hip needs more leg than one straight under it.
@@ -419,8 +553,50 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 	# appears — the animal walks with a nearly rigid trunk. So buy exactly the
 	# headroom this cycle asks for, plus room for the authored swing, and fade it
 	# in with speed: a cat stands tall and walks low, which is the same thing.
-	_move_crouch = maxf(ceil_max - _crouch, 0.0) + spec.bob * _body_height
+	# Headroom for this cycle's own `rise`, not for one unit of it. The walk's body
+	# budget is no longer pinned at 1.00 (see `PATTERNS`), and buying a single
+	# unit's worth would leave the reach limit shearing the top off three quarters
+	# of the new amplitude before it reached the picture.
+	var walk_rise: float = float(pat["rise"])
+	if _family == CreatureSpec.Locomotion.SPRAWLING:
+		walk_rise *= SPRAWL_RISE
+	_move_crouch = maxf(ceil_max - _crouch, 0.0) + spec.bob * _body_height * walk_rise
+
+	var b_lo := INF
+	var b_hi := -INF
+	for v in bounce:
+		b_lo = minf(b_lo, v)
+		b_hi = maxf(b_hi, v)
+	var b_span: float = b_hi - b_lo
+	_bounce_gain = (BOUNCE_SHARE * geo_span / b_span) if b_span > 1e-5 else 0.0
+
+	# Peak-to-peak of what the runtime will actually target, not of one of its two
+	# halves. The two terms are close to a quarter cycle apart, so calibrating on
+	# the geometry alone would have overshot the authored amplitude by the whole of
+	# the new term.
+	var t_lo := INF
+	var t_hi := -INF
+	for s in SAMPLES:
+		var v: float = (_support_ref - geo[s]) + _bounce_gain * bounce[s]
+		t_lo = minf(t_lo, v)
+		t_hi = maxf(t_hi, v)
+	var span: float = t_hi - t_lo
+	if not is_finite(span) or span < 1e-5:
+		return 1.0
 	return clampf((spec.bob * _body_height * 2.0) / span, 0.1, 12.0)
+
+
+## Deviation of the total vertical support from its own cycle mean, normalised.
+##
+## The mean is exact rather than followed: one foot's half-sine of load averages
+## `2/PI` of its peak over the fraction of the cycle it is down, so a whole animal
+## averages `feet x duty x 2/PI` and the reference needs no filter to settle. A
+## follower here would lag the very transient this term exists to deliver.
+func _bounce_of(load_sum: float, d: float) -> float:
+	var ref: float = float(_feet_present) * d * 2.0 / PI
+	if ref < 1e-4:
+		return 0.0
+	return load_sum / ref - 1.0
 
 
 ## Snap every foot back to its bind position and zero the cycle.
@@ -433,6 +609,10 @@ func settle() -> void:
 	girdle_twist = 0.0
 	flex = 0.0
 	withers = 0.0
+	brake = 0.0
+	_brake_vel = 0.0
+	_brake_rock = 0.0
+	_prev_speed = speed
 	_fore_load_mean = 0.0
 	_bob_mean = 0.0
 	_bob_vel = 0.0
@@ -527,6 +707,7 @@ func advance(dt: float) -> void:
 		return
 	var v: float = maxf(speed, 0.0)
 	exertion = clampf(v / maxf(_spec.run_speed, 1e-3), 0.0, 1.0)
+	_advance_brake(dt, v)
 
 	if kind == Kind.IDLE or v < 0.02:
 		_idle_step(dt)
@@ -579,6 +760,26 @@ func advance(dt: float) -> void:
 		f.support = _support_height(f)
 
 	_solve_body(dt)
+
+
+## The trunk rocking on its own momentum. Runs before the gait branches, so it is
+## alive through the standstill that follows a stop rather than only while the
+## feet are still cycling. See `BRAKE_PITCH`.
+func _advance_brake(dt: float, v: float) -> void:
+	# The impulse is the speed lost this step, not the acceleration it implies.
+	_brake_vel += (_prev_speed - v) * BRAKE_PITCH
+	_prev_speed = v
+	var h: float = clampf(dt, 0.0, 0.02)
+	_brake_vel += (-_brake_rock * BRAKE_OMEGA * BRAKE_OMEGA
+		- _brake_vel * 2.0 * BRAKE_ZETA * BRAKE_OMEGA) * h
+	_brake_rock += _brake_vel * h
+	# The limiter sits between the spring and the picture, never inside the loop.
+	# Fed back into the state it is not a limit at all, it is a per-frame haircut:
+	# `_soft_clip` takes 15% off a 0.02 rad rock, and applied every step at 120 Hz
+	# that is an extra 18/s of damping nothing in the constants accounts for. It
+	# held the first version of this to 1.5° and killed it inside 0.3 s, which is
+	# indistinguishable from the handbrake it was written to fix.
+	brake = _soft_clip(_brake_rock, BRAKE_MAX)
 
 
 func _idle_step(dt: float) -> void:
@@ -693,12 +894,17 @@ func _solve_body(dt: float) -> void:
 	## Deliberately normalised — the attitude channels are about *when* weight
 	## hands over, not about how tall the animal is.
 	var load := [0.0, 0.0, 0.0, 0.0]
+	## Sum of the same, which is the total force holding the animal up. The
+	## attitude channels below want the *difference* between girdles; the height
+	## solver wants the sum, and until this round it never asked for it.
+	var load_sum := 0.0
 	for i in FOOT_COUNT:
 		var f: Foot = feet[i]
 		if not f.present:
 			continue
 		if f.stance:
 			load[i] = sin(PI * clampf(f.phase / maxf(duty, 1e-3), 0.0, 1.0))
+			load_sum += float(load[i])
 		var w: float = 1.0 if f.stance else 0.16
 		w_sum += w
 		# Attitude is a differential: how much higher than its *resting* height this
@@ -737,24 +943,32 @@ func _solve_body(dt: float) -> void:
 	if w_sum <= 0.0:
 		return
 
-	# `lift` finally does what the pattern table says it does. The pendulum's
+	# `rise` finally does what the pattern table says it does. The pendulum's
 	# geometry is nearly the same at every speed — a cat's legs are long next to
 	# its stride, so the support height only ever varies by a couple of
 	# hundredths — but a galloping animal's trunk travels far more than a walking
 	# one's, because most of that travel is ballistic and no static geometry can
-	# see it. `spec.bob` is authored for the walk; each faster pattern declares
-	# how much further the body goes.
+	# see it. `spec.bob` is the species' reference amplitude and every pattern,
+	# the walk included, declares its own multiple of it.
 	var ride: float = _crouch + _move_crouch \
 		* clampf(speed / maxf(_spec.walk_speed, 1e-3), 0.0, 1.0)
-	var lift: float = float(_pattern()["lift"])
-	var budget: float = _spec.bob * _body_height * lift
+	var rise: float = float(_pattern()["rise"])
+	if _family == CreatureSpec.Locomotion.SPRAWLING:
+		rise *= SPRAWL_RISE
+	var budget: float = _spec.bob * _body_height * rise
 	if stance_w <= 0.0:
 		_fly(dt, budget)
 	else:
 		_airborne = false
 		var mean: float = stance_h / stance_w
-		var target_bob: float = ride + (_support_ref - mean) * _bob_gain * lift
-		# `lift` is a budget as well as a gain. At a gallop the animal is often on a
+		# Geometry says how high the legs *permit* the body to ride; the support
+		# force says how hard they are pushing it there. The walk needs both — see
+		# `BOUNCE_SHARE` — and the gallop is almost all geometry and flight anyway,
+		# because at a duty of 0.32 there is rarely more than one foot down and the
+		# sum and the single leg's own pendulum are the same curve.
+		var drive: float = (_support_ref - mean) + _bounce_gain * _bounce_of(load_sum, duty)
+		var target_bob: float = ride + drive * _bob_gain * rise
+		# `rise` is a budget as well as a gain. At a gallop the animal is often on a
 		# single leg, and one pendulum swings far wider than the average of four
 		# does, so the raw geometry overshot the declared amplitude by well over
 		# double — a quarter of the cat's own height of vertical travel per stride.
@@ -767,17 +981,23 @@ func _solve_body(dt: float) -> void:
 		var over: float = absf(excess) / maxf(budget, 1e-5)
 		if over > 1.0:
 			target_bob = ride + signf(excess) * budget * (2.0 - 1.0 / over)
-		if is_finite(ceiling):
-			target_bob = maxf(target_bob, ceiling)
-		# One pole of smoothing: the body has mass and cannot follow a discontinuity
-		# in support the instant a foot lands. The rate scales with cadence, because
-		# the discontinuity *is* a footfall and footfalls arrive faster as the animal
-		# speeds up. Held fixed, the corner sits below the stride at anything past a
-		# stroll, which quietly halves the bob and drags what is left a sixth of a
-		# stride behind the feet that are meant to be causing it — which is what
-		# "the bob is out of phase with the footfalls" looks like from the outside.
-		bob = lerpf(bob, target_bob,
-			clampf(dt * maxf(26.0, frequency * 40.0), 0.0, 1.0))
+		# A spring, not a follower. The trunk has mass: it passes the height its
+		# legs are asking for and settles back, and it arrives in stance still
+		# carrying whatever momentum the suspension gave it, because `_bob_vel` is
+		# the same variable `_fly` integrates. See `BOB_OMEGA`.
+		var h0: float = clampf(dt, 0.0, 0.02)
+		_bob_vel += (-(bob - target_bob) * BOB_OMEGA * BOB_OMEGA
+			- _bob_vel * 2.0 * BOB_ZETA * BOB_OMEGA) * h0
+		bob += _bob_vel * h0
+		# The reach limit is a fact about bone length, so it binds the *state*, not
+		# just the target: a spring is allowed to overshoot downward, which is a leg
+		# compressing under load, and is not allowed to overshoot upward, which is a
+		# foot leaving the ground in the middle of a stance phase. Only the offending
+		# half of the velocity is removed, so a body pressed against the limit still
+		# falls away from it the moment the geometry lets go.
+		if is_finite(ceiling) and bob < ceiling:
+			bob = ceiling
+			_bob_vel = maxf(_bob_vel, 0.0)
 	# Slow-followed centre of the bob, so the channels that ride it below are
 	# deviations rather than copies of the crouch the animal happens to be at.
 	_bob_mean = lerpf(_bob_mean, bob, clampf(dt * 1.6, 0.0, 1.0))

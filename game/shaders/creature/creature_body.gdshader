@@ -173,7 +173,21 @@ uniform bool defer_tonemap = false;
 //                                             normal: where the field is lying
 //  19 part-to-part cast shadow, flat  21 the two heights the near shadow tap
 //  20 which depth layer is receiving      compares: terrain red, receiver green
+//  22 clump field, how well it resolves 23 coat occlusion before and after the
+//     and `frame_ok` — the view that        frame gate, amplified six times and
+//     found the frame gate scaling with     centred on grey, plus `ctx.detail`.
+//     the window instead of the animal      Flat grey here means the coat is in
+//                                           the algebra and not in the picture.
 uniform int debug_view = 0;
+
+// Mean of the coat's clump field over a body mass, measured off debug view 22
+// rather than derived. A fibre tier returns a ridge profile times a segment
+// mask, and neither is anywhere near a half — the field spends most of its area
+// in the gaps between locks. Anything that modulates by the clump has to be
+// balanced around this number or it changes the animal's overall value as a side
+// effect of adding texture, which is how a coat pass gets blamed for a lighting
+// regression.
+const float COAT_TUFT_MEAN = 0.163;
 
 const int MAT_FUR = 0;
 const int MAT_FEATHER = 1;
@@ -1162,6 +1176,11 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	// roughness prefilter below.
 	float coat_res = 1.0;
 	float coat_crisp = 1.0;
+	// The clump field and how well it resolves, for the sheen block far below.
+	// Neutral defaults — mid clump, no confidence — so a scale or a feather is
+	// untouched by a term that only fur has.
+	float coat_tuft = COAT_TUFT_MEAN;
+	float coat_tuft_res = 0.0;
 
 	// Where two capsules smooth-union, the blended frame turns fast: `groom` and
 	// `grad` are interpolated by the same weight that blended the distance, and
@@ -1170,20 +1189,36 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 	// parts sweep through each other and leave a cross-hatched etch — visible over
 	// the brow, where the skull, the cheek and the ear root all meet at once.
 	//
-	// The measurement is the screen-space derivative of the frame itself, which is
-	// exactly "how far the blend field's gradient has moved since the last pixel".
-	// Anything past a few hundredths of a radian per pixel cannot be a lane
-	// direction, only a moire, so the stroke displacement is clamped away there.
-	// The coat's *lighting* keeps running; only the relief and the sub-pixel
-	// break-up stop, so the brow loses its hatch without turning bald.
 	// `axis` is in here as well as `groom`, because the markings are written in
 	// the axis frame and they fail the same way: where the spine direction spins
 	// through a blend, `arc` sweeps fast, and a band of constant `arc` collapses
 	// into a set of tight concentric rings round the joint. On the shoulder that
 	// draws what looks like a wireframe over the chest.
+	//
+	// Measured per RIG UNIT, and the multiply by `px_per_unit` is the whole of a
+	// three-round bug. `fwidth` answers "how far did this move since the last
+	// pixel", so left raw the guard says a different thing at every zoom: a body
+	// whose frame turns at some fixed rate on the animal produces three times the
+	// per-pixel swing when the animal is drawn a third the size. Rendered and
+	// measured over the cat's torso, this gate stood at 0.87 at 900 px, 0.81 at
+	// 560, and 0.61 at 260 — with a fifth of the torso below 0.3, in broad bands
+	// across the shoulder, the barrel and the whole underside. Those bands are
+	// exactly the large smooth glossy regions with no coat direction in them that
+	// three separate reviews have named, and the coat was never reaching them: it
+	// was being switched off by its own anti-aliasing guard, hardest at the one
+	// size the pet ships at. Every review at 640-720 px saw a coat at four fifths
+	// strength and signed it off; the floors underneath were then tuned twice to
+	// compensate for a loss they had not caused.
+	//
+	// How fast the frame turns is a fact about the geometry, not about the window
+	// it is drawn in, so the threshold has to be one too. `band_ok` two lines down
+	// already had this right — it converts to rig units for exactly this reason —
+	// and the two are now measured in the same space. The numbers are the old
+	// per-pixel ones taken at the density where the guard was behaving, so the
+	// close-up is unchanged and it is the ship size that moves.
 	float frame_twist = (length(fwidth(f.groom)) + length(fwidth(f.grad))
-		+ length(fwidth(f.axis))) * 0.34;
-	float frame_ok = 1.0 - 0.92 * smoothstep(0.020, 0.115, frame_twist);
+		+ length(fwidth(f.axis))) * 0.34 * px_per_unit;
+	float frame_ok = 1.0 - 0.92 * smoothstep(8.2, 47.0, frame_twist);
 	// The other way a band coordinate fails, and the one that draws the rings. A
 	// projection onto a unit direction advances by exactly one pixel of rig
 	// distance per pixel, so this number sits at 1 wherever `arc` means anything.
@@ -1246,7 +1281,18 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		glint = c.glint;
 		coat_res = c.res;
 		coat_crisp = c.crisp * frame_ok;
+		coat_tuft = c.tuft;
+		coat_tuft_res = c.tuft_res * frame_ok;
 		if (debug_view == 15) { dbg = vec3(c.res, c.crisp, px_groom / 600.0); }
+		if (debug_view == 22) { dbg = vec3(c.tuft, c.tuft_res, frame_ok); }
+		// What the coat actually delivers, amplified so a one per cent swing is
+		// visible: the occlusion it lands on the surface, centred on grey. If this
+		// view is flat grey the coat is present in the algebra and absent from the
+		// picture, which is the failure three rounds of floor-tuning were chasing.
+		if (debug_view == 23) {
+			dbg = vec3(clamp((c.occ - 1.0) * 6.0 + 0.5, 0.0, 1.0),
+				clamp((micro_occ - 1.0) * 6.0 + 0.5, 0.0, 1.0), ctx.detail);
+		}
 	} else if (mat == MAT_FEATHER) {
 		Surf s = pet_feather(arc, row_s, u,
 			coat_density * coat_density_family.y, px_per_unit);
@@ -1570,14 +1616,36 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		// Ventral half only, for the same reason: it is an armpit, not a saddle.
 		socket *= smoothstep(0.62, -0.34, dv);
 	}
-	float ao = crease_ao * curve_ao * micro_occ * limb_ao
-		* mix(1.0, 0.52, socket) * ctx.ao;
-
 	// The floor and the body between them close off the hemisphere under the
 	// belly and around the paws, so both ambient terms fall away near contact.
 	float down = clamp(0.5 + 0.5 * n.y, 0.0, 1.0);
 	float ground_ao = mix(1.0, mix(0.34, 1.0, smoothstep(0.0, 0.26, height01)),
 		0.28 + 0.72 * down);
+	// Contact occlusion: the last few pixels where the animal meets the floor.
+	//
+	// The shadow node under the creature already draws a hard core at each planted
+	// sole, and the probe already reports the feet at exactly y = 0 — and the pet
+	// still read as hovering, because all of that happens on the *floor's* side of
+	// the join and nothing at all happened on the animal's. A paw came down to the
+	// ground plane at full key and met a dark mark on the floor with a clean bright
+	// edge between them, which is the silhouette of a cut-out laid over a shadow,
+	// not two surfaces touching. What welds them is that the wedge closing between
+	// a sole and a floor occludes *everything* — key, sky and the floor's own
+	// bounce — over a band about one paw radius tall.
+	//
+	// So: short reach, deliberately. A cat's paw measures 0.04 of body height, and
+	// at ship size that is five rendered pixels; anything longer stops being a
+	// contact and becomes a dip-dyed leg. Squared, because the wedge closes fast.
+	// Weighted by which way the surface faces, so the sole goes dark and the front
+	// of the toe only shades — the floor is below the foot, not in front of it.
+	// This is the term that costs nothing and it is the last one the grounding was
+	// missing; `ground_ao` above is the same idea at ten times the reach, which is
+	// the belly, and a belly-scale falloff cannot say "touching".
+	float contact_t = clamp(height01 / 0.05, 0.0, 1.0);
+	float ground_contact = 1.0 - 0.46 * (1.0 - contact_t * contact_t)
+		* (0.25 + 0.75 * down);
+	float ao = crease_ao * curve_ao * micro_occ * limb_ao
+		* mix(1.0, 0.52, socket) * ctx.ao * ground_contact;
 	// The slot under a standing body. Height above the floor cannot say this on
 	// its own: a cat's belly is a third of a body up, well past where the
 	// ground-proximity term above has faded back to 1.0, and that is exactly how
@@ -1754,6 +1822,28 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx, out vec3 dbg) {
 		float up = clamp(-n.y, 0.0, 1.0);
 		float sheen = pet_strand_lobe(normalize(tan0 + n * 0.22), L, V, 1.05)
 			* smoothstep(-0.05, 0.62, dv) * (0.34 + 0.66 * up);
+		// Broken by the clump, and *only* by the clump.
+		//
+		// Left smooth this is the term the review kept naming: a large glossy
+		// region over the neck and the shoulder with no coat direction in it at
+		// all, which is the single most latex-looking thing on the animal. The
+		// argument above for keeping the strands out of it is still right — a
+		// strand-frequency modulator turns a low-frequency band into long bright
+		// filaments — but it proves the wrong conclusion, because it treats "coat
+		// structure" as one thing when the coat has two scales and only one of them
+		// is at the sampling limit. Measured on the ship-size frame: a strand lane
+		// lands at two screen pixels, a lock lane at fourteen. The lock is not a
+		// detail the frame is struggling to hold; it is four times the size of the
+		// features the marking block is already relying on to carry the read.
+		//
+		// So the band keeps its shape and gets its surface from the tier that can
+		// afford to give it one. Balanced about `COAT_TUFT_MEAN` so the mean sheen
+		// is unchanged and only its distribution moves — a clump crown catches
+		// twice, the parting between two locks catches four fifths — and faded back
+		// to flat by `coat_tuft_res` wherever even the locks stop resolving, which
+		// is the taskbar-icon end where a broad band is the honest answer again.
+		float clump = mix(COAT_TUFT_MEAN, coat_tuft, coat_tuft_res);
+		sheen *= mix(0.80, 2.02, clump);
 		sheen_add = mix(vec3(1.0), albedo * 2.2, 0.45) * sheen * 0.26;
 		dbg_lobe = spec;
 		dbg_sheen = sheen_add;

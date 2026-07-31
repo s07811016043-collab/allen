@@ -149,7 +149,16 @@ static func build() -> S:
 	#                                    1.70 was that number with the head held
 	#                                    out level, which is an ox, not a cat.
 	#   shoulder joint to hip     19     0.80   the span with nothing under it
-	#   chest depth               11     0.46   built at 0.52, brisket to withers
+	#   chest depth               11     0.46   built at 0.61, brisket to withers, and
+	#                                    deliberately over the reference — see the
+	#                                    ribcage block. 0.46 is a measurement taken
+	#                                    on a live animal with a centimetre of coat
+	#                                    over the sternum; what a *silhouette* has to
+	#                                    do is put the deepest point of the trunk
+	#                                    below the lowest point of the foreleg, and
+	#                                    at 0.52 it did not. `_measure` prints this
+	#                                    number every build, so the drift is visible
+	#                                    rather than discovered
 	#   fore paw to hind paw      22     0.92   built at 0.92; nearly square
 	#   head length                9     0.38   built at 0.42 — see the head block
 	#   neck thickness             —     0.75 of head height. This one matters:
@@ -284,7 +293,28 @@ static func build() -> S:
 	rump.blend = 0.085
 	var torso := _part(&"torso", Vector2(-0.420, -0.740), Vector2(-0.150, -0.734), 0.166, 0.142, COL_COAT)
 	torso.blend = 0.070
-	var chest := _part(&"chest", Vector2(-0.150, -0.758), Vector2(0.150, -0.758), 0.204, 0.212, COL_COAT)
+	# The ribcage is 0.026 fatter than it was and its axis has come up 0.012 to pay
+	# for it, so the topline is within a hundredth of where it was and the whole
+	# gain lands on the underside: the barrel's lowest surface drops from -0.546 to
+	# -0.508.
+	#
+	# This is the other half of the Oriental verdict, and it is the half the last
+	# pass missed. That pass read "the barrel is a smooth tube with no rib-to-flank
+	# step" and built the step — a long thin loin between a fat croup and a fat
+	# ribcage — which was right and is still here. What it did not do was ask why an
+	# Oriental *looks* like an Oriental, and the answer is not the waist. It is the
+	# ratio of chest depth to leg length. A shorthair's brisket hangs to about the
+	# level of its elbow and the daylight under its belly is a little over a third
+	# of its withers height; a Rex or an Oriental carries a shallow barrel high on
+	# long legs, and that gap runs to a half. Measured on the 260 px frame this cat
+	# was at 48%, which is the wrong side of the line, and no amount of waist can
+	# move it — a waist is a horizontal feature and this is a vertical one.
+	#
+	# Deepening the chest also makes the step it sits behind bigger for free: the
+	# ribcage now stands 0.084 proud of the loin's front cap against 0.062 before,
+	# under the same 0.028 blend, so the last rib is a longer drop as well as a
+	# tighter one.
+	var chest := _part(&"chest", Vector2(-0.150, -0.746), Vector2(0.150, -0.746), 0.226, 0.238, COL_COAT)
 	chest.blend = 0.028
 	# Shoulder blade *and* brisket in one capsule, because the budget affords one
 	# and the animal needs both. It runs from the withers down and forward to the
@@ -328,7 +358,28 @@ static func build() -> S:
 	# So the sternum now runs forward at +12° against the ribcage's 0°, and the
 	# withers it used to carry are the ribcage's own top surface, which is 0.02
 	# higher than the old brisket cap reached anyway.
-	var brisket := _part(&"brisket", Vector2(0.072, -0.630), Vector2(0.298, -0.582), 0.146, 0.154, COL_COAT)
+	#
+	# It also drops below the elbow now, which the review asked for by name, and the
+	# reason it did not before is worth recording because the old numbers looked as
+	# though it already did. The brisket's lowest surface was -0.428 and the elbow
+	# *joint* is at -0.462, so on paper the chest hung 0.034 under it. But an elbow
+	# is not a point, it is the end of a 0.055-radius capsule, and the lowest thing
+	# that leg puts on the screen is -0.407. The chest was 0.021 above it. Rendered,
+	# the foreleg was the deepest thing on the forehand and the chest stopped short
+	# of it — which is a leg with a body balanced on top, and it is exactly the
+	# silhouette a Rex has.
+	#
+	# Measured against the capsule's surface instead of its axis, the sternum now
+	# bottoms out at -0.388: 0.019 below the lowest point of the leg in front of it,
+	# which is two rendered pixels at the 113 px per unit `_measure` reports for this
+	# animal at ship size. Two pixels is not much, and it is worth being clear that
+	# the deep chest is what does the work here — this number only has to change
+	# sign. The coat fringe stands off both surfaces equally, so unlike a gap between
+	# two limbs it is not closed by the fringe. The
+	# elbow is engulfed as a result and its crease is gone, and that is anatomy
+	# rather than a loss: a cat's elbow is buried in triceps and brisket, and what
+	# you see from the side is the chest, with the free leg starting below it.
+	var brisket := _part(&"brisket", Vector2(0.066, -0.622), Vector2(0.302, -0.548), 0.152, 0.166, COL_COAT)
 	# Still blended wider than the parts it joins, and standing less proud than it
 	# did. Pushed forward at 0.10 blend and 1.12 height it stopped being a chest
 	# and became a ball: a sphere with its own highlight and a hard crease ringing
@@ -381,7 +432,14 @@ static func build() -> S:
 	# The underline is unchanged to the pixel: both endpoints are the old lower
 	# surface re-expressed as centre minus radius, so the tuck, the groin and the
 	# depth of the chest against the belly are all exactly where they were.
-	var belly := _part(&"belly", Vector2(-0.210, -0.666), Vector2(0.140, -0.579), 0.079, 0.104, COL_BELLY)
+	#
+	# The underline drops 0.035 with the ribcage above it — belly clearance goes
+	# from 48% of withers height to 44% — and the radius ratio the block above is
+	# about is checked at both ends afterwards rather than assumed: 0.086 against a
+	# 0.147 loin is 0.26, and 0.116 against a 0.237 ribcage is 0.34. Both under the
+	# 0.36 where the height field starts digging its groove, which is the number
+	# this capsule exists to respect.
+	var belly := _part(&"belly", Vector2(-0.210, -0.652), Vector2(0.140, -0.556), 0.086, 0.116, COL_BELLY)
 	# Sunk until its top edge barely clears the torso's underline, and blended
 	# wide. Sitting 0.10 higher it painted a hard pale stripe up the flank, and a
 	# bright band across the middle of the body at 260 px is the same plank
@@ -471,7 +529,24 @@ static func build() -> S:
 	# field and a small capsule loses that blend anyway, so asking for a pale chin
 	# here buys nothing; what the shape has to do is be *darker* than the mask above
 	# it, and coat over cheek is already three stops down from 0.93.
-	var chin := _part(&"chin", Vector2(0.652, -0.872), Vector2(0.716, -0.884), 0.048, 0.030, COL_COAT, 1)
+	#
+	# The endpoints moved this round and the reason is the one thing the last pass
+	# got wrong about its own idea. The mechanism above is right — a layer boundary
+	# is the crispest line the renderer draws, so the mouth is the muzzle's lower
+	# outline composited against a shadowed jaw — but it only works if the jaw is
+	# *visible* under the muzzle, and it was not. Measured as lower surfaces rather
+	# than as axes, the chin hung 0.042 below the muzzle at its root and 0.002 at its
+	# tip; forward of the cheek the muzzle was the lowest thing on the face, so there
+	# was no dark shelf for its outline to be an edge against, and a head close-up at
+	# 3.4x shows exactly that: a pale mask with nothing under it and no mouth
+	# anywhere on the animal.
+	#
+	# Raised until the chin clears the muzzle along its whole run: 0.052 at the root
+	# and 0.029 at the tip, which is 5.9 and 3.3 rendered pixels at ship size. The
+	# taper is the feature, not the gap — a cat's mouth line runs forward *and up*
+	# from the corner of the mouth to the nose leather, so a band that narrows as it
+	# goes forward is the shape, and a band of constant width would read as a jowl.
+	var chin := _part(&"chin", Vector2(0.650, -0.862), Vector2(0.722, -0.862), 0.048, 0.031, COL_COAT, 1)
 	chin.blend = 0.016
 	chin.coat_length = 0.62
 	parts.append_array([skull, cheek, muzzle, nose, chin])

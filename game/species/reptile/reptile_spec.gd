@@ -205,12 +205,25 @@ static func build() -> S:
 	#
 	# so the *ratio* of the two speeds is what decides how hard a walking lizard
 	# writhes. At 1.30 over 4.60 a walk ran at 0.28 exertion and 0.145 rad of wave;
-	# at 1.30 over 3.30 it runs at 0.39 and 0.163. On screen the sprint barely
-	# changes — 3.30 × 132 is 436 px/s against the old 4.60 × 118 = 543 — and the
-	# walk, which is what the pet does almost all of the time, gains 12% of wave on
-	# top of the 22% the shorter tail buys in frame scale.
+	# at 1.30 over 2.85 it runs at 0.456 and 0.173. On screen the sprint barely
+	# changes — 2.85 × 132 is 376 px/s against the old 4.60 × 118 = 543 — and the
+	# walk, which is what the pet does almost all of the time, gains 19% of wave on
+	# top of the 8% the shorter tail buys in frame scale.
+	#
+	# This is the whole of what a species file can do about the review's "lateral
+	# trunk undulation", and the rest is a finding for the rig rather than a number
+	# here, so it is written down where the next person will look for it. `Rig`
+	# applies the wave as `b.angle += undulation * sin(TAU * (t * 0.8 - cycle))`
+	# over `_spine_bones` only — a fixed `RigBones.SPINE_BONES` joints lerped
+	# between the pelvis and the chest centroids. On this animal that is the run
+	# from x ≈ -1.2 to x ≈ +0.19: about a third of its length, and the third with
+	# the least silhouette to move. The tail chain never sees `undulation` at all;
+	# it gets spring sway and nothing else. A lizard is the one animal here whose
+	# wave should be *largest* behind the vent, so until that term reaches the tail
+	# chain, no amplitude authored on this side of the contract will read the way
+	# the review is asking for.
 	s.walk_speed = 1.30
-	s.run_speed = 3.30
+	s.run_speed = 2.85
 	s.stride = 0.52
 	# Half the cat's. A sprawling animal carries its weight on splayed limbs and
 	# pays for it by keeping the trunk nearly level; the motion that should read is
@@ -277,8 +290,11 @@ static func build() -> S:
 	# hung off the side of the body, not the ⌐ of a mammal, and the negative space
 	# between the Λ and the belly is the whole silhouette.
 	#
-	# Withers sit at y = -1.00, the skull crown reaches -0.98, the belly bottoms
-	# out at -0.31, and the body spans x = -4.16 (tail tip) to +1.44 (snout).
+	# Withers sit at y = -1.00, the skull crown reaches -1.01, the belly bottoms
+	# out at -0.31, and the body spans x = -2.84 (tail tip) to +1.43 (snout), with
+	# the raised tail tip reaching y = -0.96. Span 4.27 by height 1.01: still by a
+	# long way the widest footprint on the desktop, and still the number that sets
+	# how many pixels every other feature on the animal gets.
 	#
 	# One more thing constrains the numbers below, and it is invisible until you
 	# render the head. `CreatureRenderer._pack_landmarks` finds the scapula and
@@ -385,18 +401,26 @@ static func build() -> S:
 	# past about 1.3 the squamation stops tiling and smears into a smooth patch
 	# on the cheek. 1.26 is where the wedge is as deep as it can be while the
 	# scales still hold.
-	var skull := _part(&"head", Vector2(0.70, -0.800), Vector2(1.00, -0.815), 0.195, 0.160, COL_HIDE)
+	#
+	# The three skull capsules are 6% fatter than they were, and it is the same
+	# argument the tail block makes from the other end: this animal's features are
+	# starved of pixels because its span is long, and the head is where the pixels
+	# have to go. A Pogona's head is genuinely large for its body — 0.64 of a
+	# shoulder height, against a cat's 0.42 — so the direction is toward the
+	# reference and not away from it, and the eye that now sits in this skull needs
+	# a cheek wide enough to hold it without touching the outline.
+	var skull := _part(&"head", Vector2(0.70, -0.800), Vector2(1.00, -0.815), 0.206, 0.170, COL_HIDE)
 	skull.blend = 0.072
 	skull.height_scale = 1.26
 	# The jaw hinge. A beardie's head is at its widest and deepest behind the eye,
 	# where the adductor muscle packs out the cheek, and without this capsule the
 	# skull tapers evenly from back to front and reads as a crocodile.
-	var cheek := _part(&"cheek", Vector2(0.68, -0.735), Vector2(0.86, -0.748), 0.150, 0.120, COL_HIDE)
+	var cheek := _part(&"cheek", Vector2(0.68, -0.735), Vector2(0.86, -0.748), 0.159, 0.127, COL_HIDE)
 	cheek.blend = 0.062
 	cheek.height_scale = 1.14
 	# Blunt, not pointed. A beardie's snout ends in a rounded square; taper it to a
 	# real point and the head stops being a wedge and becomes a monitor lizard's.
-	var muzzle := _part(&"muzzle", Vector2(1.00, -0.815), Vector2(1.33, -0.802), 0.160, 0.114, COL_HIDE)
+	var muzzle := _part(&"muzzle", Vector2(1.00, -0.815), Vector2(1.31, -0.802), 0.169, 0.120, COL_HIDE)
 	muzzle.blend = 0.052
 	muzzle.height_scale = 1.10
 	# The jaw line. Authored to hang 0.02–0.04 proud of the skull's lower edge
@@ -419,6 +443,21 @@ static func build() -> S:
 	# it did not have was a *socket*: the disc sat on a smooth cheek with nothing
 	# around it, which is a bead pressed into clay rather than an eye in a head.
 	#
+	# Both capsules moved outward this pass because the ball inside them grew by
+	# half. See the eye block at the foot of the file for why; what matters here is
+	# that the brow and the lid have to keep hugging the *rim* of the ball, and a
+	# 0.086 ball's rim is 0.028 further out than a 0.058 one's. Held where they
+	# were, the brow would have been drawn across the top of the open eye and the
+	# lower lid across the bottom of the iris, which is a squint, not a socket.
+	#
+	# Burial is the constraint that bounds how far out they may go. Both take the
+	# marking path rather than adding geometry, and that path gates on
+	# `smoothstep(0.15 * r, 0.6 * r, burial)` — for a 0.030 part, fully on at 0.018
+	# of burial. Measured against the skull's own surface directly above each
+	# endpoint, the brow now sits 0.032 deep at its root and 0.037 at its tip: past
+	# the gate by a factor of two, with room for the head to be re-proportioned
+	# again without the ridge silently becoming a lump on the outline.
+	#
 	# On a beardie the orbit is the loudest thing on the face. The supraorbital
 	# scales stand up into a hard brow with a straight top edge, the lower lid is a
 	# thick granular fold, and both are markedly darker than the cheek — which is
@@ -435,10 +474,10 @@ static func build() -> S:
 	#
 	# `height_scale` keeps a little relief on the brow and less on the lid: the
 	# ridge is a real ridge and the lid is a fold of skin.
-	var brow := _part(&"eye_brow_near", Vector2(0.772, -0.908), Vector2(0.918, -0.898), 0.028, 0.020, COL_HIDE_DARK)
+	var brow := _part(&"eye_brow_near", Vector2(0.752, -0.930), Vector2(0.940, -0.920), 0.030, 0.022, COL_HIDE_DARK)
 	brow.blend = 0.014
 	brow.height_scale = 0.82
-	var lid := _part(&"eye_lid_near", Vector2(0.788, -0.792), Vector2(0.908, -0.800), 0.026, 0.018, COL_HIDE_DARK)
+	var lid := _part(&"eye_lid_near", Vector2(0.778, -0.752), Vector2(0.922, -0.760), 0.028, 0.020, COL_HIDE_DARK)
 	lid.blend = 0.014
 	lid.height_scale = 0.66
 	parts.append_array([skull, cheek, muzzle, chin, brow, lid])
@@ -536,19 +575,35 @@ static func build() -> S:
 	# trailing dead flat, so the arc spends part of itself on y where the frame has
 	# room. A resting beardie carries the last third of its tail clear of the
 	# ground anyway; flat on the floor is the sleeping pose, not the standing one.
-	# Span goes 5.60 → 4.58, which is 53 px per unit at ship size, a 22% gain on
-	# every feature the animal has.
+	# Span went 5.60 → 4.58 that round and 4.58 → 4.27 this one, which is 56 px per
+	# unit at ship size against the 43 the animal started at.
 	#
 	# Landmark steering is unchanged and it is the constraint that fixes the first
-	# joint: at -2.02 the tail's root still falls inside the hind leg's cluster, and
+	# joint: at -2.04 the tail's root still falls inside the hind leg's cluster, and
 	# past about -2.20 it claims a landmark slot of its own and the renderer stamps
 	# a scapula dome on the tail.
-	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.02, -0.598), 0.250, 0.170, COL_HIDE)
+	#
+	# This pass spends the last third of the arc on y instead of on x, and the
+	# reason is the frame rather than the animal. The span was 4.62 units and the
+	# animal is 1.0 tall, so on a square 260 px frame the fit is decided by the
+	# width and *nothing else*: two thirds of the picture was tail taper, and the
+	# other third had to carry a head, an eye and four limbs at 52 px per rig unit.
+	# Curling the tail up behind the hip costs nothing at all — the frame has three
+	# units of unused height — and takes the span to 4.27, which is 56 px per unit.
+	# Every feature on the animal is 8% larger for a change that removes no length:
+	# the arc is 1.47 units against the 1.71 it was, and the missing quarter-unit is
+	# bought back by the rise rather than deleted.
+	#
+	# Carried clear of the ground is also the more honest posture of the two. A
+	# beardie lying down drags its tail flat; a beardie standing, walking or
+	# watching you holds the base up off the floor and lets the tip trail. The pose
+	# this file authors is the standing one.
+	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.04, -0.632), 0.250, 0.170, COL_HIDE)
 	tail_0.blend = 0.070
 	tail_0.height_scale = 1.02
-	var tail_1 := _part(&"tail_1", Vector2(-2.02, -0.598), Vector2(-2.66, -0.486), 0.170, 0.084, COL_TAILBAND)
+	var tail_1 := _part(&"tail_1", Vector2(-2.04, -0.632), Vector2(-2.52, -0.706), 0.170, 0.084, COL_TAILBAND)
 	tail_1.blend = 0.048
-	var tail_2 := _part(&"tail_2", Vector2(-2.66, -0.486), Vector2(-3.16, -0.288), 0.084, 0.020, COL_HIDE)
+	var tail_2 := _part(&"tail_2", Vector2(-2.52, -0.706), Vector2(-2.82, -0.940), 0.084, 0.020, COL_HIDE)
 	tail_2.blend = 0.026
 	parts.append_array([tail_0, tail_1, tail_2])
 
@@ -724,36 +779,88 @@ static func build() -> S:
 	# species here has, and a heavy lower lid that never fully opens. The lid is
 	# the expression: a lizard with its eye wide is a lizard that has just decided
 	# something is wrong.
+	#
+	# All four numbers below moved this pass, and the review that forced it is the
+	# shortest one this file has had: "the reptile has no eye at ship size — a one
+	# to two pixel amber dot. An animal without a visible eye is an object."
+	#
+	# The arithmetic says exactly that, and it is worth writing down because it is
+	# the arithmetic every species has to pass and this one is the hardest case in
+	# the project. The harness fits the settled pose into a 244 px content box after
+	# a 0.05 margin on each side, so what decides how many pixels a feature gets is
+	# the animal's *longest* dimension: at a 4.27-unit span this lizard renders at
+	# 244 / 4.37 = 56 px per rig unit, where the cat measures 113. The same authored
+	# eye is worth half as much here as it is there.
+	#
+	# Then the lids take most of what is left. The eye shader opens the aperture to
+	# `1.25 * R` tall against `2 * R` wide at `lid_open` 0.84, and the pupil is
+	# `iris_ratio * pupil_ratio * 2R`. At the old numbers, on the old 52 px per unit,
+	# that came to a 6.0 px ball showing a 3.8 px slot with a 2.0 px pupil in it —
+	# and the pupil is the only part with any contrast against a sandy head, because
+	# an iris of 0.88 leaves a rim of sclera 0.4 px wide. Two pixels of amber is
+	# precisely what the reviewer saw, and it is what the file authored.
+	#
+	# So the ball grows by half, and the *interior* is re-cut so the growth is
+	# spent on things that survive a downsample rather than on a bigger flat disc:
+	#
+	#   radius 0.086     9.6 px of ball at ship size, against 6.0
+	#   iris   0.70      a sclera rim 1.4 px wide either side of the iris. This is
+	#                    the "lit sclera" the review asked for: `sclera_color` is a
+	#                    global shader uniform and nothing per-species reaches it,
+	#                    so the only lever a species owns over how much pale eyeball
+	#                    shows is how much of the ball the iris does *not* cover
+	#   pupil  0.44      3.0 px of near-black in the middle of the gold, which is
+	#                    the one feature here that can never be confused with a
+	#                    scale
+	#   socket 0.34      the sclera is dimmed by `mix(1.0, 0.70, socket_depth)` and
+	#                    the socket ring's own alpha rides it too. At 0.46 the pale
+	#                    rim this pass just bought would have been handed back as
+	#                    shadow; a beardie's orbit is deep but its eye is not sunk
+	#
+	# The specular comes free with the radius and that is the last of the four: the
+	# catchlight, the sky-dome reflection and the total-internal-reflection ring at
+	# the limbus are all sized in units of `R`, so a ball half again as large gets a
+	# highlight half again as large without a number being touched. That is the
+	# difference between a painted dot and something wet.
+	#
+	# `lid_open` goes to 0.88 rather than further. A hooded eye is this species'
+	# whole expression and the temptation with a bigger ball is to open it wide to
+	# show the ball off, which buys legibility by turning a lizard into a startled
+	# gecko.
 	var eye_near: E = E.new()
 	eye_near.id = &"eye_near"
 	eye_near.bone = &"head"
 	eye_near.center = Vector2(0.845, -0.848)
-	eye_near.radius = 0.058
+	eye_near.radius = 0.086
 	eye_near.tilt = -0.12
-	eye_near.iris_ratio = 0.88
-	eye_near.pupil_ratio = 0.38
+	eye_near.iris_ratio = 0.70
+	eye_near.pupil_ratio = 0.44
 	eye_near.pupil_slit = 0.10
-	eye_near.iris_color = Color(0.66, 0.49, 0.20)
+	eye_near.iris_color = Color(0.72, 0.53, 0.21)
 	eye_near.limbal_color = Color(0.10, 0.07, 0.04)
 	eye_near.sclera_color = Color(0.86, 0.82, 0.74)
-	eye_near.socket_depth = 0.46
-	eye_near.lid_open = 0.84
+	eye_near.socket_depth = 0.34
+	eye_near.lid_open = 0.88
 	eye_near.lid_palette_index = COL_HIDE
 	eye_near.baby_radius_scale = 1.75
 
 	var eye_far: E = E.new()
 	eye_far.id = &"eye_far"
 	eye_far.bone = &"head"
-	eye_far.center = Vector2(0.678, -0.866)
-	eye_far.radius = 0.022
+	eye_far.center = Vector2(0.664, -0.868)
+	eye_far.radius = 0.032
 	eye_far.tilt = -0.16
-	eye_far.iris_ratio = 0.88
-	eye_far.pupil_ratio = 0.38
+	eye_far.iris_ratio = 0.70
+	eye_far.pupil_ratio = 0.44
 	eye_far.pupil_slit = 0.10
-	eye_far.iris_color = Color(0.56, 0.41, 0.17)
+	eye_far.iris_color = Color(0.60, 0.44, 0.18)
 	eye_far.limbal_color = Color(0.08, 0.06, 0.03)
 	eye_far.sclera_color = Color(0.80, 0.76, 0.69)
-	eye_far.socket_depth = 0.68
+	# Kept deep. The far eye grew with its partner — it has to, or the ratio
+	# between them stops reading as a turned head and starts reading as one eye
+	# being wrong — but on a skull this wide the far orbit is most of the way round
+	# the curve, and the socket term is what says so.
+	eye_far.socket_depth = 0.66
 	eye_far.lid_open = 0.84
 	eye_far.lid_palette_index = COL_HIDE
 	eye_far.baby_radius_scale = 1.75

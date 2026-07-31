@@ -65,7 +65,25 @@ static func build() -> S:
 		                           # already shaded as far-side, and stacking a
 		                           # genuinely dark pigment on top of that turned
 		                           # the off legs and the far ear into holes.
-		Color(0.94, 0.90, 0.83),   # urajiro: belly, socks
+		# Urajiro: belly, socks. Pulled down 8% this round, and the reason is the
+		# specular rather than the pigment — it is the last term in the "ventral
+		# airbrush smear" the review has now named twice.
+		#
+		# The coat's TRT lobe is tinted by albedo, so a pale patch does not merely
+		# look pale, it *shines* pale, and the lobe fires along the barrel's own
+		# groom direction. Rendered at 260 px and cropped, what the underside
+		# carried was not a countershading ramp with a soft edge — it was a soft
+		# edge with a hot white streak lying inside it, which is why the last pass's
+		# work on the capsule's shape and length did not remove it: the shape was
+		# already fixed and the brightness was doing the damage on its own.
+		#
+		# 0.94 is within a rounding error of paper white, and a highlight on paper
+		# white has nowhere to go but clipped. At 0.865 the same lobe lands inside
+		# the tonemap's usable range, the streak becomes a sheen, and the cream is
+		# still four stops clear of the red coat around it — which is all urajiro
+		# has to be. The cat's belly was pulled down for exactly this reason two
+		# rounds ago, from a value brighter than this one.
+		Color(0.865, 0.815, 0.730), # urajiro: belly, socks
 		Color(0.90, 0.85, 0.76),   # urajiro on the face — a shade warmer, so the
 		                           # cheek mask reads as fur meeting fur and not
 		                           # as a sticker laid over the muzzle
@@ -270,8 +288,17 @@ static func build() -> S:
 	#
 	# The underline is unchanged to the pixel over the run that remains: both
 	# endpoints are the old lower surface re-expressed as centre minus radius.
+	#
+	# The blend comes down again, 0.082 → 0.060, and the block above is the reason
+	# it can: below the classifier's cliff the blend *is* the pigment boundary in
+	# rig units, so it is the one number here that trades edge against fog directly.
+	# 0.082 was 12 rendered pixels at ship size and it was chosen as "a ramp you can
+	# see is a ramp". Against a cream this bright it was instead the width of the
+	# smear. At 0.060 it is 9 px — still three times anything that could be mistaken
+	# for a stencil, and now narrow enough that the eye finds a boundary at the top
+	# of it rather than losing the flank into a cloud.
 	var belly := _part(&"belly", Vector2(-0.230, -0.659), Vector2(0.075, -0.596), 0.092, 0.104, COL_CREAM)
-	belly.blend = 0.082
+	belly.blend = 0.060
 	belly.coat_length = 1.25
 	# Short and thick, and set on high enough that the neck rises out of the
 	# withers instead of leaving them. Base radius 0.170 against the cat's 0.128.
@@ -351,16 +378,30 @@ static func build() -> S:
 	# forward again to reach the ground — so the limb has a shallow zigzag where it
 	# had a straight line, and the outline changes direction twice.
 	#
-	# The 0.006 of radius step at each joint is the second half and it costs
-	# nothing. A capsule's radius is linear along its spine, so a segment that
-	# *starts* fatter than the one above it ends leaves a small overhang, and the
-	# smooth union at a tight blend turns that overhang into a crease. That is the
-	# olecranon at the elbow and the accessory carpal at the wrist, and it is why
-	# the blends drop to 0.042 and 0.030 here where the shoulder's stays at 0.095.
+	# The radius step at each joint is the second half and it costs nothing. A
+	# capsule's radius is linear along its spine, so a segment that *starts* fatter
+	# than the one above it ends leaves a small overhang, and the smooth union at a
+	# tight blend turns that overhang into a crease. That is the olecranon at the
+	# elbow and the accessory carpal at the wrist, and it is why the blends drop
+	# here where the shoulder's stays at 0.095.
+	#
+	# Both steps doubled this round, 0.006 → 0.012, and both blends came down with
+	# them, because 0.006 did not survive being looked at. The review still reads
+	# these legs as smooth sticks, and a 260 px crop says why: 0.006 of a rig unit
+	# is 0.9 rendered pixels of overhang, laid under a 0.042 blend that is six
+	# pixels wide. The union closes a step it can reach across, so the crease was
+	# being averaged out of existence before the frame was ever downsampled — the
+	# joints were authored, packed and drawn, and arrived as nothing. 0.012 against
+	# a 0.030 blend is 1.8 px of overhang inside a 4.4 px union, and that is the
+	# side of the ratio a crease survives on.
+	#
+	# This is the same finding as the coat fringe and the rib step, in a third
+	# place: a feature authored below the blend that carries it does not read as
+	# faint, it reads as absent.
 	var ff_u := _part(&"leg_fore_near_upper", Vector2(0.268, -0.712), Vector2(0.240, -0.470), 0.064, 0.058, COL_COAT, 2)
 	ff_u.blend = 0.095
-	var ff_l := _part(&"leg_fore_near_lower", Vector2(0.240, -0.470), Vector2(0.268, -0.186), 0.064, 0.044, COL_COAT, 2)
-	ff_l.blend = 0.042
+	var ff_l := _part(&"leg_fore_near_lower", Vector2(0.240, -0.470), Vector2(0.268, -0.186), 0.070, 0.044, COL_COAT, 2)
+	ff_l.blend = 0.030
 	# The pastern, and it is a real segment rather than a decoration. A dog is
 	# digitigrade: the metacarpus is a bone that stands nearly upright and carries
 	# a visible slope of ten to fifteen degrees off plumb, and it *flexes* — which
@@ -372,8 +413,8 @@ static func build() -> S:
 	# Measured off the bind pose the rest fold is 168°, so nothing about the
 	# standing silhouette changes; what changes is that the stride has a joint in
 	# it below the elbow.
-	var ff_c := _part(&"leg_fore_near_pastern", Vector2(0.268, -0.186), Vector2(0.296, -0.104), 0.050, 0.042, COL_COAT, 2)
-	ff_c.blend = 0.030
+	var ff_c := _part(&"leg_fore_near_pastern", Vector2(0.268, -0.186), Vector2(0.296, -0.104), 0.056, 0.042, COL_COAT, 2)
+	ff_c.blend = 0.022
 	var ff_p := _part(&"paw_fore_near", Vector2(0.296, -0.104), Vector2(0.336, -0.050), 0.046, 0.050, COL_CREAM, 2)
 	ff_p.blend = 0.032
 	# Hind leg: one muscled haunch from hip to hock, then a rear pastern.
@@ -494,6 +535,15 @@ static func build() -> S:
 	# does on the cat, but the ears and tail follow their own axes: a pricked ear
 	# is combed up toward the tip, and the coat on a curled tail has to rotate
 	# with the curl or the brush ends up combed against itself.
+	#
+	# Grooming the belly away from the barrel's PI was tried this round and measured
+	# at *twenty-eight changed pixels* on a 260 px frame, so it is not here. Worth a
+	# line because it is a plausible idea that does not work and will otherwise be
+	# had again: a part this deeply engulfed does not own its own coat frame. The
+	# body shader blends `axis` across the union weighted by the field, and a 0.10
+	# capsule inside a 0.24 one contributes almost none of it, so the ventral coat is
+	# combed by the torso whatever this file writes here. Groom is an authoring lever
+	# on parts that stand proud — legs, tail, ears — and a no-op on ones that do not.
 	for p in parts:
 		var id := String(p.id)
 		if id.begins_with("leg") or id.begins_with("paw"):
