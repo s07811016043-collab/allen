@@ -117,6 +117,12 @@ const STANCE_COMPRESSION := 0.95
 
 var _spec: CreatureSpec
 var _family: int = CreatureSpec.Locomotion.QUADRUPED
+## Body height of *this* creature, not of the adult of its species. Every bob
+## number in the spec is authored as a fraction of body height, and the rig it is
+## applied to has already been scaled by growth — so reading `adult_height`
+## straight gave a kitten the adult's absolute bob on a body 0.42 the size, which
+## drove a walking kitten nearly four hundredths of a unit into the floor.
+var _body_height := 1.0
 var _stride_ref := 0.4
 var _bob_gain := 1.0
 var _body_len := 0.5
@@ -139,9 +145,10 @@ var _crouch := 0.0
 var _move_crouch := 0.0
 
 
-func setup(spec: CreatureSpec, chains: Array) -> void:
+func setup(spec: CreatureSpec, chains: Array, body_scale: float = 1.0) -> void:
 	_spec = spec
 	_family = spec.locomotion
+	_body_height = maxf(spec.adult_height * body_scale, 1e-3)
 	feet.clear()
 	for i in FOOT_COUNT:
 		var f := Foot.new()
@@ -184,7 +191,13 @@ func setup(spec: CreatureSpec, chains: Array) -> void:
 	# `spec.stride` is the ground distance covered by one full cycle at the
 	# comfortable walking speed — the reference point the frequency law below
 	# scales from. A foot's stance sweep is that times the duty factor.
-	_stride_ref = maxf(spec.stride, 0.05)
+	#
+	# Scaled by growth, like every other length in this file. Authored at adult
+	# size and read literally, a kitten reached an adult's step on legs 0.42 as
+	# long: the sweep came to nearly a whole leg length fore and aft, which the
+	# body could only pay for by crouching a third of its leg length, and it still
+	# drove the paws through the floor.
+	_stride_ref = maxf(spec.stride * body_scale, 0.02)
 	_bob_gain = 1.0
 	_bob_gain = _calibrate_bob(spec)
 	settle()
@@ -248,8 +261,8 @@ func _calibrate_bob(spec: CreatureSpec) -> float:
 	# appears — the animal walks with a nearly rigid trunk. So buy exactly the
 	# headroom this cycle asks for, plus room for the authored swing, and fade it
 	# in with speed: a cat stands tall and walks low, which is the same thing.
-	_move_crouch = maxf(ceil_max - _crouch, 0.0) + spec.bob * spec.adult_height
-	return clampf((spec.bob * spec.adult_height * 2.0) / span, 0.1, 12.0)
+	_move_crouch = maxf(ceil_max - _crouch, 0.0) + spec.bob * _body_height
+	return clampf((spec.bob * _body_height * 2.0) / span, 0.1, 12.0)
 
 
 ## Snap every foot back to its bind position and zero the cycle.
@@ -527,7 +540,7 @@ func _solve_body(dt: float) -> void:
 	# for two thirds of a gallop cycle and turned the curve into two flat plateaux,
 	# which reads more mechanical than the overshoot it was fixing; this leaves an
 	# ordinary stride untouched and only reins in the single-leg outliers.
-	var budget: float = _spec.bob * _spec.adult_height * lift
+	var budget: float = _spec.bob * _body_height * lift
 	var excess: float = target_bob - ride
 	var over: float = absf(excess) / maxf(budget, 1e-5)
 	if over > 1.0:

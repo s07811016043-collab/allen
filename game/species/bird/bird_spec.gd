@@ -1,6 +1,7 @@
 extends RefCounted
 
-## Small perching songbird — a bluebird-shaped archetype.
+## Small perching songbird — dark iridescent upperparts over pale underparts, in
+## the shape of a chat or a bluebird and in the colours of a martin.
 ##
 ## Rig space convention used by every species:
 ##   * +x is forward (the creature faces right at rotation 0),
@@ -230,19 +231,33 @@ static func build() -> S:
 	# after the leg. Everything below is laid out on that tilted axis.
 
 	# --- far-side limbs (drawn behind the torso) ----------------------------
-	# Only the lower two segments of the far leg exist. The femur of a bird is
-	# horizontal and completely buried in the flank; authoring it would spend two
-	# uniform slots on something that can never be seen.
+	# Only two segments of the far leg exist: the far side is a sliver beside the
+	# near leg, and a third capsule there would cost a uniform slot the budget no
+	# longer has (this species is 28 of 28).
 	#
-	# The far tibiotarsus takes the *same* rust as the near one rather than a
+	# The segment tokens are therefore a lie, deliberately, and the next person to
+	# read this needs to know which way. `upper` here is the *tibiotarsus* and
+	# `lower` is the *tarsometatarsus* — each shifted one segment proximal from what
+	# it anatomically is, so that the chain `_fit_limb` builds starts at an UPPER
+	# bone. A limb whose first member declares `lower` gets a chain with no root
+	# bone at all, and the near leg's history shows what that costs: the IK solved it
+	# as though the tibiotarsus were the femur and planted the hip on the ground. The
+	# near leg fixes it honestly, with a real femur; the far leg cannot afford one
+	# and buys the same well-formed chain by renaming instead.
+	#
+	# It is not a complete fix. The far ankle still measures about 0.08 below the
+	# ground plane against the near leg's 0.00 — see the hand-off note. Behind the
+	# body and under the contact shadow it does not read, but it is not right.
+	#
+	# The far tibiotarsus takes the *same* buff as the near one rather than a
 	# darkened stand-in. It is still feathered flank at this height — the trousers,
 	# not the bare leg — so painting it a separate dark colour put a brown blob
 	# under the belly that read as a shadow rather than as a limb. The BEHIND layer
 	# already has `layer_occlude` and the atmospheric term to push it back, and
 	# those desaturate rather than just darken, which is the whole reason they
 	# exist.
-	var fl_far := _part(&"leg_hind_far_lower", Vector2(0.168, -0.556), Vector2(-0.036, -0.278), 0.072, 0.042, COL_BREAST, 0)
-	var fc_far := _part(&"leg_hind_far_cannon", Vector2(-0.036, -0.278), Vector2(0.102, -0.052), 0.031, 0.024, COL_TARSUS_DARK, 0)
+	var fl_far := _part(&"leg_hind_far_upper", Vector2(0.168, -0.556), Vector2(-0.036, -0.278), 0.072, 0.042, COL_BREAST, 0)
+	var fc_far := _part(&"leg_hind_far_lower", Vector2(-0.036, -0.278), Vector2(0.102, -0.052), 0.031, 0.024, COL_TARSUS_DARK, 0)
 	fc_far.surface = P.Surface.SCALE
 	fc_far.blend = 0.022
 	var ft_far := _part(&"leg_hind_far_toe", Vector2(0.102, -0.052), Vector2(0.244, -0.026), 0.023, 0.010, COL_TARSUS_DARK, 0)
@@ -251,7 +266,7 @@ static func build() -> S:
 	# One far primary, sitting a hair higher than the near bundle so a sliver of
 	# it shows past the near wing tip. That sliver is the entire depth read on a
 	# bird held in profile — without it the folded wing is a flat decal.
-	var wing_far := _part(&"wing_far_primary", Vector2(-0.260, -0.782), Vector2(-0.535, -0.748), 0.058, 0.020, COL_FLIGHT_DARK, 0)
+	var wing_far := _part(&"flank_far_primary", Vector2(-0.260, -0.782), Vector2(-0.535, -0.748), 0.058, 0.020, COL_FLIGHT_DARK, 0)
 	wing_far.height_scale = 0.34
 	wing_far.blend = 0.022
 	parts.append_array([fl_far, fc_far, ft_far, wing_far])
@@ -284,17 +299,27 @@ static func build() -> S:
 	# the wing tip the wing's rear half was dark-on-dark and simply disappeared,
 	# which is most of why the folded wing stayed invisible at desktop size even
 	# after it was being drawn at all.
-	# `blend` on an engulfed part is not a joint softness, it is the width of the
-	# *colour* edge: paint fades over `smoothstep(blend, -blend, d)`. At the 0.12
-	# these carried, the pale faded out over a quarter of a rig unit and the
-	# underparts arrived as a soft oval stain floating on the flank rather than as a
-	# bird's pale belly with a flank line. Dropping it to 0.035 is what turns them
-	# into a region with an edge. The union these capsules contribute is unaffected,
-	# because a capsule wholly inside the body barely moves the field at all.
-	var belly := _part(&"belly", Vector2(-0.360, -0.560), Vector2(-0.130, -0.585), 0.130, 0.155, COL_CREAM)
-	belly.blend = 0.035
-	var breast := _part(&"belly_breast", Vector2(-0.130, -0.585), Vector2(0.190, -0.660), 0.155, 0.175, COL_BREAST)
-	breast.blend = 0.040
+	# These two are *surface*, not paint, and the difference is the whole reason the
+	# underparts read as underparts.
+	#
+	# A part buried inside the body only paints where `engulf` lets it, and that
+	# gate is `smoothstep(0.15 * r, 0.6 * r, burial)` — scaled by the painting
+	# part's own radius. A breast wide enough to cover a bird's underside is r 0.17
+	# inside a body of r 0.25, so the deepest burial it can ever reach is about 0.08
+	# against the 0.10 it would need. It is arithmetically incapable of painting
+	# fully: only its core comes through, faded, which is exactly the soft oval
+	# stain floating on the flank that this replaces. Shrinking it to fit the gate
+	# would make it too small to be a belly.
+	#
+	# So they are pitched a hair *proud* of the mantle capsules along the ventral
+	# line instead. There the pale wins the ordinary smooth-union blend rather than
+	# the paint path, the flank line falls where the two fields cross, and `blend`
+	# sets how sharp that line is — which is why it drops from 0.12 to 0.035. It is
+	# the same thing the cat's belly does.
+	var belly := _part(&"belly", Vector2(-0.350, -0.565), Vector2(-0.120, -0.578), 0.150, 0.160, COL_CREAM)
+	belly.blend = 0.024
+	var breast := _part(&"belly_breast", Vector2(-0.120, -0.570), Vector2(0.185, -0.650), 0.150, 0.172, COL_BREAST)
+	breast.blend = 0.026
 	# "Nape", not "neck". A perching songbird at rest has no visible neck: the
 	# vertebrae are folded into an S inside the feathers and the head simply
 	# continues the shoulder. This capsule exists to fill that junction solid, so
@@ -348,6 +373,25 @@ static func build() -> S:
 	# The interior angle at the ankle is about 118°, which is a relaxed perching
 	# crouch. Straighten it past ~150° and the bird instantly reads as a mammal
 	# on two legs; close it past ~90° and it reads as a wading bird.
+	#
+	# The femur is authored even though it can never be seen, and that is not
+	# bookkeeping — without it the leg is broken. A bird's femur really is horizontal
+	# and buried in the flank, so the first instinct is to leave it out and start the
+	# chain at the tibiotarsus, which is what this species did. But `_fit_limb` reads
+	# the segment token off each part and builds the bone chain from it, so a leg
+	# whose first member declares `lower` gets a chain with no UPPER bone, and the IK
+	# then solves it as though the tibiotarsus were the femur. The result measured
+	# +0.018 at the top of the thigh — the hip joint planted *on the ground*, with
+	# the drumstick drawn as a second shin standing beside the real one. It is
+	# clearly visible once you know to look: every earlier capture in this pass has
+	# four leg segments on the near side instead of three.
+	#
+	# So it exists to give the chain its UPPER, and it is painted in mantle rather
+	# than in flank buff precisely so it stays invisible: matching the body colour
+	# drives `distinct` to zero, and a part that fails the distinctness test paints
+	# nothing at all.
+	var ff := _part(&"leg_hind_near_upper", Vector2(-0.075, -0.628), Vector2(0.085, -0.552), 0.072, 0.070, COL_MANTLE)
+	ff.blend = 0.05
 	var fl := _part(&"leg_hind_near_lower", Vector2(0.085, -0.552), Vector2(-0.125, -0.268), 0.078, 0.046, COL_BREAST)
 	fl.blend = 0.05
 	var fc := _part(&"leg_hind_near_cannon", Vector2(-0.125, -0.268), Vector2(0.010, -0.040), 0.033, 0.025, COL_TARSUS)
@@ -363,62 +407,79 @@ static func build() -> S:
 	var hal := _part(&"leg_hind_near_hallux", Vector2(0.008, -0.040), Vector2(-0.100, -0.014), 0.019, 0.007, COL_TARSUS)
 	hal.surface = P.Surface.CLAW
 	hal.blend = 0.014
-	parts.append_array([fl, fc, ft, hal])
+	parts.append_array([ff, fl, fc, ft, hal])
 
 	# --- folded wing --------------------------------------------------------
-	# In BODY, not FRONT, and that is a considered choice. A folded wing is not
-	# held away from the flank; it is pressed flat against it, so the honest model
-	# is a raised patch on the body rather than a separate plane in front of it.
-	# Authored in FRONT it also came out visibly *brighter* than the mantle it is
-	# lying on — the front layer is lit with no occlusion while everything behind
-	# it pays a cast shadow — and it dragged that shadow across the whole flank,
-	# which is what was turning the rust underneath into mud.
+	# Named `flank_*` and not `wing_*`, and that is load-bearing rather than
+	# cosmetic. `RigBoneMap` routes any id containing `wing`, `covert`, `primary` or
+	# `secondary` to `Slot.WING`, and `RigSkeleton.build` then fits it as an
+	# articulated limb — twice, because the `fore` loop it sits inside is only
+	# skipped for `Slot.LIMB`, so both passes add the same bone names and parts end
+	# up bound against duplicated rest transforms. The measured result was the wing
+	# collapsing: the secondary's root snapped onto the covert's root and the primary
+	# tip was dragged from x = -0.59 to -0.30, which is why the folded wing was
+	# unreadable no matter how it was coloured. Classified on `flank` it becomes a
+	# SPINE part, rides the torso rigidly, and holds the shape authored here to
+	# within a hundredth of a unit. A perched songbird's folded wing does not
+	# articulate anyway. See the hand-off: this wants fixing in the rig, and until it
+	# is, a species that names a wing `wing` gets a broken one.
 	#
-	# Sitting inside the body's field, each capsule is engulfed and therefore
-	# paints, and the renderer gives a painted part its own shallow dome. So the
-	# wing arrives as what it actually is: a crisply outlined shape standing a
-	# little proud of the contour feathers, with the smooth-union crease drawing
-	# the dark line along its lower edge for free.
+	# In BODY, not FRONT. A folded wing is not held away from the flank; it is
+	# pressed flat against it, so the honest model is a patch on the body rather than
+	# a separate plane in front of it. FRONT was tried and is badly wrong: that layer
+	# takes no occlusion at all and casts a 42% shadow on everything behind it, so
+	# the wing came back fully lit with a hard rim and read as a plank leaning
+	# against the bird.
 	#
-	# The coverts stay rounded and soft; the flight groups flatten toward a
-	# `height_scale` of 0.30 and drop their blend to 0.02, which is the whole
-	# difference between a stiff vane and the down it lies on. The tip clears the
-	# rump and reaches about a third of the way down the tail — a folded wing that
-	# stops at the rump reads as clipped.
-	var w_cov := _part(&"wing_near_covert", Vector2(0.168, -0.834), Vector2(-0.050, -0.790), 0.078, 0.096, COL_FLIGHT)
+	# Sitting inside the body's field, each capsule is engulfed and therefore paints,
+	# and the renderer gives a painted part its own shallow dome at the edge of the
+	# painted region — so the outline gets relief even though the silhouette cannot.
+	#
+	# Soft coverts, stiff flight feathers, and the distinction is carried by the
+	# *material* rather than by shape or tone.
+	#
+	# Tone cannot carry it: the marking gate caps how far the wing may sit from the
+	# mantle (see the palette note), and inside that cap the wing is a faint patch
+	# however it is drawn. What the renderer does hand over is `f.mat` — a part that
+	# wins the paint test brings its own surface family with it, which is the same
+	# mechanism that lets a nose be bare leather in the middle of a furry face. So
+	# the secondaries and primaries are CLAW: the same hard keratin as the beak and
+	# the claws, because that is literally what a flight feather's rachis and vane
+	# are. They come back with a tight 0.16 roughness and a specular that runs along
+	# the fibre, against the broad matte barb scatter of the contour feathers around
+	# them. A folded wing catching a hard line of light while the breast beside it
+	# stays soft is the read the brief is asking for, and it is the only one
+	# available that the palette cannot veto.
+	#
+	# The coverts stay FEATHER — they are the soft, rounded, overlapping rows that
+	# cover the base of the flight feathers, and turning them glossy too would lose
+	# the contrast this is buying.
+	#
+	# `height_scale` is set on all three for documentation only: an engulfed part
+	# loses that field to the body it is painted on (`h` saturates at 1 in the smin,
+	# so the torso's value wins). It matters on the far wing, which unions in its
+	# own layer, and nowhere else.
+	var w_cov := _part(&"flank_covert", Vector2(0.168, -0.834), Vector2(-0.050, -0.790), 0.078, 0.096, COL_FLIGHT)
 	w_cov.height_scale = 0.86
 	w_cov.blend = 0.016
-	var w_sec := _part(&"wing_near_secondary", Vector2(-0.050, -0.790), Vector2(-0.278, -0.752), 0.096, 0.062, COL_FLIGHT_DARK)
+	var w_sec := _part(&"flank_secondary", Vector2(-0.050, -0.790), Vector2(-0.278, -0.752), 0.096, 0.062, COL_FLIGHT_DARK)
+	w_sec.surface = P.Surface.CLAW
 	w_sec.height_scale = 0.44
 	w_sec.blend = 0.014
-	var w_pri := _part(&"wing_near_primary", Vector2(-0.276, -0.754), Vector2(-0.600, -0.710), 0.062, 0.016, COL_FLIGHT_DARK)
+	# The primaries carry the one piece of the wing that is allowed to be geometry
+	# rather than paint. Everything forward of here is buried in the flank and can
+	# only ever be a painted patch, but past the rump the body has run out and the
+	# only thing left at this height is the tail — so lifting the tip until its
+	# upper edge clears the tail's by about 0.03 puts a real tapered point into the
+	# silhouette. That is worth more than any amount of extra contrast on the buried
+	# part: a shape that breaks the outline is read as a separate object for free,
+	# and wing tips crossing over the base of the tail is exactly how a perched
+	# passerine folds.
+	var w_pri := _part(&"flank_primary", Vector2(-0.276, -0.754), Vector2(-0.590, -0.748), 0.062, 0.024, COL_FLIGHT_DARK)
+	w_pri.surface = P.Surface.CLAW
 	w_pri.height_scale = 0.30
 	w_pri.blend = 0.014
-	# The wing bar — the pale tips of the greater coverts — and the last part in the
-	# budget. It is the piece that finally made the folded wing legible, so it is
-	# worth recording why the two obvious alternatives are both dead ends.
-	#
-	# Darkening the wing away from the mantle cannot work: every dark colour here
-	# has to stay within about 0.23 of slot 1 or the mackerel bars rewrite it in
-	# blocks, and slot 1 has to stay near the mantle or the mantle itself gets
-	# striped. Between them those cap how far the wing may sit from the back it lies
-	# on, and under that cap it is a faint tonal patch however well it is shaped.
-	# Moving the whole wing to the FRONT layer escapes the cap and overshoots badly:
-	# FRONT takes no occlusion at all and casts a 42% shadow on the body, so the
-	# wing arrives fully lit with a hard rim and reads as a plank leaning against
-	# the bird. Making the *coverts* pale escapes it too, but a pale panel sits
-	# directly above the pale breast and the two merge into one blob.
-	#
-	# A thin pale line does none of that. High luminance is precisely what switches
-	# the markings off — buff at luminance 0.86 takes 2% of them — so it keeps full
-	# contrast against the dark wing while being far too narrow to merge with
-	# anything. It runs down and back across the covert/secondary joint, which is
-	# how a wing bar actually lies on a folded wing, and it is the one mark that
-	# says "the dark shape on this flank has feather rows in it".
-	var w_bar := _part(&"wing_near_covert_bar", Vector2(0.020, -0.872), Vector2(-0.076, -0.712), 0.014, 0.010, COL_CHEEK)
-	w_bar.height_scale = 0.50
-	w_bar.blend = 0.010
-	parts.append_array([w_cov, w_sec, w_pri, w_bar])
+	parts.append_array([w_cov, w_sec, w_pri])
 
 	# --- beak ---------------------------------------------------------------
 	# Hard keratin, so CLAW rather than SKIN: the claw model pipes light along the
@@ -431,14 +492,21 @@ static func build() -> S:
 	var beak_lo := _part(&"beak_lower", Vector2(0.452, -0.938), Vector2(0.654, -0.930), 0.048, 0.009, COL_BEAK_PALE, 2)
 	beak_lo.surface = P.Surface.CLAW
 	beak_lo.blend = 0.018
-	# The gape flange. At adult it is a 0.019 speck buried in the base of the bill
-	# and paints as a thin yellow rictus; at baby `baby_radius_scale` and the head
-	# bias between them multiply it past the bill's own radius so it stops being a
-	# marking and becomes a swollen fleshy corner. That single number is most of
-	# what makes the fledgling read as a fledgling.
-	var gape := _part(&"beak_gape", Vector2(0.462, -0.968), Vector2(0.492, -0.962), 0.016, 0.012, COL_GAPE, 2)
+	# The gape flange. The whole point of it is that it is a *fledgling* feature, so
+	# the adult radius is set by what should be invisible rather than by what looks
+	# right on a chick: at 0.008 it is a hairline of yellow skin in the crease where
+	# the mandibles meet the face, which is all an adult passerine has. At 0.016 —
+	# where it started — a head close-up showed a grown bird with a yellow patch on
+	# its bill like a permanent baby.
+	#
+	# `baby_radius_scale` then does the work in the other direction, and it has to be
+	# large because it is compensating for a deliberately tiny adult. Multiplied by
+	# the 1.45 head bias it swells past the bill's own radius, so it stops being a
+	# marking and becomes the swollen fleshy corner that makes a fledgling read as a
+	# fledgling.
+	var gape := _part(&"beak_gape", Vector2(0.462, -0.968), Vector2(0.492, -0.962), 0.008, 0.007, COL_GAPE, 2)
 	gape.surface = P.Surface.SKIN
-	gape.blend = 0.016
+	gape.blend = 0.012
 	# Natal down. Invisibly thin on an adult, a proper cowlick on a chick.
 	var down := _part(&"crest_down", Vector2(0.320, -1.086), Vector2(0.300, -1.134), 0.009, 0.004, COL_CREAM)
 	down.height_scale = 0.70
@@ -459,13 +527,15 @@ static func build() -> S:
 	for p in parts:
 		var id := String(p.id)
 		if id == "beak_gape":
-			p.baby_radius_scale = 2.20
+			p.baby_radius_scale = 3.80
 			p.baby_length_scale = 1.10
 			p.baby_offset = BABY_FACE_PUSH
 		elif id == "crest_down":
-			p.baby_radius_scale = 4.00
-			p.baby_length_scale = 2.40
-			p.baby_offset = Vector2(-0.022, -0.152)
+			# Shorter and blunter than it was. Natal down is a scruffy tuft, and at
+			# 2.4 length it came to a point and read as a little grey horn.
+			p.baby_radius_scale = 4.60
+			p.baby_length_scale = 1.60
+			p.baby_offset = Vector2(-0.022, -0.128)
 		elif id.begins_with("beak"):
 			# Short, blunt and stubby, but still clear of the skull.
 			p.baby_length_scale = 0.82
@@ -477,7 +547,10 @@ static func build() -> S:
 			# blunt-ended.
 			p.baby_length_scale = 0.46
 			p.baby_radius_scale = 1.45
-		elif id.begins_with("wing"):
+		elif id.begins_with("flank"):
+			# The folded wing — see the naming note above it. A fledgling's flight
+			# feathers are still half in their sheaths, so it is short and blunt, and
+			# too short to fly with, which is the point of the stage.
 			p.baby_length_scale = 0.55
 			p.baby_radius_scale = 1.50
 		elif id.begins_with("leg"):
@@ -498,12 +571,13 @@ static func build() -> S:
 
 	# Feather tract direction. Contour feathers sweep back and down along the
 	# body; a flight feather's rachis runs the length of the feather, which for
-	# the wing and tail capsules is simply their own axis. `pet_feather` indexes
-	# its barbs off this, so getting it wrong on the wing lays the barbs along the
-	# vane instead of across it and the whole thing reads as a painted shell.
+	# the wing (`flank_*`) and tail capsules is simply their own axis. `pet_feather`
+	# indexes its barbs off this, so getting it wrong on the wing lays the barbs
+	# along the vane instead of across it and the whole thing reads as a painted
+	# shell.
 	for p in parts:
 		var id := String(p.id)
-		if id.begins_with("wing") or id.begins_with("tail") or id.begins_with("beak") \
+		if id.begins_with("flank") or id.begins_with("tail") or id.begins_with("beak") \
 				or id.begins_with("crest") or id.begins_with("leg"):
 			p.groom_angle = (p.b - p.a).angle()
 		else:
@@ -534,11 +608,18 @@ static func build() -> S:
 	eye_near.socket_depth = 0.18
 	eye_near.lid_palette_index = COL_MANTLE
 
+	# The far eye is a hint, not a second eye. A bird's eyes sit on the sides of a
+	# round skull, so at this three-quarter angle the far one should be most of the
+	# way round the curve: a small dark bead, high, deep in its socket. Sitting where
+	# it first did — 0.046 lower than the near eye and two thirds its size — it came
+	# forward onto the cheek and read as a googly second eye rather than as the far
+	# side of a head. Raised nearly level with its partner and shrunk, it goes back
+	# to doing the only job it has, which is saying the skull has a far side.
 	var eye_far: E = E.new()
 	eye_far.id = &"eye_far"
 	eye_far.bone = &"head"
-	eye_far.center = Vector2(0.248, -0.966)
-	eye_far.radius = 0.026
+	eye_far.center = Vector2(0.258, -0.998)
+	eye_far.radius = 0.019
 	eye_far.tilt = 0.0
 	eye_far.iris_ratio = 0.93
 	eye_far.pupil_ratio = 0.62
@@ -546,7 +627,7 @@ static func build() -> S:
 	eye_far.iris_color = Color(0.17, 0.11, 0.08)
 	eye_far.limbal_color = Color(0.03, 0.02, 0.02)
 	eye_far.sclera_color = Color(0.86, 0.82, 0.77)
-	eye_far.socket_depth = 0.70
+	eye_far.socket_depth = 0.82
 	eye_far.lid_palette_index = COL_MANTLE
 
 	s.eyes = [eye_far, eye_near]

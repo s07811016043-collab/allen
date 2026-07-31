@@ -65,18 +65,24 @@ var _head_level := 0.0
 var _head_aim := 0.0
 var _prev_bob := 0.0
 var _bob_vel := 0.0
+var _prev_speed := 0.0
+var _carrier_accel := 0.0
 ## Mood tail carry, kept here rather than written straight into the chain: the
 ## idle layer wants to add its own wander to the same rest angle, and whichever
 ## of the two wrote last would otherwise erase the other.
 var _tail_carry := 0.0
 
 
+## `body_scale` is the creature's growth scale. The bind pose handed in has
+## already been scaled by it, so anything the gait reads out of the spec in
+## absolute units — the bob, which is authored against adult height — has to be
+## brought onto the same footing or a kitten inherits an adult's amplitude.
 func setup(spec: CreatureSpec, bind_parts: Array[SDFPart], bind_eyes: Array,
-		seed_value: int) -> void:
+		seed_value: int, body_scale: float = 1.0) -> void:
 	_spec = spec
 	skeleton = RigSkeleton.build(spec, bind_parts, bind_eyes)
 	legs = LegIK.gather(skeleton)
-	gait.setup(spec, legs)
+	gait.setup(spec, legs, body_scale)
 	idle.setup(spec, seed_value)
 	squash.setup(spec)
 	_cache_bones()
@@ -210,7 +216,18 @@ func _step(dt: float) -> void:
 	_pose_body(dt)
 	skeleton.update_pose()
 	_pose_legs()
+	# The creature crosses the desktop by moving its own node, which never touches
+	# a bone transform, so the chains cannot see it happen. Differentiate the speed
+	# the brain wrote and hand the result over: braking from a run is the textbook
+	# reason a tail keeps going, and until this existed it was the one event the
+	# springs were structurally unable to feel. Clamped and filtered because a
+	# scripted speed change is a step, and an undamped step here would fold a tail
+	# through the hips in a single frame.
+	_carrier_accel = lerpf(_carrier_accel,
+		clampf((speed - _prev_speed) / dt, -40.0, 40.0), clampf(dt * 20.0, 0.0, 1.0))
+	_prev_speed = speed
 	for c in chains:
+		c.carrier_accel = Vector2(_carrier_accel, 0.0)
 		c.advance(skeleton, dt)
 	_pose_ears()
 	_pose_tail()

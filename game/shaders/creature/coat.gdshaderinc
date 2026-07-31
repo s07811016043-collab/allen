@@ -45,10 +45,10 @@ struct Surf {
 // ---------------------------------------------------------------------------
 
 // A lane tier is honest down to roughly two pixels per lane; below that it can
-// only alias. Being timid about this threshold is what emptied the coat at body
-// scale: at ~320 px per rig unit the coarsest strand rung is already close to
-// two pixels a lane, so a cutoff at four or five removes every rung the body has
-// and leaves nothing but the clump field — which is exactly the smooth-clay read.
+// only alias. Being timid about this threshold is what empties the coat at the
+// small end: a desktop pet is often drawn at only 150 screen pixels to the rig
+// unit, and a cutoff at four or five pixels a lane removes every rung it has and
+// leaves nothing but the clump field — which is exactly the smooth-clay read.
 float pet_tier_fade(float px_per_lane) {
 	return smoothstep(1.25, 2.55, px_per_lane);
 }
@@ -128,16 +128,22 @@ float pet_fibre_tier(vec2 t, float pitch, float clump, float aspect, float seed,
 
 // The layered coat.
 //
-// Three strand rungs plus a clump field. The rungs sit a shade over two to one
-// apart rather than the two-and-a-half of a conventional mip chain, and each one
-// only hands its weight down once the rung below it is *comfortably* resolved
-// rather than merely present. Both choices exist to keep the coat off a lane
-// that is two pixels wide: handing over the instant a finer rung appears is what
-// put the entire body-scale coat on the sampling limit, and the beat between
-// that lane pitch and the pixel grid is the wavy filament pattern that made the
-// animal look like varnished timber.
+// A ladder of strand rungs plus a clump field, and the whole thing is arranged
+// so that at every size the pet is ever drawn there is a rung landing at two or
+// three screen pixels a lane. That is the entire design: a short coat has no
+// resolvable individual hairs at any of these magnifications, so what the eye is
+// actually given is a *grain*, and a grain only reads if its pitch stays near
+// the resolution limit. Let it coarsen and the animal wears corduroy; let it
+// vanish and the animal is clay.
 //
-// The clump is not a fixed rig-space frequency. A lock is "about ten hairs
+// Contrast is handled separately from pitch, and separating them is the fix for
+// the wood grain this replaces. The old coat drew a two-pixel lane at the same
+// contrast as a six-pixel one, so its sub-pixel bright core beat against the
+// pixel grid into long wavy filaments. Here the finest present rung still
+// carries the coat, but `amp` and the profile width below back its contrast off
+// as it approaches the limit — the same trade a mip level makes.
+//
+// The clump is not a fixed rig-space frequency. A lock is "about eight hairs
 // across", and which rung is currently standing in for a hair changes with the
 // zoom, so the clump pitch is derived from the rungs that are actually carrying
 // the coat. That holds the lock-to-strand ratio — the relationship the eye reads
@@ -181,9 +187,15 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	if (f2 > 0.002) { h2 = pet_fibre_tier(t, pitch2, 0.90, 7.0, 19.0, 1.0 - k2, d2, r2, n2); }
 	if (f3 > 0.002) { h3 = pet_fibre_tier(t, pitch3, 0.90, 7.5, 43.0, 1.0 - k3, d3, r3, n3); }
 
-	float w0 = f0 * (1.0 - 0.72 * k1);
-	float w1 = f1 * (1.0 - 0.72 * k2);
-	float w2 = f2 * (1.0 - 0.72 * k3);
+	// Each rung hands most of its weight down as soon as the next one is *present*,
+	// not once it is crisp, so the coat is always carried by the finest grain the
+	// frame can hold — which is what keeps the apparent hair density the same at
+	// every zoom instead of coarsening as the pet shrinks. The moire that rule
+	// used to cause is dealt with where it belongs, in `amp` and in the profile
+	// width, rather than by refusing to draw the fine rung at all.
+	float w0 = f0 * (1.0 - 0.72 * f1);
+	float w1 = f1 * (1.0 - 0.72 * f2);
+	float w2 = f2 * (1.0 - 0.72 * f3);
 	float w3 = f3;
 	float wsum = w0 + w1 + w2 + w3;
 	float inv = 1.0 / max(wsum, 1e-4);
@@ -202,7 +214,7 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 	float lean = (w0 * n0 + w1 * n1 + w2 * n2 + w3 * n3) * inv;
 	float rnd = (w0 * r0 + w1 * r1 + w2 * r2 + w3 * r3) * inv;
 
-	// The lock: ten strand widths across and stubby, four times as long as it is
+	// The lock: some eight strands across and stubby, four times as long as it is
 	// wide, because a lock is a stubby thing and a long one is only corduroy at a
 	// bigger scale. It is a fibre tier rather than a blob of fractal noise for
 	// one reason — fractal noise has no strands in it, so it can only ever be
@@ -239,7 +251,7 @@ Coat pet_fur(vec2 p, vec2 groom, float density, float px, float fluffy) {
 
 	// Slopes are divided by their own pitch so a fine rung does not tilt the
 	// normal harder than a coarse one just for being denser. The lock gets a
-	// tenth of the strands' amplitude: a lock is a parting in the coat, not a
+	// quarter of the strands' amplitude: a lock is a parting in the coat, not a
 	// ridge in the flesh, and given real relief it becomes a row of sausages.
 	c.slope = across * fluffy * amp * inv
 		* (0.034 * w0 * d0 / pitch0 + 0.032 * w1 * d1 / pitch1

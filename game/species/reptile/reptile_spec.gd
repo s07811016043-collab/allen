@@ -14,7 +14,7 @@ extends RefCounted
 ## bearded dragon has four things a cat, a dog and a bird all lack — a head that
 ## is a flat wedge wider than it is tall, a spiny gular pouch under the jaw, a
 ## keratin skirt along the flank, and limbs that go *out* before they go down.
-## Every one of those survives being 110 px tall.
+## Every one of those survives being 118 px tall.
 ##
 ## Built in code rather than as a .tres so a species reads as a document: you can
 ## see the whole animal's proportions in one screen and diff a change to its
@@ -39,6 +39,7 @@ const COL_LIP := 6
 const COL_LIMB := 7
 const COL_TOE := 8
 const COL_CLAW := 9
+const COL_TAILBAND := 10
 
 
 static func _part(id: StringName, a: Vector2, b: Vector2, ra: float, rb: float,
@@ -80,7 +81,7 @@ static func build() -> S:
 		                              # dark pigment on top of that turns the off
 		                              # limbs into holes
 		Color(0.730, 0.428, 0.198),   # rust saddle over the hips
-		Color(0.700, 0.642, 0.548),   # ventral scutes: warm sand
+		Color(0.722, 0.664, 0.566),   # ventral scutes: warm sand
 		Color(0.612, 0.548, 0.448),   # keratin: nuchal row, lateral fringe
 		Color(0.238, 0.200, 0.186),   # gular pouch. Smoky rather than black: a
 		                              # relaxed beard is grey and only goes to ink
@@ -89,6 +90,17 @@ static func build() -> S:
 		Color(0.520, 0.386, 0.252),   # limbs
 		Color(0.548, 0.482, 0.392),   # toes, dry and bleached
 		Color(0.185, 0.160, 0.140),   # claws
+		Color(0.300, 0.206, 0.124),   # caudal band. Its own slot rather than
+		                              # reusing the far-side brown, because those
+		                              # two want opposite things: the far side has
+		                              # to stay light or the off limbs become holes
+		                              # in the animal, while a band has to be much
+		                              # darker than looks right on the swatch. The
+		                              # key plus the sky plus the bounce lift a
+		                              # midtone a long way, and a band authored one
+		                              # step under the dorsum came back out the same
+		                              # colour as the dorsum. This is 45 per cent of
+		                              # its luminance and only just reads
 	])
 
 	s.adult_height = 1.0
@@ -112,10 +124,10 @@ static func build() -> S:
 	# as hard, and this is the number that had to be found by looking rather than
 	# by reasoning: 0.92 puts the plate at 3.9 px on the desktop, a quarter of the
 	# way up the ramp, and the pet renders as a smooth clay toy with no surface at
-	# all. 0.74 is the compromise — a 0.041-unit plate, 4.8 px and about seventy
+	# all. 0.68 is the compromise — a 0.044-unit plate, 5.2 px and about eighty
 	# per cent faded in at 118 px/unit, so the desktop gets a dry pebbled hide,
 	# and it resolves into individual shingles when the pet is scaled up.
-	s.coat_density = 0.74
+	s.coat_density = 0.68
 	# A reptile is dry. The only places light gets through are the toes, the
 	# trailing edge of the beard and the last centimetre of tail, and the body
 	# shader gates transmission on part radius and flatness — so keeping the
@@ -209,7 +221,25 @@ static func build() -> S:
 	# between the Λ and the belly is the whole silhouette.
 	#
 	# Withers sit at y = -1.00, the skull crown reaches -0.98, the belly bottoms
-	# out at -0.31, and the body spans x = -4.18 (tail tip) to +1.46 (snout).
+	# out at -0.31, and the body spans x = -4.16 (tail tip) to +1.44 (snout).
+	#
+	# One more thing constrains the numbers below, and it is invisible until you
+	# render the head. `CreatureRenderer._pack_landmarks` finds the scapula and
+	# the hip point geometrically — anything thinner than 0.62 of the widest body
+	# part whose lower end hangs below the trunk's midline is taken for a limb
+	# root, and roots within `core_r * 2.2` of each other in x are one limb. Those
+	# thresholds are calibrated on a cat, whose whole body is 1.9 units long. On
+	# an animal 5.6 units long the tolerance is a tenth of the body, so the jaw
+	# and the gular pouch came out as a limb of their own and the renderer stamped
+	# a scapula dome across the snout: a smooth bald crater in the middle of the
+	# face, which is exactly as bad as it sounds.
+	#
+	# Three numbers below exist to steer that heuristic and are marked where they
+	# occur: the jaw's axis is kept above the trunk midline so it is not a root at
+	# all, the beard's tip and the belly's tip are placed so the beard falls
+	# inside the *foreleg's* cluster, and the tail's first joint sits close enough
+	# to the hip to fall inside the hind leg's. What comes out is two landmarks,
+	# on the shoulder and on the hip, which is what the feature is for.
 
 	# --- far-side limbs (drawn behind the torso) ----------------------------
 	# Three segments each, not two, and it is a rig constraint rather than an
@@ -248,10 +278,10 @@ static func build() -> S:
 	# 0.31 of clear air they need underneath.
 	var hip := _part(&"hip", Vector2(-1.42, -0.660), Vector2(-0.98, -0.672), 0.290, 0.315, COL_BAND)
 	hip.blend = 0.095
-	hip.height_scale = 1.10
+	hip.height_scale = 1.15
 	var torso := _part(&"torso", Vector2(-0.98, -0.672), Vector2(-0.16, -0.678), 0.315, 0.320, COL_HIDE)
 	torso.blend = 0.100
-	torso.height_scale = 1.12
+	torso.height_scale = 1.18
 	# Runs all the way up under the skull. There is no neck capsule, and that is
 	# deliberate rather than a budget casualty: a beardie's nuchal row carries
 	# straight off the back of the head onto the shoulder with no waist in
@@ -259,35 +289,42 @@ static func build() -> S:
 	# not have. The gular pouch fills the underside of the same junction.
 	var chest := _part(&"chest", Vector2(-0.16, -0.678), Vector2(0.54, -0.700), 0.320, 0.255, COL_HIDE)
 	chest.blend = 0.095
-	chest.height_scale = 1.10
+	chest.height_scale = 1.15
 	# The belly is its own volume slung under the trunk, not a colour band on it.
 	# It has to bottom out below the flank — a lizard's weight sits on its gut —
 	# but only just: 0.05 proud of a trunk that is already the lowest of any
 	# species here. Push it further and the elbows have nowhere left to be.
-	var belly := _part(&"belly", Vector2(-0.88, -0.452), Vector2(0.08, -0.470), 0.140, 0.128, COL_BELLY)
+	var belly := _part(&"belly", Vector2(-0.88, -0.452), Vector2(0.14, -0.470), 0.140, 0.128, COL_BELLY)
 	belly.blend = 0.085
 	parts.append_array([hip, torso, chest, belly])
 
 	# --- head ---------------------------------------------------------------
 	# A flat wedge, and the wedge is in the *height field*: 0.39 deep in
-	# silhouette against 0.57 wide across, so `height_scale` runs to 1.35 — the
+	# silhouette against 0.57 wide across, so `height_scale` runs to 1.26 — the
 	# highest number in the file. Read in profile the skull is a broad triangle
 	# widest at the jaw hinge and tapering to a blunt snout, and it is carried
 	# level with the back rather than lifted like a cat's.
+	#
+	# It is worth knowing why the head does not go flatter still. `pet_scale`
+	# offsets its tiling by the surface normal to fake plate thickness, so the
+	# taller the height field the harder the plates shear as the surface turns —
+	# past about 1.3 the squamation stops tiling and smears into a smooth patch
+	# on the cheek. 1.26 is where the wedge is as deep as it can be while the
+	# scales still hold.
 	var skull := _part(&"head", Vector2(0.70, -0.800), Vector2(1.00, -0.815), 0.195, 0.160, COL_HIDE)
 	skull.blend = 0.072
-	skull.height_scale = 1.18
+	skull.height_scale = 1.26
 	# The jaw hinge. A beardie's head is at its widest and deepest behind the eye,
 	# where the adductor muscle packs out the cheek, and without this capsule the
 	# skull tapers evenly from back to front and reads as a crocodile.
 	var cheek := _part(&"cheek", Vector2(0.68, -0.735), Vector2(0.86, -0.748), 0.150, 0.120, COL_HIDE)
 	cheek.blend = 0.062
-	cheek.height_scale = 1.10
+	cheek.height_scale = 1.14
 	# Blunt, not pointed. A beardie's snout ends in a rounded square; taper it to a
 	# real point and the head stops being a wedge and becomes a monitor lizard's.
 	var muzzle := _part(&"muzzle", Vector2(1.00, -0.815), Vector2(1.33, -0.802), 0.160, 0.114, COL_HIDE)
 	muzzle.blend = 0.052
-	muzzle.height_scale = 1.06
+	muzzle.height_scale = 1.10
 	# The jaw line. Authored to hang 0.02–0.04 proud of the skull's lower edge
 	# rather than inside it, so it is real geometry with a smooth-union crease
 	# along its top instead of a painted stripe — that crease *is* the jaw line,
@@ -295,7 +332,11 @@ static func build() -> S:
 	# gradient. It converges on the skull toward the snout, because that is where
 	# a closed mouth actually meets. Pale, because a beardie's lower lip is
 	# bone-coloured and the boundary is one of the few hard edges on the animal.
-	var chin := _part(&"chin", Vector2(0.80, -0.672), Vector2(1.32, -0.726), 0.100, 0.052, COL_LIP)
+	#
+	# Landmark steering: the axis is kept at -0.700, just above the trunk's
+	# midline at -0.675, so the jaw is not mistaken for a limb root. The visible
+	# overhang comes from the radius instead, which the root test does not read.
+	var chin := _part(&"chin", Vector2(0.80, -0.700), Vector2(1.30, -0.745), 0.118, 0.060, COL_LIP)
 	chin.blend = 0.020
 	chin.height_scale = 1.02
 	parts.append_array([skull, cheek, muzzle, chin])
@@ -309,9 +350,13 @@ static func build() -> S:
 	# species translucency at 0.14 the beard's trailing edge is one of the only
 	# places on the animal that lights up from behind.
 	#
-	# It stops at x = 1.09, well short of the 1.46 snout tip. The first pass ran
+	# It stops at x = 1.10, well short of the 1.44 snout tip. The first pass ran
 	# it forward to 1.25 and it read as a slug crawling up the animal's face.
-	var dewlap := _part(&"dewlap", Vector2(0.72, -0.558), Vector2(1.06, -0.628), 0.136, 0.076, COL_BEARD)
+	#
+	# The tip's x is also one of the three landmark-steering numbers: at 1.02 the
+	# beard's root falls inside the foreleg's cluster, and at 1.06 it starts one
+	# of its own and the renderer puts a scapula on the snout.
+	var dewlap := _part(&"dewlap", Vector2(0.72, -0.558), Vector2(1.02, -0.628), 0.136, 0.076, COL_BEARD)
 	dewlap.blend = 0.030
 	dewlap.height_scale = 0.78
 	parts.append_array([dewlap])
@@ -369,12 +414,15 @@ static func build() -> S:
 	# The alternating palette is the caudal banding. Three bands across 2.6 units
 	# is coarser than life, but at 118 px/unit a truer eight-band pattern would be
 	# four pixels a band, and banding you cannot resolve is just noise.
-	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.36, -0.540), 0.250, 0.146, COL_HIDE)
+	# Landmark steering again: the first joint sits at -2.10 rather than further
+	# back so its root falls inside the hind leg's cluster. Past about -2.20 it
+	# claims a landmark slot of its own and a scapula dome lands on the tail.
+	var tail_0 := _part(&"tail_0", Vector2(-1.50, -0.640), Vector2(-2.10, -0.556), 0.250, 0.168, COL_HIDE)
 	tail_0.blend = 0.070
 	tail_0.height_scale = 1.02
-	var tail_1 := _part(&"tail_1", Vector2(-2.36, -0.540), Vector2(-3.24, -0.352), 0.146, 0.074, COL_HIDE_DARK)
+	var tail_1 := _part(&"tail_1", Vector2(-2.10, -0.556), Vector2(-3.06, -0.360), 0.168, 0.076, COL_TAILBAND)
 	tail_1.blend = 0.048
-	var tail_2 := _part(&"tail_2", Vector2(-3.24, -0.352), Vector2(-4.16, -0.108), 0.074, 0.020, COL_HIDE)
+	var tail_2 := _part(&"tail_2", Vector2(-3.06, -0.360), Vector2(-4.16, -0.108), 0.076, 0.020, COL_HIDE)
 	tail_2.blend = 0.026
 	parts.append_array([tail_0, tail_1, tail_2])
 

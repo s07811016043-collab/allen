@@ -31,6 +31,11 @@ Then **look at the PNG with the Read tool**. Do not claim a visual result you
 have not seen. A capture that prints `CAPTURE_OK` but that you never opened is
 not evidence of anything.
 
+**Review at ship size first.** The pet lives on a desktop at roughly 150-300 px
+tall. Reviewing only at 640-720 px is how a coat that turns into plank grain at
+ship size passed inspection for three rounds. Render `--size=260x260` before you
+render anything else; zoom in only to diagnose what the small shot told you.
+
 Captures cost ~3 s each at 560x560 (software rasteriser). Larger frames scale
 roughly with pixel count; 900x900 is about 8 s. Budget accordingly, but never
 skip looking.

@@ -131,7 +131,7 @@ func _rebuild(p_growth: float, seed_value: int) -> void:
 		_copy_eye(_bind_eyes[i], renderer.live_eyes[i])
 
 	rig = Rig.new()
-	rig.setup(spec, _bind_parts, _bind_eyes, seed_value)
+	rig.setup(spec, _bind_parts, _bind_eyes, seed_value, spec.scale_at(p_growth))
 	rig.settle()
 	_growth_built = p_growth
 	growth_value = p_growth
@@ -215,7 +215,7 @@ func _emit_footfalls() -> void:
 ## the species' walking and running speed; the rig chooses the gait.
 func move_to(target: Vector2, pace: float = 0.35) -> void:
 	_target = target
-	_target_speed = lerpf(spec.walk_speed, spec.run_speed, clampf(pace, 0.0, 1.0))
+	_target_speed = pace_speed(pace)
 
 
 func stop() -> void:
@@ -250,11 +250,21 @@ func set_gait(gait_name: StringName) -> void:
 
 func _speed_for_gait(kind: int) -> float:
 	match kind:
-		Gait.Kind.WALK: return spec.walk_speed
-		Gait.Kind.TROT: return lerpf(spec.walk_speed, spec.run_speed, 0.42)
-		Gait.Kind.RUN: return spec.run_speed
-		Gait.Kind.HOP: return lerpf(spec.walk_speed, spec.run_speed, 0.55)
+		Gait.Kind.WALK: return pace_speed(0.0)
+		Gait.Kind.TROT: return pace_speed(0.42)
+		Gait.Kind.RUN: return pace_speed(1.0)
+		Gait.Kind.HOP: return pace_speed(0.55)
 	return 0.0
+
+
+## Ground speed for a pace in [0, 1], from a stroll to a flat sprint.
+##
+## The spec authors both speeds at adult scale, and the gait's stride scales with
+## growth — so this has to as well, or a kitten covers an adult's ground on a
+## kitten's stride and has to take two and a half times the step rate to do it.
+func pace_speed(pace: float) -> float:
+	return lerpf(spec.walk_speed, spec.run_speed, clampf(pace, 0.0, 1.0)) \
+		* spec.scale_at(growth_value)
 
 
 ## Look at a point in this node's parent space. Named `look_at_point` rather than

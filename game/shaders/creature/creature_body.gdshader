@@ -353,10 +353,17 @@ vec4 shade_layer(Field f, vec2 p, LayerCtx ctx) {
 	// A marking still has thickness: nose leather and paw pads stand proud of
 	// the coat around them, and the inside of an ear is a shallow bowl. Give the
 	// painted part its own low dome so it is not a flat sticker.
+	//
+	// Only the small ones, though. A patch the size of a nose is an *object* and
+	// wants an edge; a patch the size of a belly is a *region* of different coat,
+	// and giving that one a raised lip draws a hard line all the way round the
+	// animal's underside where there should be nothing but a change of colour.
+	// The gate is a ratio against body height so it means the same for a kitten.
 	if (f.decal_w > 0.01) {
+		float small = 1.0 - smoothstep(0.026, 0.048, f.decal_r / ctx.body_h);
 		float ud = clamp(1.0 + f.decal_d / max(f.decal_r, 1e-4), 0.0, 1.0);
 		float sud = sqrt(max(1.0 - ud * ud, 0.0));
-		nxy += f.decal_grad * (0.40 * ud / max(sud, 0.42)) * f.decal_w;
+		nxy += f.decal_grad * (0.36 * ud / max(sud, 0.46)) * f.decal_w * small;
 	}
 
 	// --- groom field --------------------------------------------------------

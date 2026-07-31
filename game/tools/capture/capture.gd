@@ -21,9 +21,13 @@ extends Node2D
 ##   --focus=<x,y>       rig-space point to centre in frame, e.g. `0.40,-0.78`
 ##                       for a head close-up. Combine with --zoom.
 ##   --focus=head        shorthand: centres on the first eye
-##   --anim=<name>       walk | trot | run | hop | idle | startle. Drives the rig
-##                       at the speed that gait is actually meant for, so foot
-##                       planting in the shot is the real thing.
+##   --anim=<name>       walk | trot | run | hop | idle | startle | stop. Drives
+##                       the rig at the speed that gait is actually meant for, so
+##                       foot planting in the shot is the real thing. `stop` trots
+##                       and then brakes to a standstill part-way through, which is
+##                       the only way to see whether the tail lags the hips and
+##                       overshoots — at a constant speed nothing decelerates and
+##                       the question cannot be asked.
 ##   --t=<seconds>       advance the rig deterministically to this time before
 ##                       capturing. With --strip it is the start of the sheet.
 ##   --strip=<n>         contact sheet: n evenly spaced frames of one gait cycle
@@ -53,6 +57,10 @@ const TICK := 1.0 / 120.0
 const WARMUP_CYCLES := 2.0
 ## Ground ruler spacing in rig units. A planted foot must not move between ticks.
 const RULER_STEP := 0.1
+## When `--anim=stop` cuts the drive. Fixed rather than a fraction of the window,
+## so every cell of a sheet brakes at the same instant and the frames line up as
+## one continuous event.
+const STOP_AT := 0.5
 
 ## Rig-space padding added around the measured pose before fitting. Coat fringe
 ## and rim light live just outside the capsule surface, and a silhouette that
@@ -377,7 +385,7 @@ func _frame_times() -> PackedFloat32Array:
 		# one-shot, and two "cycles" of settling put the sheet two and a half
 		# seconds past the startle it exists to show — six identical frames of a
 		# cat standing still, which is exactly what it produced.
-		begin = 0.0 if anim == &"startle" else cycle * WARMUP_CYCLES
+		begin = 0.0 if anim in [&"startle", &"stop"] else cycle * WARMUP_CYCLES
 	for i in count:
 		out.append(begin + cycle * float(i) / float(count))
 	return out
@@ -390,11 +398,13 @@ func _cycle_seconds() -> float:
 	# show the whole event: a startle resolves in about a second.
 	match anim:
 		&"startle": return 1.2
+		# Long enough to cover the approach, the brake and the settle after it.
+		&"stop": return 1.5
 		&"", &"idle": return 4.0
-	var probe := Gait.new()
-	probe.setup(_spec, [])
+	var g := Gait.new()
+	g.setup(_spec, [], _spec.scale_at(growth))
 	var v := _speed_for(anim)
-	var f := probe.frequency_for(v)
+	var f := g.frequency_for(v)
 	return 1.0 / maxf(f, 0.2)
 
 
@@ -412,15 +422,23 @@ func _speed_for(a: StringName) -> float:
 ## ground scrolls under it is exactly the walking-on-a-treadmill view a reviewer
 ## wants: a planted foot slides backwards at precisely the body's speed.
 func _drive(c: Creature, t: float) -> void:
-	if anim != &"" and anim != &"startle":
-		c.set_gait(anim)
-	elif anim == &"startle":
-		c.set_gait(&"idle")
-		c.play_reaction(&"startle", 1.0)
+	match anim:
+		&"startle":
+			c.set_gait(&"idle")
+			c.play_reaction(&"startle", 1.0)
+		&"stop":
+			c.set_gait(&"trot")
+		&"":
+			pass
+		_:
+			c.set_gait(anim)
 	if pose == &"look" :
 		c.look_at_point(c.position + Vector2(240.0, -80.0))
 	var steps: int = clampi(int(round(maxf(t, 0.0) / TICK)), 0, 6000)
-	for _i in steps:
+	var brake_step: int = int(round(STOP_AT / TICK)) if anim == &"stop" else -1
+	for i in steps:
+		if i == brake_step:
+			c.set_gait(&"idle")
 		c.tick(TICK)
 
 
@@ -639,7 +657,11 @@ class _StripOverlay:
 					var ankle: Vector2 = c.position + c.rig.skeleton.bones[chain.ankle_bone].xform.origin * px
 					draw_line(ankle - Vector2(5, 0), ankle + Vector2(5, 0), col, 1.0)
 					draw_line(ankle - Vector2(0, 5), ankle + Vector2(0, 5), col, 1.0)
-				if not f.stance:
+				# `plant_ground` is only meaningful while a gait is running. At idle it
+				# holds wherever the foot last landed, which on a `stop` sheet drew
+				# markers metres from the paws standing over them and read as a slide
+				# that is not happening.
+				if not f.stance or gait.frequency <= 0.0:
 					continue
 				var fx: float = mid + (f.plant_ground - gait.travel) * px
 				draw_line(Vector2(fx, ground_y - 8.0), Vector2(fx, ground_y + 8.0), col, 1.5)

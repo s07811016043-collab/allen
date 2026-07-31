@@ -55,6 +55,15 @@ var inertia := 1.0
 ## Per-joint travel limit in radians (ANGULAR) or rig units (OFFSET), so a
 ## violent stop cannot fold a tail through the body.
 var limit := 0.9
+## Acceleration of the whole creature through the world, rig units/s², written by
+## the rig each step.
+##
+## Without it the chain is deaf to the one event it exists for. `_track_driver`
+## watches a bone's transform *in rig space*, and a creature travelling across the
+## desktop does that by moving its own node — so the hips braking from a run to a
+## standstill produce exactly zero change in any bone the chain can see, and the
+## tail that is supposed to keep going simply does not move.
+var carrier_accel := Vector2.ZERO
 ## Musculature thins toward the tip: each joint further out is this much softer
 ## and this much lighter, which is why the last third of a tail whips hardest.
 var falloff := 1.18
@@ -165,8 +174,11 @@ func _step(skeleton: RigSkeleton, h: float) -> void:
 	for l in links:
 		var k: float = maxf(stiffness * soft, 1e-4)
 		var c := 2.0 * damping * sqrt(k)
-		# Pseudo-force in the accelerating frame, plus real gravity. +y is down.
-		var force := (Vector2(0.0, gravity) - _accel * inertia) / soft
+		# Pseudo-force in the accelerating frame, plus real gravity. +y is down. The
+		# frame accelerates for two independent reasons — the hips moving inside the
+		# body, and the whole body moving through the world — and the chain has to
+		# feel both or a stop reads as a freeze.
+		var force := (Vector2(0.0, gravity) - (_accel + carrier_accel) * inertia) / soft
 		if mode == Mode.OFFSET:
 			var acc2 := -k * (l.pos - l.bias2) - c * l.vel2 + force
 			l.vel2 += acc2 * h

@@ -1,10 +1,14 @@
 extends Node2D
 
-## Temporary proportion probe for the bird. Deleted before hand-off.
+## Proportion and shading-scale probe for the bird.
 ##
-## Two jobs. It prints the proportions per growth stage so they can be checked
-## against the reference figures in `bird_spec.gd`, and it reports the *effective*
-## `px_per_unit` a capture will actually shade with.
+## Kept rather than deleted, because two of the numbers it prints are ones this
+## species was got wrong by guessing at, and both are invisible in a capture.
+##
+## It prints the proportions per growth stage so they can be checked against the
+## reference figures in `bird_spec.gd`; it names the lowest posed part, which is
+## how the leg chain was found to be planting a hip joint on the ground; and it
+## reports the *effective* `px_per_unit` a capture will actually shade with.
 ##
 ## The second one is not obvious and it matters more. `CreatureRenderer` hands the
 ## shader `spec.pixels_per_unit * view_scale`, and the capture harness sets that
@@ -37,11 +41,15 @@ func _ready() -> void:
 		var mn := Vector2(INF, INF)
 		var mx := Vector2(-INF, -INF)
 		var lowest := -1e9
+		var lowest_id := &""
 		for p in c.renderer.live_parts:
 			var r: float = maxf(p.radius_a, p.radius_b) + p.blend
 			mn = mn.min((p.a - Vector2(r, r)).min(p.b - Vector2(r, r)))
 			mx = mx.max((p.a + Vector2(r, r)).max(p.b + Vector2(r, r)))
-			lowest = maxf(lowest, maxf(p.a.y + p.radius_a, p.b.y + p.radius_b))
+			var low: float = maxf(p.a.y + p.radius_a, p.b.y + p.radius_b)
+			if low > lowest:
+				lowest = low
+				lowest_id = p.id
 		mn -= Vector2(POSE_MARGIN, POSE_MARGIN)
 		mx += Vector2(POSE_MARGIN, POSE_MARGIN)
 		mn.y = minf(mn.y, 0.0)
@@ -50,8 +58,23 @@ func _ready() -> void:
 
 		var h: float = -mn.y
 		var l: float = extent.x
-		print("growth=%.0f  H=%.3f  L=%.3f  L/H=%.2f  lowest_y=%+.4f  front=%+.3f rear=%+.3f"
-			% [g, h, l, l / h, lowest, mx.x, mn.x])
+		print("growth=%.0f  H=%.3f  L=%.3f  L/H=%.2f  lowest_y=%+.4f (%s)  front=%+.3f rear=%+.3f"
+			% [g, h, l, l / h, lowest, lowest_id, mx.x, mn.x])
+
+		# Posed positions, not the bind pose. The rig rewrites `a`/`b` from the
+		# fitted bones, so any geometry reasoned about from the authored numbers
+		# alone (does the wing tip clear the tail? does the pale reach the flank
+		# line?) is answering a question about a pose that never reaches the screen.
+		if g == 3.0:
+			for id in [&"flank_covert", &"flank_secondary",
+					&"flank_primary", &"flank_covert_bar", &"flank_far_primary",
+					&"leg_hind_near_lower", &"leg_hind_near_cannon",
+					&"leg_hind_near_toe", &"leg_hind_near_hallux",
+					&"tail_0", &"belly", &"rump", &"torso"]:
+				for p in c.renderer.live_parts:
+					if p.id == id:
+						print("    %-22s a=(%+.3f,%+.3f) r=%.3f   b=(%+.3f,%+.3f) r=%.3f"
+							% [id, p.a.x, p.a.y, p.radius_a, p.b.x, p.b.y, p.radius_b])
 
 		for size in [300.0, 560.0, 900.0]:
 			var box: float = size - CELL_INSET * 2.0
